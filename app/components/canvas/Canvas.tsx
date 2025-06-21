@@ -22,7 +22,9 @@ import { toast } from "sonner";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { Button } from "~/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Twitter, Upload, GripVertical } from "lucide-react";
+import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
+import { extractFramesFromVideo } from "~/lib/video-frames";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
@@ -39,6 +41,14 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   const [transcriptionVersion, setTranscriptionVersion] = useState(0);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    // Get initial state from localStorage
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("canvas-sidebar-collapsed");
+      return saved === "true";
+    }
+    return false;
+  });
   
   // Use refs to access current values in callbacks
   const nodesRef = useRef(nodes);
@@ -52,6 +62,11 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   useEffect(() => {
     edgesRef.current = edges;
   }, [edges]);
+  
+  // Save sidebar collapsed state
+  useEffect(() => {
+    localStorage.setItem("canvas-sidebar-collapsed", String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
   
   // Convex queries
   const canvasState = null; // Temporarily disabled to ensure DB loading works
@@ -71,16 +86,14 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   
   // Convex actions for AI
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
+  const generateThumbnail = useAction(api.thumbnail.generateThumbnail);
   const transcribeVideo = useAction(api.transcription.transcribeVideo);
 
   // Handle content generation for an agent node
   const handleGenerate = useCallback(async (nodeId: string) => {
-    console.log("handleGenerate called for:", nodeId);
-    console.log("Current nodes:", nodesRef.current.map(n => n.id));
     const agentNode = nodesRef.current.find(n => n.id === nodeId);
     if (!agentNode) {
       console.error("Agent node not found:", nodeId);
-      console.error("Available nodes:", nodesRef.current.map(n => ({ id: n.id, type: n.type })));
       return;
     }
     
@@ -149,14 +162,52 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         targetAudience: "General audience",
       };
       
-      // Generate content - pass videoId for fresh data lookup
-      const result = await generateContent({
-        agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets",
-        videoId: videoNode?.data.videoId as any, // Pass the video ID
-        videoData,
-        connectedAgentOutputs,
-        profileData,
-      });
+      // Generate content based on agent type
+      let result: string;
+      let thumbnailUrl: string | undefined;
+      
+      if (agentNode.data.type === "thumbnail" && videoNode?.data.videoUrl) {
+        // For thumbnail agent, extract frames and use vision API
+        toast.info("Extracting video frames for thumbnail generation...");
+        
+        // Get the video file from URL
+        const videoResponse = await fetch(videoNode.data.videoUrl);
+        const videoBlob = await videoResponse.blob();
+        const videoFile = new File([videoBlob], "video.mp4", { type: videoBlob.type });
+        
+        // Extract frames from video
+        const frames = await extractFramesFromVideo(videoFile, { 
+          count: 3,
+          onProgress: (progress) => {
+            // Could update UI with progress here
+          }
+        });
+        
+        // Generate thumbnail with vision API
+        const thumbnailResult = await generateThumbnail({
+          agentType: "thumbnail",
+          videoId: videoNode?.data.videoId as Id<"videos"> | undefined,
+          videoFrames: frames.map(f => ({
+            dataUrl: f.dataUrl,
+            timestamp: f.timestamp,
+          })),
+          videoData,
+          connectedAgentOutputs,
+          profileData,
+        });
+        
+        result = thumbnailResult.concept;
+        thumbnailUrl = thumbnailResult.imageUrl;
+      } else {
+        // Use regular content generation for other agent types
+        result = await generateContent({
+          agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets",
+          videoId: videoNode?.data.videoId as Id<"videos"> | undefined,
+          videoData,
+          connectedAgentOutputs,
+          profileData,
+        });
+      }
       
       // Update node with generated content
       setNodes((nds) =>
@@ -167,6 +218,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
                 data: {
                   ...node.data,
                   draft: result,
+                  thumbnailUrl: thumbnailUrl,
                   status: "ready",
                 },
               }
@@ -177,9 +229,10 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       // Save to database if the node has an agentId
       if (agentNode.data.agentId) {
         await updateAgentDraft({
-          id: agentNode.data.agentId,
+          id: agentNode.data.agentId as Id<"agents">,
           draft: result,
           status: "ready",
+          thumbnailUrl: thumbnailUrl,
         });
       }
       
@@ -487,13 +540,13 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       toast.success("Video uploaded successfully!");
       
       // Step 5: Start transcription
-      toast.info("Starting transcription...");
-      transcribeVideo({
-        videoId: video._id,
-        storageId: storageId,
-      }).then(() => {
-        toast.success("Video transcribed successfully!");
-        // Update node to show transcription is complete
+      const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+      
+      if (file.size > MAX_FILE_SIZE) {
+        // File is too large, need to extract audio
+        toast.info("Video is large. Extracting audio for transcription...");
+        
+        // Update node to show audio extraction
         setNodes((nds) => 
           nds.map((node) => 
             node.id === `video_${video._id}`
@@ -501,42 +554,154 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
                   ...node,
                   data: {
                     ...node.data,
-                    isTranscribing: false,
-                    hasTranscription: true,
+                    isExtracting: true,
                   },
                 }
               : node
           )
         );
-        // Force a re-render to pick up the new transcription data
-        setTranscriptionVersion(v => v + 1);
-      }).catch((error) => {
-        console.error("Transcription error:", error);
-        // Show specific error message if available
-        const errorMessage = error.message || "Failed to transcribe video";
-        if (errorMessage.includes("too large")) {
-          toast.error("Video is too large for transcription (max 25MB). You can still generate content without transcription.");
-        } else if (errorMessage.includes("OPENAI_API_KEY")) {
-          toast.error("OpenAI API key not configured. Content will be generated without transcription.");
-        } else {
-          toast.error(`Transcription failed: ${errorMessage}`);
+        
+        try {
+          // Extract audio from video
+          const audioFile = await extractAudioFromVideo(file, (progress) => {
+            // Update extraction progress
+            setNodes((nds) => 
+              nds.map((node) => 
+                node.id === `video_${video._id}`
+                  ? {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        extractionProgress: Math.round(progress * 100),
+                      },
+                    }
+                  : node
+              )
+            );
+          });
+          
+          toast.success("Audio extracted! Uploading for transcription...");
+          
+          // Upload extracted audio
+          const audioUploadUrl = await generateUploadUrl();
+          const audioUploadResult = await fetch(audioUploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": audioFile.type },
+            body: audioFile,
+          });
+          
+          if (!audioUploadResult.ok) throw new Error("Audio upload failed");
+          
+          const { storageId: audioStorageId } = await audioUploadResult.json();
+          
+          // Update node - extraction complete, now transcribing
+          setNodes((nds) => 
+            nds.map((node) => 
+              node.id === `video_${video._id}`
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      isExtracting: false,
+                      isTranscribing: true,
+                      extractionProgress: undefined,
+                    },
+                  }
+                : node
+            )
+          );
+          
+          // Transcribe the extracted audio
+          await transcribeVideo({
+            videoId: video._id,
+            storageId: audioStorageId,
+            fileType: 'audio',
+          });
+          
+          toast.success("Video transcribed successfully!");
+          
+        } catch (error: any) {
+          console.error("Audio extraction/transcription error:", error);
+          toast.error(`Failed to process video: ${error.message}`);
+          
+          // Update node to show failure
+          setNodes((nds) => 
+            nds.map((node) => 
+              node.id === `video_${video._id}`
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      isExtracting: false,
+                      isTranscribing: false,
+                      hasTranscription: false,
+                      extractionProgress: undefined,
+                    },
+                  }
+                : node
+            )
+          );
+          return;
         }
-        // Update node to show transcription failed
-        setNodes((nds) => 
-          nds.map((node) => 
-            node.id === `video_${video._id}`
-              ? {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    isTranscribing: false,
-                    hasTranscription: false,
-                  },
-                }
-              : node
-          )
-        );
-      });
+      } else {
+        // File is small enough, transcribe directly
+        toast.info("Starting transcription...");
+        
+        try {
+          await transcribeVideo({
+            videoId: video._id,
+            storageId: storageId,
+            fileType: 'video',
+          });
+          
+          toast.success("Video transcribed successfully!");
+        } catch (error: any) {
+          console.error("Transcription error:", error);
+          const errorMessage = error.message || "Failed to transcribe video";
+          
+          if (errorMessage.includes("OPENAI_API_KEY")) {
+            toast.error("OpenAI API key not configured. Content will be generated without transcription.");
+          } else {
+            toast.error(`Transcription failed: ${errorMessage}`);
+          }
+          
+          // Update node to show transcription failed
+          setNodes((nds) => 
+            nds.map((node) => 
+              node.id === `video_${video._id}`
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      isTranscribing: false,
+                      hasTranscription: false,
+                    },
+                  }
+                : node
+            )
+          );
+          return;
+        }
+      }
+      
+      // Update node to show transcription is complete
+      setNodes((nds) => 
+        nds.map((node) => 
+          node.id === `video_${video._id}`
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  isTranscribing: false,
+                  hasTranscription: true,
+                },
+              }
+            : node
+        )
+      );
+      
+      // Force a re-render to pick up the new transcription data
+      setTranscriptionVersion(v => v + 1);
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Failed to upload video");
@@ -559,6 +724,16 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
             x: event.clientX,
             y: event.clientY,
           });
+
+          // Show file size info
+          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+          const MAX_FILE_SIZE = 25 * 1024 * 1024;
+          
+          if (file.size > MAX_FILE_SIZE) {
+            toast.info(`Video is ${fileSizeMB}MB. Audio will be extracted for transcription (supports up to ~25 min videos).`);
+          } else {
+            toast.info(`Video is ${fileSizeMB}MB. Will transcribe directly.`);
+          }
 
           // Upload video to Convex
           handleVideoUpload(file, position);
@@ -600,10 +775,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
             draft: "",
             status: "idle",
             connections: [],
-            onGenerate: () => {
-              console.log("onGenerate callback triggered for:", nodeId);
-              handleGenerate(nodeId);
-            },
+            onGenerate: () => handleGenerate(nodeId),
             onChat: () => setSelectedNodeForChat(nodeId),
           },
         };
@@ -671,12 +843,10 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
           agentId: agent._id, // Store the database ID
           type: agent.type,
           draft: agent.draft,
+          thumbnailUrl: agent.thumbnailUrl,
           status: agent.status,
           connections: agent.connections,
-          onGenerate: () => {
-            console.log("onGenerate callback triggered for loaded agent:", `agent_${agent.type}_${agent._id}`);
-            handleGenerate(`agent_${agent.type}_${agent._id}`);
-          },
+          onGenerate: () => handleGenerate(`agent_${agent.type}_${agent._id}`),
           onChat: () => setSelectedNodeForChat(`agent_${agent.type}_${agent._id}`),
         },
       }));
@@ -759,42 +929,109 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   return (
     <div className="flex h-[calc(100vh-var(--header-height))]">
       {/* Sidebar with draggable agent nodes */}
-      <aside className="w-64 border-r bg-background p-4">
-        <h2 className="mb-4 text-lg font-semibold">Agent Nodes</h2>
-        <div className="space-y-2">
-          <DraggableNode type="title" label="Title Agent" />
-          <DraggableNode type="description" label="Description Agent" />
-          <DraggableNode type="thumbnail" label="Thumbnail Agent" />
-          <DraggableNode type="tweets" label="Tweets Agent" />
-        </div>
-        
-        <div className="mt-8">
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-            Drag & Drop Video
-          </h3>
-          <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              Drop video file onto canvas
-            </p>
+      <aside className={`${isSidebarCollapsed ? "w-16" : "w-64"} border-r bg-background transition-all duration-300 flex flex-col`}>
+        <div className={`flex-1 ${isSidebarCollapsed ? "p-2" : "p-4"}`}>
+          {!isSidebarCollapsed && (
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Agent Nodes</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {isSidebarCollapsed && (
+            <div className="text-center mb-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="h-8 w-8"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          
+          <div className="space-y-2">
+            <DraggableNode 
+              type="title" 
+              label={isSidebarCollapsed ? "" : "Title Agent"} 
+              icon={<FileText className="h-4 w-4" />}
+              collapsed={isSidebarCollapsed}
+            />
+            <DraggableNode 
+              type="description" 
+              label={isSidebarCollapsed ? "" : "Description Agent"} 
+              icon={<FileText className="h-4 w-4" />}
+              collapsed={isSidebarCollapsed}
+            />
+            <DraggableNode 
+              type="thumbnail" 
+              label={isSidebarCollapsed ? "" : "Thumbnail Agent"} 
+              icon={<Image className="h-4 w-4" />}
+              collapsed={isSidebarCollapsed}
+            />
+            <DraggableNode 
+              type="tweets" 
+              label={isSidebarCollapsed ? "" : "Tweets Agent"} 
+              icon={<Twitter className="h-4 w-4" />}
+              collapsed={isSidebarCollapsed}
+            />
           </div>
+          
+          {!isSidebarCollapsed && (
+            <div className="mt-8">
+              <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+                Drag & Drop Video
+              </h3>
+              <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Drop video file onto canvas
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {isSidebarCollapsed ? (
+            <div className="mt-8">
+              <Button
+                onClick={() => setIsSidebarCollapsed(false)}
+                size="icon"
+                variant="ghost"
+                className="w-full"
+                title="Upload Video"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
         </div>
 
-        <div className="mt-8">
+        <div className={`${isSidebarCollapsed ? "p-2" : "p-4"}`}>
           <Button 
             onClick={handleGenerateAll} 
             disabled={isGeneratingAll}
             className="w-full"
             variant="default"
+            size={isSidebarCollapsed ? "icon" : "default"}
+            title={isSidebarCollapsed ? "Generate All Content" : undefined}
           >
-            <Sparkles className="mr-2 h-4 w-4" />
-            {isGeneratingAll 
+            <Sparkles className={isSidebarCollapsed ? "h-4 w-4" : "mr-2 h-4 w-4"} />
+            {!isSidebarCollapsed && (isGeneratingAll 
               ? `Generating ${generationProgress.current}/${generationProgress.total}...`
               : "Generate All Content"
-            }
+            )}
           </Button>
-          <p className="mt-2 text-xs text-muted-foreground text-center">
-            Connect all agents to video & generate content
-          </p>
+          {!isSidebarCollapsed && (
+            <p className="mt-2 text-xs text-muted-foreground text-center">
+              Connect all agents to video & generate content
+            </p>
+          )}
         </div>
       </aside>
 
@@ -811,14 +1048,14 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
                 if (nodeToDelete) {
                   // Delete from database
                   if (nodeToDelete.type === 'video' && nodeToDelete.data.videoId) {
-                    deleteVideo({ id: nodeToDelete.data.videoId })
+                    deleteVideo({ id: nodeToDelete.data.videoId as Id<"videos"> })
                       .then(() => toast.success("Video deleted"))
                       .catch((error) => {
                         console.error("Failed to delete video:", error);
                         toast.error("Failed to delete video");
                       });
                   } else if (nodeToDelete.type === 'agent' && nodeToDelete.data.agentId) {
-                    deleteAgent({ id: nodeToDelete.data.agentId })
+                    deleteAgent({ id: nodeToDelete.data.agentId as Id<"agents"> })
                       .then(() => toast.success(`${nodeToDelete.data.type} agent deleted`))
                       .catch((error) => {
                         console.error("Failed to delete agent:", error);
@@ -862,19 +1099,48 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   );
 }
 
-function DraggableNode({ type, label }: { type: string; label: string }) {
+function DraggableNode({ 
+  type, 
+  label, 
+  icon, 
+  collapsed 
+}: { 
+  type: string; 
+  label: string; 
+  icon?: React.ReactNode;
+  collapsed?: boolean;
+}) {
   const onDragStart = (event: React.DragEvent) => {
     event.dataTransfer.setData("application/reactflow", type);
     event.dataTransfer.effectAllowed = "move";
   };
 
+  if (collapsed) {
+    return (
+      <div
+        className="cursor-move rounded-lg border bg-card p-2 transition-colors hover:bg-accent hover:text-white flex items-center justify-center group"
+        onDragStart={onDragStart}
+        draggable
+        title={`${type.charAt(0).toUpperCase() + type.slice(1)} Agent`}
+        style={{ opacity: 1 }}
+      >
+        {icon}
+      </div>
+    );
+  }
+
   return (
     <div
-      className="cursor-move rounded-lg border bg-card p-3 text-center transition-colors hover:bg-accent"
+      className="cursor-move rounded-lg border bg-card p-3 transition-colors hover:bg-accent hover:text-white group"
       onDragStart={onDragStart}
       draggable
+      style={{ opacity: 1 }}
     >
-      <span className="text-sm font-medium">{label}</span>
+      <div className="flex items-center gap-2">
+        <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-white" />
+        {icon}
+        <span className="text-sm font-medium">{label}</span>
+      </div>
     </div>
   );
 }

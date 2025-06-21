@@ -16,6 +16,7 @@ import { Button } from "~/components/ui/button";
 export interface AgentNodeData {
   type: "title" | "description" | "thumbnail" | "tweets";
   draft: string;
+  thumbnailUrl?: string;
   status: "idle" | "generating" | "ready" | "error";
   connections: string[];
 }
@@ -88,7 +89,22 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
         </Badge>
       </div>
       
-      {data.draft ? (
+      {data.type === "thumbnail" && data.thumbnailUrl ? (
+        <div className="mb-3">
+          <div className="aspect-video relative rounded-lg overflow-hidden bg-muted">
+            <img 
+              src={data.thumbnailUrl} 
+              alt="Generated thumbnail" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+          {data.draft && (
+            <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+              {data.draft}
+            </p>
+          )}
+        </div>
+      ) : data.draft ? (
         <div className="mb-3">
           <p className="text-sm text-muted-foreground line-clamp-3">
             {data.draft}
@@ -117,14 +133,7 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
           size="sm" 
           variant="default" 
           className="flex-1"
-          onClick={() => {
-            console.log("Generate button clicked", { nodeId: id, onGenerate: !!data.onGenerate, status: data.status });
-            if (data.onGenerate) {
-              data.onGenerate();
-            } else {
-              console.error("No onGenerate function provided for node:", id);
-            }
-          }}
+          onClick={data.onGenerate}
           disabled={data.status === "generating"}
         >
           {data.status === "generating" ? (

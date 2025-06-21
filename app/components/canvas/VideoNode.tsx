@@ -12,6 +12,8 @@ export interface VideoNodeData {
   isUploading?: boolean;
   isTranscribing?: boolean;
   hasTranscription?: boolean;
+  isExtracting?: boolean;
+  extractionProgress?: number;
 }
 
 export const VideoNode = memo(({ data, selected }: NodeProps) => {
@@ -64,19 +66,25 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
         </p>
         
         {/* Transcription status */}
-        {videoData.isTranscribing && (
+        {videoData.isExtracting && (
+          <div className="flex items-center gap-1 text-xs text-blue-600">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>Extracting audio... {videoData.extractionProgress ? `${videoData.extractionProgress}%` : ''}</span>
+          </div>
+        )}
+        {!videoData.isExtracting && videoData.isTranscribing && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
             <span>Transcribing...</span>
           </div>
         )}
-        {!videoData.isTranscribing && videoData.hasTranscription && (
+        {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription && (
           <div className="flex items-center gap-1 text-xs text-green-600">
             <FileText className="h-3 w-3" />
             <span>Transcribed</span>
           </div>
         )}
-        {!videoData.isTranscribing && videoData.hasTranscription === false && (
+        {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription === false && (
           <div className="flex items-center gap-1 text-xs text-yellow-600">
             <AlertCircle className="h-3 w-3" />
             <span>No transcription</span>

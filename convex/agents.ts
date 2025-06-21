@@ -55,6 +55,7 @@ export const updateDraft = mutation({
       v.literal("ready"),
       v.literal("error")
     )),
+    thumbnailUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -66,10 +67,16 @@ export const updateDraft = mutation({
       throw new Error("Agent not found or unauthorized");
     }
 
-    await ctx.db.patch(args.id, {
+    const updateData: any = {
       draft: args.draft,
       status: args.status || "ready",
-    });
+    };
+    
+    if (args.thumbnailUrl !== undefined) {
+      updateData.thumbnailUrl = args.thumbnailUrl;
+    }
+
+    await ctx.db.patch(args.id, updateData);
   },
 });
 

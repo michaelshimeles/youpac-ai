@@ -15,3 +15,13 @@
   background: #555;
   border: 2px solid #fff;
 }
+
+/* Prevent drag ghost from showing */
+[draggable="true"] {
+  -webkit-user-drag: element;
+}
+
+/* Style for dragging state */
+[draggable="true"]:active {
+  opacity: 0.5;
+}

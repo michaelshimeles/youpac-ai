@@ -50,6 +50,7 @@ export default defineSchema({
       v.literal("tweets")
     ),
     draft: v.string(),
+    thumbnailUrl: v.optional(v.string()),
     connections: v.array(v.string()),
     chatHistory: v.array(
       v.object({

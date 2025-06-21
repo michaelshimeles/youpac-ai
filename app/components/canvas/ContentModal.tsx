@@ -17,6 +17,7 @@ interface ContentModalProps {
   nodeData: {
     type: string;
     draft: string;
+    thumbnailUrl?: string;
   } | null;
   onUpdate?: (newContent: string) => void;
 }
@@ -66,10 +67,20 @@ export function ContentModal({ isOpen, onClose, nodeData, onUpdate }: ContentMod
         </DialogHeader>
         
         <div className="space-y-4">
+          {nodeData.type === "thumbnail" && nodeData.thumbnailUrl && (
+            <div className="aspect-video relative rounded-lg overflow-hidden bg-muted mb-4">
+              <img 
+                src={nodeData.thumbnailUrl} 
+                alt="Generated thumbnail" 
+                className="w-full h-full object-contain"
+              />
+            </div>
+          )}
+          
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="min-h-[300px] font-mono text-sm"
+            className={nodeData.type === "thumbnail" ? "min-h-[150px] font-mono text-sm" : "min-h-[300px] font-mono text-sm"}
             placeholder="No content generated yet..."
           />
           
