@@ -37,6 +37,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.24.3",
+    "date-fns": "^4.1.0",
     "isbot": "^5.1.27",
     "lucide-react": "^0.511.0",
     "motion": "^12.15.0",

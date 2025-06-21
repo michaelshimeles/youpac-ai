@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 
 export const create = mutation({
   args: {
+    projectId: v.id("projects"),
     title: v.optional(v.string()),
     videoUrl: v.optional(v.string()),
     fileId: v.optional(v.string()),
@@ -28,6 +29,7 @@ export const create = mutation({
 
     const videoId = await ctx.db.insert("videos", {
       userId,
+      projectId: args.projectId,
       title: args.title,
       videoUrl,
       fileId: args.fileId || args.storageId,
@@ -76,6 +78,26 @@ export const getByUser = query({
       .query("videos")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
+      .collect();
+  },
+});
+
+export const getByProject = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const userId = identity.subject;
+
+    // Verify project ownership
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      return [];
+    }
+
+    return await ctx.db
+      .query("videos")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
   },
 });

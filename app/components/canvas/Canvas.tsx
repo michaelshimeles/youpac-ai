@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type DragEvent } from "react";
+import { useCallback, useRef, useState, type DragEvent, useEffect } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -17,27 +17,33 @@ import "@xyflow/react/dist/style.css";
 import { VideoNode } from "./VideoNode";
 import { AgentNode } from "./AgentNode";
 import { ContentModal } from "./ContentModal";
-import { useMutation, useAction } from "convex/react";
+import { useMutation, useAction, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { api } from "convex/_generated/api";
+import type { Id } from "convex/_generated/dataModel";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
   agent: AgentNode,
 };
 
-function CanvasContent() {
+function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [selectedNodeForChat, setSelectedNodeForChat] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  
+  // Convex queries
+  const canvasState = useQuery(api.canvas.getState, { projectId });
+  const projectVideos = useQuery(api.videos.getByProject, { projectId });
+  const projectAgents = useQuery(api.agents.getByProject, { projectId });
   
   // Convex mutations
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createVideo = useMutation(api.videos.create);
-  const createAgent = useMutation(api.agents.create);
-  const updateAgent = useMutation(api.agents.updateDraft);
+  const saveCanvasState = useMutation(api.canvas.saveState);
   
   // Convex actions for AI
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
@@ -71,7 +77,7 @@ function CanvasContent() {
                 ...node,
                 data: {
                   ...node.data,
-                  connections: [...(node.data.connections || []), params.source],
+                  connections: [...((node.data.connections as string[]) || []), params.source as string],
                 },
               }
             : node
@@ -215,6 +221,7 @@ function CanvasContent() {
       
       // Step 3: Create video record in database with storage URL
       const video = await createVideo({
+        projectId,
         title: file.name.replace(/\.[^/.]+$/, ""),
         storageId: storageId,
         canvasPosition: position,
@@ -302,6 +309,83 @@ function CanvasContent() {
     [reactFlowInstance, setNodes, handleVideoUpload, handleGenerate]
   );
 
+  // Load existing canvas state when component mounts
+  useEffect(() => {
+    if (!hasLoaded && canvasState) {
+      setNodes(canvasState.nodes || []);
+      setEdges(canvasState.edges || []);
+      if (reactFlowInstance && canvasState.viewport) {
+        reactFlowInstance.setViewport(canvasState.viewport);
+      }
+      setHasLoaded(true);
+    }
+  }, [canvasState, hasLoaded, reactFlowInstance, setNodes, setEdges]);
+
+  // Load existing videos and agents from the project
+  useEffect(() => {
+    if (!hasLoaded && projectVideos && projectAgents && !canvasState) {
+      const videoNodes: Node[] = projectVideos.map((video) => ({
+        id: `video_${video._id}`,
+        type: "video",
+        position: video.canvasPosition,
+        data: {
+          videoId: video._id,
+          title: video.title,
+          videoUrl: video.videoUrl,
+          storageId: video.fileId,
+        },
+      }));
+
+      const agentNodes: Node[] = projectAgents.map((agent) => ({
+        id: `agent_${agent.type}_${agent._id}`,
+        type: "agent",
+        position: agent.canvasPosition,
+        data: {
+          type: agent.type,
+          draft: agent.draft,
+          status: agent.status,
+          connections: agent.connections,
+          onGenerate: () => handleGenerate(`agent_${agent.type}_${agent._id}`),
+          onChat: () => setSelectedNodeForChat(`agent_${agent.type}_${agent._id}`),
+        },
+      }));
+
+      setNodes([...videoNodes, ...agentNodes]);
+      setHasLoaded(true);
+    }
+  }, [projectVideos, projectAgents, canvasState, hasLoaded, setNodes, handleGenerate]);
+
+  // Auto-save canvas state periodically
+  useEffect(() => {
+    if (!reactFlowInstance || !hasLoaded) return;
+
+    const saveState = () => {
+      const viewport = reactFlowInstance.getViewport();
+      saveCanvasState({
+        projectId,
+        nodes: nodes.map(n => ({
+          id: n.id,
+          type: n.type || "agent",
+          position: n.position,
+          data: n.data,
+        })),
+        edges: edges.map(e => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.sourceHandle || undefined,
+          targetHandle: e.targetHandle || undefined,
+        })),
+        viewport,
+      }).catch((error) => {
+        console.error("Failed to save canvas state:", error);
+      });
+    };
+
+    const interval = setInterval(saveState, 5000); // Save every 5 seconds
+    return () => clearInterval(interval);
+  }, [nodes, edges, reactFlowInstance, projectId, saveCanvasState, hasLoaded]);
+
   return (
     <div className="flex h-[calc(100vh-var(--header-height))]">
       {/* Sidebar with draggable agent nodes */}
@@ -380,10 +464,10 @@ function DraggableNode({ type, label }: { type: string; label: string }) {
   );
 }
 
-function Canvas() {
+function Canvas({ projectId }: { projectId: Id<"projects"> }) {
   return (
     <ReactFlowProvider>
-      <CanvasContent />
+      <CanvasContent projectId={projectId} />
     </ReactFlowProvider>
   );
 }

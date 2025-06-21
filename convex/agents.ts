@@ -29,6 +29,7 @@ export const create = mutation({
     return await ctx.db.insert("agents", {
       videoId: args.videoId,
       userId,
+      projectId: video.projectId,
       type: args.type,
       draft: "",
       connections: [],
@@ -146,6 +147,26 @@ export const getByVideo = query({
       .query("agents")
       .withIndex("by_video", (q) => q.eq("videoId", args.videoId))
       .filter((q) => q.eq(q.field("userId"), userId))
+      .collect();
+  },
+});
+
+export const getByProject = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const userId = identity.subject;
+
+    // Verify project ownership
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      return [];
+    }
+
+    return await ctx.db
+      .query("agents")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
   },
 });

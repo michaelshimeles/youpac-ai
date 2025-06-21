@@ -9,8 +9,22 @@ export default defineSchema({
     tokenIdentifier: v.string(),
   }).index("by_token", ["tokenIdentifier"]),
 
+  projects: defineTable({
+    userId: v.string(),
+    title: v.string(),
+    description: v.optional(v.string()),
+    thumbnail: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    isArchived: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_updated", ["updatedAt"])
+    .index("by_user_archived", ["userId", "isArchived"]),
+
   videos: defineTable({
     userId: v.string(),
+    projectId: v.optional(v.id("projects")),
     title: v.optional(v.string()),
     videoUrl: v.optional(v.string()),
     fileId: v.optional(v.string()),
@@ -22,11 +36,13 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_project", ["projectId"])
     .index("by_created", ["createdAt"]),
 
   agents: defineTable({
     videoId: v.id("videos"),
     userId: v.string(),
+    projectId: v.optional(v.id("projects")),
     type: v.union(
       v.literal("title"),
       v.literal("description"),
@@ -56,6 +72,7 @@ export default defineSchema({
   })
     .index("by_video", ["videoId"])
     .index("by_user", ["userId"])
+    .index("by_project", ["projectId"])
     .index("by_type", ["type"]),
 
   profiles: defineTable({
@@ -71,8 +88,9 @@ export default defineSchema({
   })
     .index("by_user", ["userId"]),
 
-  canvasStates: defineTable({
+  projectCanvases: defineTable({
     userId: v.string(),
+    projectId: v.id("projects"),
     nodes: v.array(
       v.object({
         id: v.string(),
@@ -100,5 +118,6 @@ export default defineSchema({
     }),
     updatedAt: v.number(),
   })
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"]),
 });

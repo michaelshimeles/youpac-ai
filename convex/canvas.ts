@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 
 export const saveState = mutation({
   args: {
+    projectId: v.id("projects"),
     nodes: v.array(
       v.object({
         id: v.string(),
@@ -34,9 +35,15 @@ export const saveState = mutation({
     if (!identity) throw new Error("Unauthorized");
     const userId = identity.subject;
 
+    // Verify project ownership
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found or unauthorized");
+    }
+
     const existing = await ctx.db
-      .query("canvasStates")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .query("projectCanvases")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .first();
 
     if (existing) {
@@ -47,8 +54,9 @@ export const saveState = mutation({
         updatedAt: Date.now(),
       });
     } else {
-      await ctx.db.insert("canvasStates", {
+      await ctx.db.insert("projectCanvases", {
         userId,
+        projectId: args.projectId,
         nodes: args.nodes,
         edges: args.edges,
         viewport: args.viewport,
@@ -59,27 +67,41 @@ export const saveState = mutation({
 });
 
 export const getState = query({
-  handler: async (ctx) => {
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
     const userId = identity.subject;
 
+    // Verify project ownership
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      return null;
+    }
+
     return await ctx.db
-      .query("canvasStates")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .query("projectCanvases")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .first();
   },
 });
 
 export const clearState = mutation({
-  handler: async (ctx) => {
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
     const userId = identity.subject;
 
+    // Verify project ownership
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found or unauthorized");
+    }
+
     const state = await ctx.db
-      .query("canvasStates")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .query("projectCanvases")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .first();
 
     if (state) {

@@ -16,14 +16,9 @@ import {
 const data = {
   navMain: [
     {
-      title: "Dashboard",
+      title: "Projects",
       url: "/dashboard",
       icon: IconDashboard,
-    },
-    {
-      title: "Canvas",
-      url: "/dashboard/canvas",
-      icon: IconPalette,
     },
     {
       title: "Chat",
