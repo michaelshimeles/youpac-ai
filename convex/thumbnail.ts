@@ -34,12 +34,23 @@ export const generateThumbnail = action({
     ),
   },
   handler: async (ctx, args): Promise<{ concept: string; imageUrl: string }> => {
+    console.log("[Thumbnail] Starting thumbnail generation process");
+    console.log("[Thumbnail] Args received:", {
+      agentType: args.agentType,
+      videoId: args.videoId,
+      frameCount: args.videoFrames.length,
+      hasTranscription: !!args.videoData.transcription,
+      hasProfile: !!args.profileData,
+      connectedAgentsCount: args.connectedAgentOutputs.length
+    });
+    
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
 
     // Get OpenAI API key from Convex environment
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
+      console.error("[Thumbnail] OpenAI API key not configured");
       throw new Error("OpenAI API key not configured");
     }
 
@@ -49,8 +60,14 @@ export const generateThumbnail = action({
       // If we have a videoId, fetch the latest video data with transcription
       let videoData = args.videoData;
       if (args.videoId) {
+        console.log("[Thumbnail] Fetching fresh video data for ID:", args.videoId);
         const freshVideoData = await ctx.runQuery(api.videos.getWithTranscription, {
           id: args.videoId,
+        });
+        console.log("[Thumbnail] Fresh video data fetched:", {
+          hasTitle: !!freshVideoData?.title,
+          hasTranscription: !!freshVideoData?.transcription,
+          transcriptionLength: freshVideoData?.transcription?.length || 0
         });
         if (freshVideoData && freshVideoData.transcription) {
           videoData = {
@@ -61,11 +78,13 @@ export const generateThumbnail = action({
       }
 
       // Step 1: Analyze video frames with GPT-4 Vision to understand visual content
+      console.log("[Thumbnail] Step 1: Building frame analysis prompt");
       const frameAnalysisPrompt = buildFrameAnalysisPrompt(
         videoData,
         args.connectedAgentOutputs,
         args.profileData
       );
+      console.log("[Thumbnail] Frame analysis prompt length:", frameAnalysisPrompt.length);
 
       const visionMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         {
@@ -87,36 +106,104 @@ export const generateThumbnail = action({
         },
       ];
 
+      console.log("[Thumbnail] Calling GPT-4o to analyze frames...");
+      console.log("[Thumbnail] Vision messages count:", visionMessages.length);
+      console.log("[Thumbnail] Number of frames being analyzed:", args.videoFrames.length);
+      
       const visionResponse = await openai.chat.completions.create({
-        model: "gpt-4-vision-preview",
+        model: "gpt-4o", // Updated model that supports vision
         messages: visionMessages,
         max_tokens: 500,
         temperature: 0.7,
       });
 
       const thumbnailConcept = visionResponse.choices[0].message.content || "";
+      console.log("[Thumbnail] GPT-4o response received");
+      console.log("[Thumbnail] Thumbnail concept:", thumbnailConcept.substring(0, 200) + "...");
 
       // Step 2: Generate thumbnail image with DALL-E 3
+      console.log("[Thumbnail] Step 2: Building DALL-E prompt");
       const imagePrompt = buildDallePrompt(thumbnailConcept, args.profileData);
+      console.log("[Thumbnail] DALL-E prompt:", imagePrompt.substring(0, 300) + "...");
+      console.log("[Thumbnail] DALL-E prompt length:", imagePrompt.length);
 
+      console.log("[Thumbnail] Calling gpt-image-1 to generate image...");
       const imageResponse = await openai.images.generate({
-        model: "dall-e-3",
+        model: "gpt-image-1",
         prompt: imagePrompt,
-        n: 1,
-        size: "1792x1024", // 16:9 aspect ratio for YouTube
-        quality: "hd",
-        style: "vivid",
       });
 
-      const imageUrl = imageResponse.data?.[0]?.url;
-      if (!imageUrl) throw new Error("Failed to generate thumbnail image");
+      console.log("[Thumbnail] gpt-image-1 response:", imageResponse);
+
+      console.log("[Thumbnail] gpt-image-1 response received");
+      
+      // Handle both URL and base64 responses
+      let imageUrl: string;
+      const imageData = imageResponse.data?.[0];
+      
+      if (imageData?.url) {
+        imageUrl = imageData.url;
+        console.log("[Thumbnail] Got image URL from response");
+      } else if (imageData?.b64_json) {
+        console.log("[Thumbnail] Got base64 image, uploading to storage...");
+        
+        // Convert base64 to blob
+        const base64Data = imageData.b64_json;
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/png' });
+        
+        // Upload to Convex storage
+        const uploadUrl = await ctx.runMutation(api.files.generateUploadUrl);
+        console.log("[Thumbnail] Got upload URL, uploading image...");
+        
+        const uploadResponse = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": "image/png" },
+          body: blob,
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error("Failed to upload thumbnail image to storage");
+        }
+        
+        const { storageId } = await uploadResponse.json();
+        console.log("[Thumbnail] Image uploaded to storage:", storageId);
+        
+        // Get the URL from storage
+        const storageUrl = await ctx.runQuery(api.files.getUrl, { storageId });
+        if (!storageUrl) {
+          throw new Error("Failed to get storage URL for thumbnail");
+        }
+        
+        imageUrl = storageUrl;
+        console.log("[Thumbnail] Got storage URL for thumbnail");
+      } else {
+        console.error("[Thumbnail] No image URL or base64 in response:", imageResponse);
+        throw new Error("Failed to generate thumbnail image - no URL or base64 data");
+      }
+      
+      console.log("[Thumbnail] Image generated successfully");
+      console.log("[Thumbnail] Final image URL:", imageUrl.substring(0, 100) + "...");
 
       return {
         concept: thumbnailConcept,
         imageUrl,
       };
-    } catch (error) {
-      console.error("Error generating thumbnail:", error);
+    } catch (error: any) {
+      console.error("[Thumbnail] Error generating thumbnail:", error);
+      console.error("[Thumbnail] Error type:", error.constructor.name);
+      console.error("[Thumbnail] Error message:", error.message);
+      console.error("[Thumbnail] Error stack:", error.stack);
+      
+      if (error.response) {
+        console.error("[Thumbnail] API response error:", error.response.data);
+      }
+      
       throw error;
     }
   },

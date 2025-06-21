@@ -7,6 +7,7 @@ import type {
 } from "@xyflow/react";
 import { VideoNode } from "./VideoNode";
 import { AgentNode } from "./AgentNode";
+import { VideoInfoNode } from "./VideoInfoNode";
 import { ContentModal } from "./ContentModal";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { toast } from "sonner";
@@ -16,12 +17,15 @@ import { Button } from "~/components/ui/button";
 import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Twitter, Upload, GripVertical } from "lucide-react";
 import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
 import { extractFramesFromVideo } from "~/lib/video-frames";
+import { extractVideoMetadata } from "~/lib/video-metadata";
 import { FloatingChat } from "./FloatingChat";
 import { ReactFlowWrapper } from "./ReactFlowWrapper";
+import { ThumbnailUploadModal } from "./ThumbnailUploadModal";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
   agent: AgentNode,
+  videoInfo: VideoInfoNode,
 };
 
 function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
@@ -66,8 +70,8 @@ function InnerCanvas({
   addEdge: any;
 }) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [selectedNodeForModal, setSelectedNodeForModal] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState<string>("");
@@ -75,6 +79,8 @@ function InnerCanvas({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   const [transcriptionVersion, setTranscriptionVersion] = useState(0);
+  const [thumbnailModalOpen, setThumbnailModalOpen] = useState(false);
+  const [pendingThumbnailNode, setPendingThumbnailNode] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     // Get initial state from localStorage
     if (typeof window !== "undefined") {
@@ -119,24 +125,33 @@ function InnerCanvas({
   // Convex mutations
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createVideo = useMutation(api.videos.create);
+  const updateVideoMetadata = useMutation(api.videos.updateMetadata);
   const createAgent = useMutation(api.agents.create);
   const updateAgentDraft = useMutation(api.agents.updateDraft);
   const updateAgentConnections = useMutation(api.agents.updateConnections);
   const saveCanvasState = useMutation(api.canvas.saveState);
   const deleteVideo = useMutation(api.videos.remove);
   const deleteAgent = useMutation(api.agents.remove);
+  const scheduleTranscription = useMutation(api.videoJobs.scheduleTranscription);
   
   // Convex actions for AI
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
   const generateThumbnail = useAction(api.thumbnail.generateThumbnail);
-  const transcribeVideo = useAction(api.transcription.transcribeVideo);
   const refineContent = useAction(api.chat.refineContent);
 
   // Handle content generation for an agent node
-  const handleGenerate = useCallback(async (nodeId: string) => {
+  const handleGenerate = useCallback(async (nodeId: string, thumbnailImages?: File[]) => {
     const agentNode = nodesRef.current.find((n: any) => n.id === nodeId);
     if (!agentNode) {
       console.error("Agent node not found:", nodeId);
+      return;
+    }
+    
+    // For thumbnail agents without images, show the upload modal
+    if (agentNode.data.type === "thumbnail" && !thumbnailImages) {
+      console.log("[Canvas] Opening thumbnail upload modal for node:", nodeId);
+      setPendingThumbnailNode(nodeId);
+      setThumbnailModalOpen(true);
       return;
     }
     
@@ -170,13 +185,22 @@ function InnerCanvas({
         .filter(Boolean);
       
       // Prepare data for AI generation
-      let videoData: { title?: string; transcription?: string } = {};
+      let videoData: { 
+        title?: string; 
+        transcription?: string;
+        duration?: number;
+        resolution?: { width: number; height: number };
+        format?: string;
+      } = {};
       if (videoNode && videoNode.data.videoId) {
-        // Fetch the video with transcription from database
+        // Fetch the video with transcription and metadata from database
         const video = projectVideos?.find((v: any) => v._id === videoNode.data.videoId);
         videoData = {
           title: videoNode.data.title as string,
           transcription: video?.transcription,
+          duration: video?.duration,
+          resolution: video?.resolution,
+          format: video?.format,
         };
         
         // If no transcription, warn the user
@@ -209,24 +233,38 @@ function InnerCanvas({
       let result: string;
       let thumbnailUrl: string | undefined;
       
-      if (agentNode.data.type === "thumbnail" && videoNode?.data.videoUrl) {
-        // For thumbnail agent, extract frames and use vision API
-        toast.info("Extracting video frames for thumbnail generation...");
+      if (agentNode.data.type === "thumbnail" && thumbnailImages) {
+        // For thumbnail agent, use uploaded images
+        console.log("[Canvas] Starting thumbnail generation with uploaded images:", thumbnailImages.length);
+        toast.info("Processing uploaded images for thumbnail generation...");
         
-        // Get the video file from URL
-        const videoResponse = await fetch(videoNode.data.videoUrl as string);
-        const videoBlob = await videoResponse.blob();
-        const videoFile = new File([videoBlob], "video.mp4", { type: videoBlob.type });
-        
-        // Extract frames from video
-        const frames = await extractFramesFromVideo(videoFile, { 
-          count: 3,
-          onProgress: (progress: number) => {
-            // Could update UI with progress here
-          }
-        });
+        // Convert uploaded images to data URLs
+        console.log("[Canvas] Converting images to data URLs...");
+        const frames = await Promise.all(
+          thumbnailImages.map(async (file, index) => {
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(file);
+            });
+            return {
+              dataUrl,
+              timestamp: index, // Use index as timestamp for uploaded images
+            };
+          })
+        );
+        console.log("[Canvas] Images converted to data URLs:", frames.length);
         
         // Generate thumbnail with vision API
+        console.log("[Canvas] Calling generateThumbnail action with:", {
+          videoId: videoNode?.data.videoId,
+          frameCount: frames.length,
+          hasVideoData: !!videoData,
+          hasTranscription: !!videoData.transcription,
+          connectedAgentsCount: connectedAgentOutputs.length,
+          hasProfile: !!profileData
+        });
+        
         const thumbnailResult = await generateThumbnail({
           agentType: "thumbnail",
           videoId: videoNode?.data.videoId as Id<"videos"> | undefined,
@@ -238,6 +276,10 @@ function InnerCanvas({
           connectedAgentOutputs,
           profileData,
         });
+        
+        console.log("[Canvas] Thumbnail generation completed");
+        console.log("[Canvas] Concept received:", thumbnailResult.concept.substring(0, 100) + "...");
+        console.log("[Canvas] Image URL received:", !!thumbnailResult.imageUrl);
         
         result = thumbnailResult.concept;
         thumbnailUrl = thumbnailResult.imageUrl;
@@ -253,6 +295,11 @@ function InnerCanvas({
       }
       
       // Update node with generated content
+      console.log("[Canvas] Updating node with generated content");
+      if (agentNode.data.type === "thumbnail") {
+        console.log("[Canvas] Thumbnail URL to save:", thumbnailUrl ? "Present" : "Missing");
+      }
+      
       setNodes((nds: any) =>
         nds.map((node: any) =>
           node.id === nodeId
@@ -279,9 +326,19 @@ function InnerCanvas({
         });
       }
       
-      toast.success(`${agentNode.data.type} generated successfully!`);
+      if (agentNode.data.type === "thumbnail" && thumbnailUrl) {
+        console.log("[Canvas] Thumbnail generation successful with image URL");
+        toast.success("Thumbnail generated successfully! Click 'View' to see the image.");
+      } else {
+        toast.success(`${agentNode.data.type} generated successfully!`);
+      }
     } catch (error: any) {
-      console.error("Generation error:", error);
+      console.error("[Canvas] Generation error:", error);
+      console.error("[Canvas] Error details:", {
+        message: error.message,
+        stack: error.stack,
+        response: error.response
+      });
       toast.error(error.message || "Failed to generate content");
       
       // Update status to error
@@ -302,7 +359,24 @@ function InnerCanvas({
         });
       }
     }
-  }, [generateContent, userProfile, setNodes, updateAgentDraft, projectVideos, transcriptionVersion]);
+  }, [generateContent, generateThumbnail, userProfile, setNodes, updateAgentDraft, projectVideos, transcriptionVersion]);
+  
+  // Handle thumbnail image upload
+  const handleThumbnailUpload = useCallback(async (images: File[]) => {
+    if (!pendingThumbnailNode) return;
+    
+    console.log("[Canvas] Handling thumbnail upload for node:", pendingThumbnailNode);
+    console.log("[Canvas] Number of images:", images.length);
+    
+    // Close modal and reset state
+    setThumbnailModalOpen(false);
+    
+    // Call handleGenerate with the uploaded images
+    await handleGenerate(pendingThumbnailNode, images);
+    
+    // Reset pending node
+    setPendingThumbnailNode(null);
+  }, [pendingThumbnailNode, handleGenerate]);
 
   // Handle chat messages with @mentions
   const handleChatMessage = useCallback(async (message: string) => {
@@ -500,10 +574,19 @@ function InnerCanvas({
       }
     });
     
-    // Generate content for each agent
+    // Generate content for each agent (skip thumbnail nodes)
+    let processedCount = 0;
     for (let i = 0; i < agentNodes.length; i++) {
       const agentNode = agentNodes[i];
-      setGenerationProgress({ current: i + 1, total: agentNodes.length });
+      
+      if (agentNode.data.type === "thumbnail") {
+        console.log("[Canvas] Skipping thumbnail node in Generate All:", agentNode.id);
+        toast.info("Thumbnail generation requires manual image upload");
+        continue;
+      }
+      
+      processedCount++;
+      setGenerationProgress({ current: processedCount, total: agentNodes.length });
       
       try {
         await handleGenerate(agentNode.id);
@@ -626,6 +709,7 @@ function InnerCanvas({
       const { storageId } = await result.json();
       
       // Step 3: Create video record in database with storage URL
+      console.log("Creating video record in database...");
       const video = await createVideo({
         projectId,
         title: file.name.replace(/\.[^/.]+$/, ""),
@@ -633,7 +717,10 @@ function InnerCanvas({
         canvasPosition: position,
       });
       
-      if (!video) throw new Error("Failed to create video");
+      console.log("Video created:", video);
+      if (!video || !video._id) {
+        throw new Error("Failed to create video - no ID returned");
+      }
       
       // Step 4: Update node with real data including video URL
       setNodes((nds: any) => 
@@ -658,9 +745,109 @@ function InnerCanvas({
       
       toast.success("Video uploaded successfully!");
       
-      // Step 5: Transcribe video or extract audio first if too large
+      // Update node to show transcribing state immediately
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === `video_${video._id}`
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  isTranscribing: true,
+                },
+              }
+            : node
+        )
+      );
+      
+      // Step 5: Extract video metadata and create info node (optional, non-blocking)
+      console.log("Starting optional metadata extraction for video:", video._id);
+      // Run metadata extraction in parallel, don't block transcription
+      const metadataPromise = (async () => {
+        try {
+          // Create temporary info node
+          const infoNodeId = `video_info_${video._id}`;
+          const infoNode: Node = {
+            id: infoNodeId,
+            type: "videoInfo",
+            position: { x: position.x - 350, y: position.y }, // Position to the left of video
+            data: {
+              videoId: video._id,
+              title: video.title,
+              isLoading: true,
+            },
+          };
+          setNodes((nds: any) => nds.concat(infoNode));
+          
+          // Connect info node to video node
+          const infoEdge: Edge = {
+            id: `e_info_${video._id}`,
+            source: infoNodeId,
+            target: `video_${video._id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: '#888', strokeDasharray: '5 5' },
+          };
+          setEdges((eds: any) => eds.concat(infoEdge));
+          
+          // Extract metadata
+          toast.info("Extracting video information...");
+          console.log("Calling extractVideoMetadata...");
+          const metadata = await extractVideoMetadata(file, {
+            onProgress: (progress) => {
+              console.log("Metadata extraction progress:", progress);
+            },
+            extractThumbnails: true,
+          });
+          console.log("Metadata extracted:", metadata);
+          
+          // Update video in database with metadata
+          await updateVideoMetadata({
+            id: video._id,
+            duration: metadata.duration,
+            fileSize: metadata.fileSize,
+            resolution: metadata.resolution,
+            frameRate: metadata.frameRate,
+            bitRate: metadata.bitRate,
+            format: metadata.format,
+            codec: metadata.codec,
+            audioInfo: metadata.audioInfo,
+          });
+          
+          // Update info node with metadata
+          setNodes((nds: any) =>
+            nds.map((node: any) =>
+              node.id === infoNodeId
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      ...metadata,
+                      isLoading: false,
+                    },
+                  }
+                : node
+            )
+          );
+          
+          toast.success("Video information extracted!");
+        } catch (metadataError) {
+          console.error("Metadata extraction error:", metadataError);
+          // Continue with upload even if metadata fails
+          toast.warning("Could not extract all video information");
+        }
+      })();
+      
+      console.log("Moving to transcription step...");
+      
+      // Step 6: Transcribe video or extract audio first if too large
       const fileSizeMB = file.size / (1024 * 1024);
       const MAX_DIRECT_TRANSCRIBE_SIZE = 25; // 25MB limit for Whisper API
+      
+      console.log(`Video file size: ${fileSizeMB.toFixed(2)}MB, Max direct size: ${MAX_DIRECT_TRANSCRIBE_SIZE}MB`);
+      
+      // Small delay to ensure file is available in storage
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       try {
         if (fileSizeMB > MAX_DIRECT_TRANSCRIBE_SIZE) {
@@ -685,8 +872,7 @@ function InnerCanvas({
           );
           
           // Extract audio from video
-          const audioFile = await extractAudioFromVideo(file, {
-            onProgress: (progress) => {
+          const audioFile = await extractAudioFromVideo(file, (progress) => {
               setNodes((nds: any) =>
                 nds.map((node: any) =>
                   node.id === `video_${video._id}`
@@ -700,8 +886,7 @@ function InnerCanvas({
                     : node
                 )
               );
-            },
-          });
+            });
           
           // Upload audio file
           const audioUploadUrl = await generateUploadUrl();
@@ -731,41 +916,43 @@ function InnerCanvas({
             )
           );
           
-          // Transcribe the extracted audio
-          await transcribeVideo({
-            videoId: video._id,
-            storageId: audioStorageId,
-            fileType: "audio",
-          });
+          // Schedule background transcription
+          try {
+            console.log("Scheduling audio transcription for video:", video._id);
+            const result = await scheduleTranscription({
+              videoId: video._id,
+              storageId: audioStorageId,
+              fileType: "audio",
+            });
+            console.log("Schedule transcription result:", result);
+            
+            toast.info("Audio transcription started in background. It will continue even if you close this tab.");
+          } catch (scheduleError: any) {
+            console.error("Failed to schedule transcription:", scheduleError);
+            console.error("Error details:", scheduleError.message, scheduleError.stack);
+            throw scheduleError;
+          }
         } else {
-          // Direct transcription for smaller files
-          await transcribeVideo({
-            videoId: video._id,
-            storageId: storageId,
-            fileType: "video",
-          });
+          // Schedule background transcription for smaller files  
+          try {
+            console.log("Scheduling video transcription for video:", video._id);
+            const result = await scheduleTranscription({
+              videoId: video._id,
+              storageId: storageId,
+              fileType: "video",
+            });
+            console.log("Schedule transcription result:", result);
+            
+            toast.info("Video transcription started in background. It will continue even if you close this tab.");
+          } catch (scheduleError: any) {
+            console.error("Failed to schedule transcription:", scheduleError);
+            console.error("Error details:", scheduleError.message, scheduleError.stack);
+            throw scheduleError;
+          }
         }
         
-        toast.success("Video transcribed successfully!");
-        
-        // Update node with transcription complete
-        setNodes((nds: any) =>
-          nds.map((node: any) =>
-            node.id === `video_${video._id}`
-              ? {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    isTranscribing: false,
-                    hasTranscription: true,
-                  },
-                }
-              : node
-          )
-        );
-        
-        // Force a re-render to pick up the new transcription data
-        setTranscriptionVersion(v => v + 1);
+        // Note: The transcription status will be updated when we reload from DB
+        // For now, keep showing the transcribing state
       } catch (transcriptionError: any) {
         console.error("Transcription error:", transcriptionError);
         toast.error(transcriptionError.message || "Failed to transcribe video");
@@ -789,6 +976,7 @@ function InnerCanvas({
       }
     } catch (error: any) {
       console.error("Upload error:", error);
+      console.error("Full error details:", error.stack);
       toast.error(error.message || "Failed to upload video");
       
       // Remove the temporary node on error
@@ -924,8 +1112,9 @@ function InnerCanvas({
           title: video.title,
           videoUrl: video.videoUrl,
           storageId: video.fileId,
-          hasTranscription: !!video.transcription,
-          isTranscribing: false,
+          hasTranscription: !!video.transcription || video.transcriptionStatus === "completed",
+          isTranscribing: video.transcriptionStatus === "processing",
+          transcriptionError: video.transcriptionStatus === "failed" ? video.transcriptionError : null,
         },
       }));
 
@@ -946,7 +1135,48 @@ function InnerCanvas({
         },
       }));
 
-      setNodes([...videoNodes, ...agentNodes]);
+      // Create VideoInfoNodes for videos that have metadata
+      const videoInfoNodes: Node[] = [];
+      const infoEdges: Edge[] = [];
+      
+      projectVideos.forEach((video) => {
+        if (video.duration || video.resolution || video.audioInfo) {
+          const infoNode: Node = {
+            id: `video_info_${video._id}`,
+            type: "videoInfo",
+            position: { 
+              x: video.canvasPosition.x - 350, 
+              y: video.canvasPosition.y 
+            },
+            data: {
+              videoId: video._id,
+              title: video.title,
+              duration: video.duration,
+              fileSize: video.fileSize,
+              resolution: video.resolution,
+              frameRate: video.frameRate,
+              bitRate: video.bitRate,
+              format: video.format,
+              codec: video.codec,
+              audioInfo: video.audioInfo,
+              isLoading: false,
+            },
+          };
+          videoInfoNodes.push(infoNode);
+          
+          // Create edge connecting info node to video node
+          infoEdges.push({
+            id: `e_info_${video._id}`,
+            source: `video_info_${video._id}`,
+            target: `video_${video._id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: '#888', strokeDasharray: '5 5' },
+          });
+        }
+      });
+      
+      setNodes([...videoNodes, ...agentNodes, ...videoInfoNodes]);
       
       // Load chat history from agents
       const allMessages: typeof chatMessages = [];
@@ -996,10 +1226,63 @@ function InnerCanvas({
         });
       });
       
-      setEdges(edges);
+      setEdges([...edges, ...infoEdges]);
       setHasLoadedFromDB(true);
     }
   }, [projectVideos, projectAgents, hasLoadedFromDB, setNodes, setEdges, handleGenerate, handleChatButtonClick]);
+  
+  // Periodically check for transcription updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Update nodes with current transcription status from database
+      if (projectVideos && projectVideos.length > 0) {
+        setNodes((nds: any) =>
+          nds.map((node: any) => {
+            if (node.type === 'video') {
+              const video = projectVideos.find((v: any) => `video_${v._id}` === node.id);
+              if (video) {
+                // Only update if status has changed
+                const newHasTranscription = !!video.transcription || video.transcriptionStatus === "completed";
+                const newIsTranscribing = video.transcriptionStatus === "processing";
+                const newTranscriptionError = video.transcriptionStatus === "failed" ? video.transcriptionError : null;
+                
+                if (node.data.hasTranscription !== newHasTranscription ||
+                    node.data.isTranscribing !== newIsTranscribing ||
+                    node.data.transcriptionError !== newTranscriptionError) {
+                  console.log(`Updating video ${video._id} transcription status:`, {
+                    status: video.transcriptionStatus,
+                    hasTranscription: newHasTranscription,
+                    isTranscribing: newIsTranscribing,
+                    error: newTranscriptionError
+                  });
+                  
+                  // Show toast when transcription completes
+                  if (!node.data.hasTranscription && newHasTranscription) {
+                    toast.success("Video transcription completed!");
+                  } else if (!node.data.transcriptionError && newTranscriptionError) {
+                    toast.error(`Transcription failed: ${newTranscriptionError}`);
+                  }
+                  
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      hasTranscription: newHasTranscription,
+                      isTranscribing: newIsTranscribing,
+                      transcriptionError: newTranscriptionError,
+                    },
+                  };
+                }
+              }
+            }
+            return node;
+          })
+        );
+      }
+    }, 3000); // Check every 3 seconds
+    
+    return () => clearInterval(interval);
+  }, [projectVideos, setNodes]);
 
   // Auto-save canvas state
   useEffect(() => {
@@ -1040,7 +1323,7 @@ function InnerCanvas({
           <div className={`flex-1 ${isSidebarCollapsed ? "p-2" : "p-4"}`}>
             {!isSidebarCollapsed && (
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Agent Nodes</h2>
+                <h2 className="text-lg font-semibold">Agents</h2>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1202,6 +1485,17 @@ function InnerCanvas({
               handleContentUpdate(selectedNodeForModal, newContent);
             }
           }}
+        />
+        
+        {/* Thumbnail Upload Modal */}
+        <ThumbnailUploadModal
+          isOpen={thumbnailModalOpen}
+          onClose={() => {
+            setThumbnailModalOpen(false);
+            setPendingThumbnailNode(null);
+          }}
+          onUpload={handleThumbnailUpload}
+          isGenerating={false}
         />
         
         {/* Floating Chat - Always Visible */}

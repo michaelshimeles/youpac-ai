@@ -1,27 +1,27 @@
 const members = [
   {
-    name: "Michael Shimeles",
-    role: "Co-Founder & CEO",
+    name: "Alex Chen",
+    role: "Founder & CEO",
     avatar:
-      "https://pbs.twimg.com/profile_images/1927552295291564033/U8DD7JlB_400x400.jpg",
+      "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex&backgroundColor=b6e3f4",
   },
   {
-    name: "Ras Mic",
-    role: "Co-Founder & CTO",
+    name: "Sarah Johnson",
+    role: "Head of AI",
     avatar:
-      "https://pbs.twimg.com/media/GsOcrswWMAALjCG?format=jpg&name=medium",
+      "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede",
   },
   {
-    name: "Micky",
-    role: "Co-Founder & CMO",
+    name: "Marcus Rivera",
+    role: "Lead Engineer",
     avatar:
-      "https://pbs.twimg.com/media/GrQYfZ7WAAAMy7i?format=jpg&name=medium",
+      "https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus&backgroundColor=d1d4f9",
   },
   {
-    name: "Mike",
-    role: "Co-Founder & COO",
+    name: "Emily Zhang",
+    role: "Product Designer",
     avatar:
-      "https://pbs.twimg.com/media/GoRePdpXEAAb06Q?format=jpg&name=4096x4096",
+      "https://api.dicebear.com/7.x/avataaars/svg?seed=Emily&backgroundColor=ffd5dc",
   },
 ];
 
@@ -30,7 +30,7 @@ export default function TeamSection() {
     <section id="team" className="py-12 md:py-32">
       <div className="mx-auto max-w-3xl px-8 lg:px-0">
         <h2 className="mb-8 text-4xl font-bold md:mb-16 lg:text-5xl">
-          Our team
+          Built by Creators, for Creators
         </h2>
 
         <div>

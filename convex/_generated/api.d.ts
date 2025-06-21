@@ -20,6 +20,7 @@ import type * as projects from "../projects.js";
 import type * as thumbnail from "../thumbnail.js";
 import type * as transcription from "../transcription.js";
 import type * as users from "../users.js";
+import type * as videoJobs from "../videoJobs.js";
 import type * as videos from "../videos.js";
 
 import type {
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   thumbnail: typeof thumbnail;
   transcription: typeof transcription;
   users: typeof users;
+  videoJobs: typeof videoJobs;
   videos: typeof videos;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

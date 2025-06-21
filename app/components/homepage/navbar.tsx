@@ -71,7 +71,7 @@ export const Navbar = ({
                 className="flex items-center space-x-2 font-semibold text-xl"
                 prefetch="viewport"
               >
-                <img src="/rsk.png" alt="RSK Logo" className="h-12 w-12" />
+                <img src="/youtube-ai-logo.png" alt="YouTube AI Logo" className="h-12 w-12" />
               </Link>
 
               <button
@@ -116,7 +116,7 @@ export const Navbar = ({
               </div>
               <div className="flex w-full flex-col space-y-3 sm:flex-row sm:gap-3 sm:space-y-0 md:w-fit">
                 <Link
-                  to="https://github.com/michaelshimeles/react-starter-kit"
+                  to="https://github.com/youtube-ai-assistant"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center"

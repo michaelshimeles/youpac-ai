@@ -1,217 +1,151 @@
-# AI-Powered YouTube Assistant - Task List
+# 📝 YouTube AI Assistant - To-Do List
 
-## ✅ Completed Tasks
+## ✅ DONE (What's Working Now)
 
-### Infrastructure & Setup
-- [x] Install ReactFlow and dependencies
-- [x] Update Convex schema with videos, agents, profiles, and canvasStates tables
-- [x] Set up authentication with Clerk
-- [x] Configure React Router v7 routes
-- [x] Implement project-based architecture
+### Core Features ✓
+- [x] Project-based architecture (one project = one video)
+- [x] Projects dashboard with grid view
+- [x] Canvas with drag-and-drop nodes
+- [x] Real video upload to storage
+- [x] Video playback in canvas
+- [x] AI content generation for all agents
+- [x] Profile system for personalized content
+- [x] Auto-save canvas every 5 seconds
+- [x] Node connections with validation
+- [x] "Generate All" batch content creation
+- [x] Content viewing/editing modal
+- [x] Copy to clipboard
 
-### Project Architecture
-- [x] Created projects schema with full CRUD operations
-- [x] Built projects dashboard with grid view
-- [x] Implemented create/archive/delete project functionality
-- [x] Added project-specific canvas routing (`/dashboard/project/:projectId`)
-- [x] Updated all data models to support projectId
-- [x] Updated navigation to reflect project-based workflow
+### Recent Updates ✓
+- [x] Real video transcription using Whisper API
+- [x] Audio extraction for videos >25MB (using FFmpeg)
+- [x] Collapsible canvas sidebar with icons
+- [x] Hamburger icon on draggable nodes
+- [x] Video thumbnail generation (GPT-4 Vision + DALL-E 3)
+- [x] Floating chat interface (always visible)
+- [x] @mention system for agents
+- [x] Chat autocomplete dropdown
+- [x] Dashboard sidebar closed by default
+- [x] Fixed all ESM module loading issues
+- [x] Removed redundant toast notifications
 
-### Canvas Implementation
-- [x] Create canvas route (now project-specific)
-- [x] Implement ReactFlow canvas with drag-and-drop functionality
-- [x] Fix SSR issues with lazy loading
-- [x] Implement auto-save for project canvases (every 5 seconds)
-- [x] Add canvas state persistence per project
+## 🔴 HIGH PRIORITY (Do These First!)
 
-### Custom Components
-- [x] Create VideoNode component with video player (updated from thumbnail)
-- [x] Create AgentNode component with status indicators
-- [x] Implement draggable node components in sidebar
-- [x] Add node type definitions for ReactFlow
+### Video Features 🎬
+- [ ] Fix video preview on hover
+- [ ] Add video duration display
+- [ ] Support YouTube URL input (not just file upload)
+- [ ] Handle video processing errors gracefully
+- [ ] Add video metadata to agent context
 
-### Backend Infrastructure
-- [x] Implement Convex mutations and queries for videos
-  - [x] Create, update, delete, and query videos
-  - [x] Video position tracking on canvas
-  - [x] Video URL storage and retrieval
-- [x] Implement Convex mutations and queries for agents
-  - [x] Agent CRUD operations
-  - [x] Chat history storage
-  - [x] Connection management
-- [x] Implement profile system schema
-- [x] Implement canvas state management schema
+### Canvas UX 🎨
+- [ ] Add keyboard shortcuts (Cmd+S save, Delete key, etc)
+- [ ] Implement undo/redo (Cmd+Z/Cmd+Shift+Z)
+- [ ] Add node duplication (Cmd+D)
+- [ ] Fix node selection highlights
+- [ ] Add mini-map toggle button
 
-### AI Integration
-- [x] Add OpenAI integration using Vercel AI SDK
-- [x] Create content generation action
-- [x] Create content refinement action (simplified for hackathon)
-- [x] Add system prompts for different agent types
-- [x] Implement profile-aware content generation
-- [x] Wire up Generate button to AI endpoint
+### Export & Sharing 📤
+- [ ] Export all content as ZIP (markdown files)
+- [ ] Copy all content to clipboard button
+- [ ] Share canvas link (read-only)
+- [ ] Export as PDF report
+- [ ] Direct publish to YouTube (API integration)
 
-### Video Upload System
-- [x] Implement actual file upload to Convex storage
-- [x] Create upload progress indicator
-- [x] Store and retrieve video URLs
-- [x] Display videos with player controls
-- [ ] Generate video thumbnails
-- [ ] Add video transcription support
-- [ ] Handle large file uploads with chunking
+## 🟡 MEDIUM PRIORITY (Nice to Have)
 
-### Node Interaction & Connection Logic
-- [x] Implement node connection validation
-- [x] Add connection data flow between nodes
-- [x] Create visual connection indicators (animated edges)
-- [x] Implement node deletion (persists to database)
-- [ ] Add node duplication functionality
+### Profile Enhancements 👤
+- [ ] Quick profile switcher in canvas
+- [ ] Profile templates (Gaming, Tech, Vlog, etc)
+- [ ] Import profile from YouTube channel
+- [ ] Multiple profile support
 
-### Chat Interface
-- [x] Create modal for node chat/content viewing
-- [x] Add content editing capability
-- [x] Implement copy to clipboard
-- [ ] Implement real-time chat UI
-- [ ] Add message history display
-- [ ] Create typing indicators
-- [ ] Implement chat context menu (regenerate)
+### AI Improvements 🤖
+- [ ] Regenerate single content button
+- [ ] Content variations (generate 3 options)
+- [ ] Custom prompts per agent
+- [ ] Generation history with rollback
+- [ ] Tone adjustment slider
 
-### Content Generation UI
-- [x] Add generation progress indicators
-- [x] Add content preview in nodes
-- [x] Add "Generate All" button for connected nodes
-- [x] Auto-generate on connection
-- [x] Batch generation with progress tracking
-- [ ] Create generation queue visualization
-- [ ] Implement batch operations (regenerate, clear all)
+### Chat Features 💬
+- [ ] Chat history persistence
+- [ ] Export chat as context
+- [ ] Voice input for chat
+- [ ] Suggested prompts/questions
 
-### Polish & UX
-- [x] Add animations and transitions
-- [x] Toast notifications for user feedback
-- [ ] Add keyboard shortcuts
-- [ ] Create onboarding tutorial
-- [ ] Add tooltips and help text
-- [ ] Implement dark mode support for canvas
+## 🟢 LOW PRIORITY (Future Updates)
 
-## ❌ Remaining Tasks
-
-### High Priority
-
-#### Profile System UI (80%)
-- [x] Create profile settings page
-- [x] Add profile form with validation
-- [x] Implement profile preview
-- [x] Integrate with AI generation
-- [ ] Add quick profile switcher
-- [ ] Create profile templates
-
-#### Canvas Features (10%)
-- [x] Implement auto-save (completed with 5-second interval)
-- [ ] Add canvas zoom controls
-- [ ] Create canvas export/import functionality
-- [ ] Add undo/redo functionality
-- [ ] Implement canvas templates
-
-### Medium Priority
-
-#### Enhanced Video Features
-- [ ] Video thumbnail generation from frames
-- [ ] Video transcription integration
-- [ ] Video preview on hover
-- [ ] Support for multiple video formats
-- [ ] Video metadata extraction
-
-#### Advanced Generation Features
-- [ ] Batch content generation
-- [ ] Generation history
-- [ ] A/B testing for generated content
-- [ ] Custom prompt templates
-- [ ] Multi-language support
-
-### Low Priority
-
-#### Advanced Features (5%)
-- [ ] Add collaboration features (share canvas)
-- [ ] Implement version history for drafts
-- [ ] Create content export formats (JSON, Markdown, CSV)
-- [ ] Add analytics dashboard
-- [ ] Implement API key management
+### Advanced Features 🚀
+- [ ] Real-time collaboration
+- [ ] Canvas templates library
+- [ ] Analytics dashboard
 - [ ] Webhook integrations
-- [ ] Third-party platform publishing
+- [ ] Plugin system
+- [ ] Mobile app
+- [ ] API for developers
 
-## 📊 Progress Summary
+## 🎯 QUICK WINS (< 1 hour each)
 
-**Overall Completion: ~85%**
+- [ ] Add loading spinner when generating content
+- [ ] Show video file size in node
+- [ ] Add "Clear All" button for content
+- [ ] Fix chat input focus issues
+- [ ] Add generation time estimate
+- [ ] Show word count in content modal
+- [ ] Add dark mode toggle
+- [ ] Fix mobile responsive issues
 
-- Infrastructure: 100% ✅
-- Core Canvas: 100% ✅
-- AI Integration: 100% ✅
-- Project Architecture: 100% ✅
-- Content Generation: 90% ✅
-- Video Handling: 40% 🟡
-- User Interface: 85% 🟡
-- Profile System: 80% ✅
-- Advanced Features: 10% 🔴
+## 📈 Progress Tracker
 
-## 🚀 Next Steps (Priority Order)
+### What's Complete
+- ✅ Core Infrastructure (100%)
+- ✅ Project System (100%)
+- ✅ Canvas Functionality (95%)
+- ✅ AI Integration (95%)
+- ✅ Video Transcription (100%)
+- ✅ Thumbnail Generation (100%)
+- ✅ Chat Interface (90%)
+- ✅ Profile System (85%)
 
-1. **Node Management** - Delete and duplicate nodes
-2. **Export Features** - Save generated content in various formats
-3. **Video Enhancements** - Thumbnails and transcription
-4. **Profile Templates** - Pre-configured profiles for different content types
-5. **Keyboard Shortcuts** - Improve workflow efficiency
-6. **Real-time Chat** - Full chat implementation with history
-7. **Canvas Templates** - Pre-built canvas layouts for common workflows
-8. **Advanced Generation** - Regenerate content, version history
+### What Needs Work
+- 🟡 Export Features (0%)
+- 🟡 Keyboard Shortcuts (10%)
+- 🟡 Video Enhancements (60%)
+- 🟡 Content Variations (0%)
+- 🔴 Collaboration (0%)
+- 🔴 Analytics (0%)
+- 🔴 Mobile Support (20%)
 
-## 📝 Current Working Features
+## 💡 Known Issues to Fix
 
-- ✅ Project-based workflow (one project per video)
-- ✅ Projects dashboard with grid view and thumbnails
-- ✅ Real video upload to Convex storage
-- ✅ Video playback in canvas nodes
-- ✅ AI content generation for all agent types
-- ✅ Personalized AI generation using user profiles
-- ✅ Profile management with form validation
-- ✅ Smart node connections with validation
-- ✅ Auto-generate content when connecting nodes
-- ✅ "Generate All" button for batch content creation
-- ✅ Progress tracking for batch generation
-- ✅ Content viewing and editing modal
-- ✅ Copy to clipboard functionality
-- ✅ Auto-saving canvas state every 5 seconds
-- ✅ Canvas state persistence between sessions
-- ✅ Full agent persistence (content, connections, positions)
-- ✅ Loading states and animations
-- ✅ Error handling with user feedback
+1. **Canvas Issues**
+   - [ ] Nodes sometimes overlap on creation
+   - [ ] Edge animations cause performance issues
+   - [ ] Canvas state sometimes doesn't save
 
-## 🎯 What Makes This Special
+2. **Video Issues**
+   - [ ] Large videos (>100MB) fail silently
+   - [ ] Some video formats not supported
+   - [ ] Transcription timeout on long videos
 
-- Visual programming interface for YouTube content creation
-- Context-aware AI that uses video data and connected agents
-- Real-time collaboration potential
-- Professional content generation with GPT-4
-- Seamless workflow from video to published content
+3. **UI/UX Issues**
+   - [ ] Chat dropdown positioning on small screens
+   - [ ] Modal close button hard to see
+   - [ ] Toast notifications stack up
 
-## 🏆 Key Achievements
+## 🚀 Next Sprint Goals
 
-### Project Architecture Implementation
-- Successfully transformed the app from single-canvas to multi-project architecture
-- Each project represents a complete YouTube video creation workflow
-- Projects automatically display video thumbnails when available
-- Clean project management with archive/delete functionality
-- Seamless navigation between projects and their canvases
+**Week 1: Polish & Export**
+- Export functionality (ZIP, PDF)
+- Keyboard shortcuts
+- Fix all known bugs
 
-### Profile System Implementation
-- Complete profile management system with form validation
-- Personalized AI content generation based on user profiles
-- Real-time profile preview showing how AI sees the channel
-- Support for channel links, tone, and target audience
-- Integrated with Canvas for context-aware content generation
+**Week 2: Enhanced AI**
+- Content variations
+- Custom prompts
+- Regeneration options
 
-### Technical Highlights
-- Lazy loading for ReactFlow to solve SSR issues
-- Real-time auto-save with 5-second intervals
-- Type-safe Convex schema with proper indexes
-- Responsive grid layout for projects dashboard
-- Proper authentication and authorization checks
-- React Hook Form with Zod validation
+**Week 3: Collaboration**
+- Share links
+- Comments system
+- Version history

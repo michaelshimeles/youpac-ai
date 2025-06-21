@@ -17,6 +17,12 @@ export const generateContentSimple = action({
     videoData: v.object({
       title: v.optional(v.string()),
       transcription: v.optional(v.string()),
+      duration: v.optional(v.number()),
+      resolution: v.optional(v.object({
+        width: v.number(),
+        height: v.number(),
+      })),
+      format: v.optional(v.string()),
     }),
     connectedAgentOutputs: v.array(
       v.object({
@@ -94,7 +100,13 @@ function getSystemPrompt(agentType: string): string {
 
 function buildPrompt(
   agentType: string,
-  videoData: { title?: string; transcription?: string },
+  videoData: { 
+    title?: string; 
+    transcription?: string;
+    duration?: number;
+    resolution?: { width: number; height: number };
+    format?: string;
+  },
   connectedOutputs: Array<{ type: string; content: string }>,
   profileData?: {
     channelName: string;
@@ -105,6 +117,26 @@ function buildPrompt(
   }
 ): string {
   let prompt = "";
+
+  // Add video metadata if available
+  if (videoData.duration || videoData.resolution) {
+    prompt += "Video Technical Details:\n";
+    if (videoData.duration) {
+      const minutes = Math.floor(videoData.duration / 60);
+      const seconds = Math.floor(videoData.duration % 60);
+      prompt += `- Duration: ${minutes}:${seconds.toString().padStart(2, '0')}\n`;
+    }
+    if (videoData.resolution) {
+      prompt += `- Resolution: ${videoData.resolution.width}x${videoData.resolution.height}`;
+      if (videoData.resolution.height >= 2160) prompt += " (4K)";
+      else if (videoData.resolution.height >= 1080) prompt += " (HD)";
+      prompt += "\n";
+    }
+    if (videoData.format) {
+      prompt += `- Format: ${videoData.format}\n`;
+    }
+    prompt += "\n";
+  }
 
   // Emphasize transcription-based generation
   if (videoData.transcription) {

@@ -54,7 +54,7 @@ export function FloatingChat({
   onInputChange
 }: FloatingChatProps) {
   const [input, setInput] = useState(currentInputValue);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionSearchTerm, setMentionSearchTerm] = useState("");
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
@@ -237,7 +237,7 @@ export function FloatingChat({
       className="fixed bottom-4 right-4 z-50"
       style={{ width: isMinimized ? "auto" : "384px" }}
     >
-      <Card className={`shadow-lg ${isMinimized ? "p-2" : ""}`}>
+      <Card className={`shadow-lg ${isMinimized ? "p-2" : "py-0"}`}>
         {/* Header */}
         <div className={`flex items-center justify-between ${!isMinimized ? "p-4 border-b" : ""}`}>
           {!isMinimized && (
@@ -265,12 +265,6 @@ export function FloatingChat({
         {/* Chat Content */}
         {!isMinimized && (
           <>
-            {/* Instructions */}
-            <div className="px-4 py-2 bg-muted/50 border-b">
-              <p className="text-xs text-muted-foreground">
-                Use @TITLE_AGENT, @DESCRIPTION_AGENT, @THUMBNAIL_AGENT, or @TWEETS_AGENT to talk to specific agents
-              </p>
-            </div>
 
             {/* Messages */}
             <ScrollArea className="h-[300px]" ref={scrollAreaRef}>

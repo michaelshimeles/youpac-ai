@@ -14,6 +14,7 @@ export interface VideoNodeData {
   hasTranscription?: boolean;
   isExtracting?: boolean;
   extractionProgress?: number;
+  transcriptionError?: string | null;
 }
 
 export const VideoNode = memo(({ data, selected }: NodeProps) => {
@@ -85,9 +86,9 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
           </div>
         )}
         {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription === false && (
-          <div className="flex items-center gap-1 text-xs text-yellow-600">
+          <div className="flex items-center gap-1 text-xs text-yellow-600" title={videoData.transcriptionError || undefined}>
             <AlertCircle className="h-3 w-3" />
-            <span>No transcription</span>
+            <span>{videoData.transcriptionError ? "Transcription failed" : "No transcription"}</span>
           </div>
         )}
       </div>

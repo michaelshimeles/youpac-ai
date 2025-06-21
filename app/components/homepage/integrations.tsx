@@ -3,11 +3,12 @@ import { Link } from "react-router";
 import { LogoIcon } from "~/components/logo";
 import {
   Convex,
-  Polar,
+  OpenAI,
   ReactIcon,
-  ReactRouter,
+  YouTube,
   TailwindIcon,
   Typescript,
+  ClerkIcon,
 } from "~/components/logos";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
@@ -28,10 +29,10 @@ export default function IntegrationsSection({
               <div className="bg-radial to-muted dark:to-background absolute inset-0 z-10 from-transparent to-75%"></div>
               <div className="mx-auto mb-2 flex w-fit justify-center gap-2">
                 <IntegrationCard>
-                  <ReactRouter />
+                  <YouTube />
                 </IntegrationCard>
                 <IntegrationCard>
-                  <Convex />
+                  <OpenAI />
                 </IntegrationCard>
               </div>
               <div className="mx-auto my-2 flex w-fit justify-center gap-2">
@@ -45,7 +46,7 @@ export default function IntegrationsSection({
                   <LogoIcon />
                 </IntegrationCard>
                 <IntegrationCard>
-                  <TailwindIcon />
+                  <Convex />
                 </IntegrationCard>
               </div>
 
@@ -55,17 +56,17 @@ export default function IntegrationsSection({
                 </IntegrationCard>
 
                 <IntegrationCard>
-                  <Polar />
+                  <ClerkIcon />
                 </IntegrationCard>
               </div>
             </div>
             <div className="mx-auto mt-6 max-w-lg space-y-6 text-center sm:mt-0 sm:text-left">
               <h2 className="text-balance text-3xl font-semibold md:text-4xl">
-                React Starter Kit
+                YouTube AI Assistant
               </h2>
               <p className="text-muted-foreground">
-                This powerful starter kit is designed to help you launch your
-                SAAS application quickly and efficiently.
+                Streamline your YouTube content creation with AI-powered tools
+                for titles, descriptions, thumbnails, and social media posts.
               </p>
 
               <div className="flex gap-3">
@@ -79,17 +80,17 @@ export default function IntegrationsSection({
                     prefetch="viewport"
                   >
                     {loaderData?.isSignedIn
-                      ? "Go to Dashboard (Demo)"
-                      : "Get Started (Demo)"}
+                      ? "Go to Projects"
+                      : "Start Creating"}
                   </Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
                   <Link
-                    to="https://github.com/michaelshimeles/react-starter-kit"
+                    to="https://github.com/youtube-ai-assistant"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    ⭐️ Start on GitHub
+                    ⭐️ View on GitHub
                   </Link>
                 </Button>
               </div>

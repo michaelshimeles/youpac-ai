@@ -33,6 +33,32 @@ export default defineSchema({
       x: v.number(),
       y: v.number(),
     }),
+    // Video metadata fields
+    duration: v.optional(v.number()), // Duration in seconds
+    fileSize: v.optional(v.number()), // Size in bytes
+    resolution: v.optional(v.object({
+      width: v.number(),
+      height: v.number(),
+    })),
+    frameRate: v.optional(v.number()), // FPS
+    bitRate: v.optional(v.number()), // Bits per second
+    format: v.optional(v.string()), // Video format/container
+    codec: v.optional(v.string()), // Video codec
+    audioInfo: v.optional(v.object({
+      codec: v.string(),
+      sampleRate: v.number(),
+      channels: v.number(),
+      bitRate: v.number(),
+    })),
+    metadata: v.optional(v.any()), // Additional metadata
+    // Transcription status tracking
+    transcriptionStatus: v.optional(v.union(
+      v.literal("idle"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    )),
+    transcriptionError: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])

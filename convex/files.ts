@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 
 // This mutation generates an upload URL for the client to upload files directly
 export const generateUploadUrl = mutation(async (ctx) => {
@@ -26,5 +26,15 @@ export const createVideoFile = mutation({
       storageId: args.storageId,
       url,
     };
+  },
+});
+
+// Query to get URL from storage ID
+export const getUrl = query({
+  args: {
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.storage.getUrl(args.storageId);
   },
 });
