@@ -21,6 +21,8 @@ import { useMutation, useAction, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
+import { Button } from "~/components/ui/button";
+import { Sparkles } from "lucide-react";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
@@ -34,11 +36,14 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [selectedNodeForChat, setSelectedNodeForChat] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   
   // Convex queries
   const canvasState = useQuery(api.canvas.getState, { projectId });
   const projectVideos = useQuery(api.videos.getByProject, { projectId });
   const projectAgents = useQuery(api.agents.getByProject, { projectId });
+  const userProfile = useQuery(api.profiles.get);
   
   // Convex mutations
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
@@ -48,64 +53,8 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   // Convex actions for AI
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
 
-  const onConnect: OnConnect = useCallback(
-    (params) => {
-      // Validate connection: only allow video -> agent or agent -> agent
-      const sourceNode = nodes.find(n => n.id === params.source);
-      const targetNode = nodes.find(n => n.id === params.target);
-      
-      if (!sourceNode || !targetNode) return;
-      
-      // Check if this is a valid connection
-      const isValidConnection = 
-        (sourceNode.type === 'video' && targetNode.type === 'agent') ||
-        (sourceNode.type === 'agent' && targetNode.type === 'agent');
-      
-      if (!isValidConnection) {
-        toast.error("Can only connect video to agents or agents to agents");
-        return;
-      }
-      
-      // Add the edge
-      setEdges((eds) => addEdge({...params, animated: true}, eds));
-      
-      // Update target agent's connections
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === targetNode.id
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  connections: [...((node.data.connections as string[]) || []), params.source as string],
-                },
-              }
-            : node
-        )
-      );
-    },
-    [setEdges, nodes, setNodes]
-  );
-
-  const onDragOver = useCallback((event: DragEvent) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }, []);
-  
-  // Handle content update from modal
-  const handleContentUpdate = (nodeId: string, newContent: string) => {
-    setNodes((nds) =>
-      nds.map((node) =>
-        node.id === nodeId
-          ? { ...node, data: { ...node.data, draft: newContent } }
-          : node
-      )
-    );
-    toast.success("Content updated!");
-  };
-
   // Handle content generation for an agent node
-  const handleGenerate = async (nodeId: string) => {
+  const handleGenerate = useCallback(async (nodeId: string) => {
     const agentNode = nodes.find(n => n.id === nodeId);
     if (!agentNode) return;
     
@@ -140,13 +89,19 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         content: (n!.data.draft || "") as string,
       }));
       
-      // For hackathon: Use hardcoded profile data
-      const profileData = {
-        channelName: "Tech Tutorial Channel",
-        contentType: "Educational Technology",
-        niche: "Web Development",
+      // Use real user profile data or fallback to defaults
+      const profileData = userProfile ? {
+        channelName: userProfile.channelName,
+        contentType: userProfile.contentType,
+        niche: userProfile.niche,
+        tone: userProfile.tone || "Professional and engaging",
+        targetAudience: userProfile.targetAudience || "General audience",
+      } : {
+        channelName: "My Channel",
+        contentType: "General Content",
+        niche: "General",
         tone: "Professional and engaging",
-        targetAudience: "Developers and students",
+        targetAudience: "General audience",
       };
       
       // Generate content
@@ -187,6 +142,160 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         )
       );
     }
+  }, [nodes, edges, generateContent, userProfile, setNodes]);
+
+  // Generate content for all agent nodes (connect if needed)
+  const handleGenerateAll = useCallback(async () => {
+    // Find video node
+    const videoNode = nodes.find(node => node.type === 'video');
+    if (!videoNode) {
+      toast.error("Please add a video first!");
+      return;
+    }
+
+    // Find all agent nodes
+    const agentNodes = nodes.filter(node => node.type === 'agent');
+    if (agentNodes.length === 0) {
+      toast.info("No agent nodes found. Drag some agents onto the canvas!");
+      return;
+    }
+
+    // Connect all unconnected agents to the video
+    const newEdges: Edge[] = [];
+    agentNodes.forEach(agentNode => {
+      const isConnected = edges.some(edge => 
+        edge.source === videoNode.id && edge.target === agentNode.id
+      );
+      
+      if (!isConnected) {
+        const edgeId = `e${videoNode.id}-${agentNode.id}`;
+        newEdges.push({
+          id: edgeId,
+          source: videoNode.id,
+          target: agentNode.id,
+          animated: true,
+        });
+      }
+    });
+
+    // Add new edges if any
+    if (newEdges.length > 0) {
+      setEdges((eds) => [...eds, ...newEdges]);
+      
+      // Update agent connections
+      setNodes((nds) =>
+        nds.map((node) => {
+          const newConnection = newEdges.find(edge => edge.target === node.id);
+          if (newConnection) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                connections: [...((node.data.connections as string[]) || []), videoNode.id],
+              },
+            };
+          }
+          return node;
+        })
+      );
+    }
+
+    // Now find all agent nodes that need content generation
+    const agentNodesToGenerate = agentNodes.filter(node => !node.data.draft);
+
+    setIsGeneratingAll(true);
+    setGenerationProgress({ current: 0, total: agentNodesToGenerate.length });
+
+    // Sort nodes by type priority: title → description → thumbnail → tweets
+    const typePriority = { title: 1, description: 2, thumbnail: 3, tweets: 4 };
+    const sortedNodes = agentNodesToGenerate.sort((a, b) => 
+      (typePriority[a.data.type as keyof typeof typePriority] || 5) - 
+      (typePriority[b.data.type as keyof typeof typePriority] || 5)
+    );
+
+    for (let i = 0; i < sortedNodes.length; i++) {
+      const node = sortedNodes[i];
+      setGenerationProgress({ current: i + 1, total: sortedNodes.length });
+      
+      try {
+        await handleGenerate(node.id);
+        // Small delay between generations to avoid rate limiting
+        if (i < sortedNodes.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        console.error(`Failed to generate ${node.data.type}:`, error);
+        // Continue with next node even if one fails
+      }
+    }
+
+    setIsGeneratingAll(false);
+    setGenerationProgress({ current: 0, total: 0 });
+    toast.success("All content generated successfully!");
+  }, [nodes, edges, handleGenerate, setEdges, setNodes]);
+
+  const onConnect: OnConnect = useCallback(
+    (params) => {
+      // Validate connection: only allow video -> agent or agent -> agent
+      const sourceNode = nodes.find(n => n.id === params.source);
+      const targetNode = nodes.find(n => n.id === params.target);
+      
+      if (!sourceNode || !targetNode) return;
+      
+      // Check if this is a valid connection
+      const isValidConnection = 
+        (sourceNode.type === 'video' && targetNode.type === 'agent') ||
+        (sourceNode.type === 'agent' && targetNode.type === 'agent');
+      
+      if (!isValidConnection) {
+        toast.error("Can only connect video to agents or agents to agents");
+        return;
+      }
+      
+      // Add the edge
+      setEdges((eds) => addEdge({...params, animated: true}, eds));
+      
+      // Update target agent's connections
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === targetNode.id
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  connections: [...((node.data.connections as string[]) || []), params.source as string],
+                },
+              }
+            : node
+        )
+      );
+      
+      // Auto-generate content for the target agent if it doesn't have any
+      if (targetNode.type === 'agent' && !targetNode.data.draft) {
+        setTimeout(() => {
+          handleGenerate(targetNode.id);
+          toast.success(`Generating ${targetNode.data.type} content...`);
+        }, 500); // Small delay for better UX
+      }
+    },
+    [setEdges, nodes, setNodes, handleGenerate]
+  );
+
+  const onDragOver = useCallback((event: DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+  
+  // Handle content update from modal
+  const handleContentUpdate = (nodeId: string, newContent: string) => {
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, draft: newContent } }
+          : node
+      )
+    );
+    toast.success("Content updated!");
   };
 
   // Handle video file upload
@@ -407,6 +516,24 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
               Drop video file onto canvas
             </p>
           </div>
+        </div>
+
+        <div className="mt-8">
+          <Button 
+            onClick={handleGenerateAll} 
+            disabled={isGeneratingAll}
+            className="w-full"
+            variant="default"
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            {isGeneratingAll 
+              ? `Generating ${generationProgress.current}/${generationProgress.total}...`
+              : "Generate All Content"
+            }
+          </Button>
+          <p className="mt-2 text-xs text-muted-foreground text-center">
+            Connect all agents to video & generate content
+          </p>
         </div>
       </aside>
 
