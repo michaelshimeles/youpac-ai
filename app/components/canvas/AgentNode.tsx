@@ -48,6 +48,7 @@ interface ExtendedNodeProps extends NodeProps {
   data: AgentNodeData & {
     onGenerate?: () => void;
     onChat?: () => void;
+    onView?: () => void;
   };
 }
 
@@ -90,7 +91,7 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
       </div>
       
       {data.type === "thumbnail" && data.thumbnailUrl ? (
-        <div className="mb-3">
+        <div className="mb-3 cursor-pointer" onClick={data.onView}>
           <div className="aspect-video relative rounded-lg overflow-hidden bg-muted">
             <img 
               src={data.thumbnailUrl} 
@@ -105,7 +106,7 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
           )}
         </div>
       ) : data.draft ? (
-        <div className="mb-3">
+        <div className="mb-3 cursor-pointer hover:bg-muted/50 rounded p-2 -m-2 transition-colors" onClick={data.onView}>
           <p className="text-sm text-muted-foreground line-clamp-3">
             {data.draft}
           </p>

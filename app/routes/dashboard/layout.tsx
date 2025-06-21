@@ -23,9 +23,9 @@ export default function DashboardLayout() {
     // Get initial state from localStorage
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("sidebar-open");
-      return saved !== null ? saved === "true" : true;
+      return saved !== null ? saved === "true" : false;
     }
-    return true;
+    return false;
   });
 
   // Save to localStorage whenever state changes
@@ -35,6 +35,7 @@ export default function DashboardLayout() {
 
   return (
     <SidebarProvider
+      defaultOpen={false}
       open={sidebarOpen}
       onOpenChange={setSidebarOpen}
       style={

@@ -1,19 +1,10 @@
 import { useCallback, useRef, useState, type DragEvent, useEffect } from "react";
-import {
-  ReactFlow,
-  ReactFlowProvider,
-  Background,
-  Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  type Edge,
-  type Node,
-  type NodeTypes,
-  type OnConnect,
+import type {
+  Edge,
+  Node,
+  NodeTypes,
+  OnConnect,
 } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import { VideoNode } from "./VideoNode";
 import { AgentNode } from "./AgentNode";
 import { ContentModal } from "./ContentModal";
@@ -25,6 +16,8 @@ import { Button } from "~/components/ui/button";
 import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Twitter, Upload, GripVertical } from "lucide-react";
 import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
 import { extractFramesFromVideo } from "~/lib/video-frames";
+import { FloatingChat } from "./FloatingChat";
+import { ReactFlowWrapper } from "./ReactFlowWrapper";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
@@ -32,11 +25,52 @@ const nodeTypes: NodeTypes = {
 };
 
 function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
+  return (
+    <ReactFlowWrapper>
+      {({ ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge }) => (
+        <InnerCanvas 
+          projectId={projectId}
+          ReactFlow={ReactFlow}
+          ReactFlowProvider={ReactFlowProvider}
+          Background={Background}
+          Controls={Controls}
+          MiniMap={MiniMap}
+          useNodesState={useNodesState}
+          useEdgesState={useEdgesState}
+          addEdge={addEdge}
+        />
+      )}
+    </ReactFlowWrapper>
+  );
+}
+
+function InnerCanvas({ 
+  projectId,
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  addEdge
+}: { 
+  projectId: Id<"projects">;
+  ReactFlow: any;
+  ReactFlowProvider: any;
+  Background: any;
+  Controls: any;
+  MiniMap: any;
+  useNodesState: any;
+  useEdgesState: any;
+  addEdge: any;
+}) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-  const [selectedNodeForChat, setSelectedNodeForChat] = useState<string | null>(null);
+  const [selectedNodeForModal, setSelectedNodeForModal] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState<string>("");
   const [hasLoadedFromDB, setHasLoadedFromDB] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
@@ -49,6 +83,14 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
     }
     return false;
   });
+  const [chatMessages, setChatMessages] = useState<Array<{
+    id: string;
+    role: "user" | "ai";
+    content: string;
+    timestamp: number;
+    agentId?: string;
+  }>>([]);
+  const [isChatGenerating, setIsChatGenerating] = useState(false);
   
   // Use refs to access current values in callbacks
   const nodesRef = useRef(nodes);
@@ -88,10 +130,11 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
   const generateThumbnail = useAction(api.thumbnail.generateThumbnail);
   const transcribeVideo = useAction(api.transcription.transcribeVideo);
+  const refineContent = useAction(api.chat.refineContent);
 
   // Handle content generation for an agent node
   const handleGenerate = useCallback(async (nodeId: string) => {
-    const agentNode = nodesRef.current.find(n => n.id === nodeId);
+    const agentNode = nodesRef.current.find((n: any) => n.id === nodeId);
     if (!agentNode) {
       console.error("Agent node not found:", nodeId);
       return;
@@ -99,8 +142,8 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
     
     try {
       // Update status to generating in UI
-      setNodes((nds) =>
-        nds.map((node) =>
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
           node.id === nodeId
             ? { ...node, data: { ...node.data, status: "generating" } }
             : node
@@ -110,27 +153,27 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       // Also update status in database if we have an agentId
       if (agentNode.data.agentId) {
         await updateAgentDraft({
-          id: agentNode.data.agentId,
+          id: agentNode.data.agentId as Id<"agents">,
           draft: agentNode.data.draft || "",
           status: "generating",
         });
       }
       
       // Find connected video node
-      const connectedVideoEdge = edgesRef.current.find(e => e.target === nodeId && e.source?.includes('video'));
-      const videoNode = connectedVideoEdge ? nodesRef.current.find(n => n.id === connectedVideoEdge.source) : null;
+      const connectedVideoEdge = edgesRef.current.find((e: any) => e.target === nodeId && e.source?.includes('video'));
+      const videoNode = connectedVideoEdge ? nodesRef.current.find((n: any) => n.id === connectedVideoEdge.source) : null;
       
       // Find other connected agent nodes
       const connectedAgentNodes = edgesRef.current
-        .filter(e => e.target === nodeId && e.source?.includes('agent'))
-        .map(e => nodesRef.current.find(n => n.id === e.source))
+        .filter((e: any) => e.target === nodeId && e.source?.includes('agent'))
+        .map((e: any) => nodesRef.current.find((n: any) => n.id === e.source))
         .filter(Boolean);
       
       // Prepare data for AI generation
       let videoData: { title?: string; transcription?: string } = {};
       if (videoNode && videoNode.data.videoId) {
         // Fetch the video with transcription from database
-        const video = projectVideos?.find(v => v._id === videoNode.data.videoId);
+        const video = projectVideos?.find((v: any) => v._id === videoNode.data.videoId);
         videoData = {
           title: videoNode.data.title as string,
           transcription: video?.transcription,
@@ -142,7 +185,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         }
       }
       
-      const connectedAgentOutputs = connectedAgentNodes.map(n => ({
+      const connectedAgentOutputs = connectedAgentNodes.map((n: any) => ({
         type: n!.data.type as string,
         content: (n!.data.draft || "") as string,
       }));
@@ -171,14 +214,14 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         toast.info("Extracting video frames for thumbnail generation...");
         
         // Get the video file from URL
-        const videoResponse = await fetch(videoNode.data.videoUrl);
+        const videoResponse = await fetch(videoNode.data.videoUrl as string);
         const videoBlob = await videoResponse.blob();
         const videoFile = new File([videoBlob], "video.mp4", { type: videoBlob.type });
         
         // Extract frames from video
         const frames = await extractFramesFromVideo(videoFile, { 
           count: 3,
-          onProgress: (progress) => {
+          onProgress: (progress: number) => {
             // Could update UI with progress here
           }
         });
@@ -210,8 +253,8 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       }
       
       // Update node with generated content
-      setNodes((nds) =>
-        nds.map((node) =>
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
           node.id === nodeId
             ? {
                 ...node,
@@ -239,11 +282,11 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       toast.success(`${agentNode.data.type} generated successfully!`);
     } catch (error: any) {
       console.error("Generation error:", error);
-      toast.error(`Failed to generate ${agentNode.data.type}: ${error.message || 'Unknown error'}`);
+      toast.error(error.message || "Failed to generate content");
       
       // Update status to error
-      setNodes((nds) =>
-        nds.map((node) =>
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
           node.id === nodeId
             ? { ...node, data: { ...node.data, status: "error" } }
             : node
@@ -253,7 +296,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       // Update error status in database
       if (agentNode.data.agentId) {
         await updateAgentDraft({
-          id: agentNode.data.agentId,
+          id: agentNode.data.agentId as Id<"agents">,
           draft: agentNode.data.draft || "",
           status: "error",
         });
@@ -261,197 +304,273 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
     }
   }, [generateContent, userProfile, setNodes, updateAgentDraft, projectVideos, transcriptionVersion]);
 
-  // Generate content for all agent nodes (connect if needed)
-  const handleGenerateAll = useCallback(async () => {
-    // Find video node
-    const videoNode = nodes.find(node => node.type === 'video');
-    if (!videoNode) {
-      toast.error("Please add a video first!");
+  // Handle chat messages with @mentions
+  const handleChatMessage = useCallback(async (message: string) => {
+    // Extract @mention from message
+    const mentionRegex = /@(\w+_AGENT)/gi;
+    const match = message.match(mentionRegex);
+    
+    if (!match) {
+      // If no mention, just add the message to chat history
+      setChatMessages(prev => [...prev, {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: message,
+        timestamp: Date.now(),
+      }]);
+      
+      // Add a general response
+      setTimeout(() => {
+        setChatMessages(prev => [...prev, {
+          id: `ai-${Date.now()}`,
+          role: "ai",
+          content: "Please @mention a specific agent (e.g., @TITLE_AGENT) to get help with content generation or refinement.",
+          timestamp: Date.now(),
+        }]);
+      }, 500);
       return;
     }
-
-    // Find all agent nodes
-    const agentNodes = nodes.filter(node => node.type === 'agent');
-    if (agentNodes.length === 0) {
-      toast.info("No agent nodes found. Drag some agents onto the canvas!");
+    
+    // Find the agent node based on the mention
+    const agentType = match[0].replace("@", "").replace("_AGENT", "").toLowerCase();
+    const agentNode = nodesRef.current.find((n: any) => n.type === "agent" && n.data.type === agentType);
+    
+    if (!agentNode || !agentNode.data.agentId) {
+      setChatMessages(prev => [...prev, {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: message,
+        timestamp: Date.now(),
+      }]);
+      
+      setTimeout(() => {
+        setChatMessages(prev => [...prev, {
+          id: `ai-${Date.now()}`,
+          role: "ai",
+          content: `No ${agentType} agent found in the canvas. Please add one first.`,
+          timestamp: Date.now(),
+        }]);
+      }, 500);
       return;
     }
-
-    // Connect all unconnected agents to the video
-    const newEdges: Edge[] = [];
-    agentNodes.forEach(agentNode => {
-      const isConnected = edges.some(edge => 
-        edge.source === videoNode.id && edge.target === agentNode.id
-      );
+    
+    setIsChatGenerating(true);
+    
+    // Add user message immediately
+    setChatMessages(prev => [...prev, {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: message,
+      timestamp: Date.now(),
+      agentId: agentNode.id,
+    }]);
+    
+    try {
+      // Find connected video for context
+      const connectedVideoEdge = edgesRef.current.find((e: any) => e.target === agentNode.id && e.source?.includes('video'));
+      const videoNode = connectedVideoEdge ? nodesRef.current.find((n: any) => n.id === connectedVideoEdge.source) : null;
       
-      if (!isConnected) {
-        const edgeId = `e${videoNode.id}-${agentNode.id}`;
-        newEdges.push({
-          id: edgeId,
-          source: videoNode.id,
-          target: agentNode.id,
-          animated: true,
-        });
-      }
-    });
-
-    // Add new edges if any
-    if (newEdges.length > 0) {
-      setEdges((eds) => [...eds, ...newEdges]);
-      
-      // Update agent connections
-      setNodes((nds) =>
-        nds.map((node) => {
-          const newConnection = newEdges.find(edge => edge.target === node.id);
-          if (newConnection) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                connections: [...((node.data.connections as string[]) || []), videoNode.id],
-              },
-            };
-          }
-          return node;
-        })
-      );
-      
-      // Update connections in database for each newly connected agent
-      for (const edge of newEdges) {
-        const agentNode = agentNodes.find(n => n.id === edge.target);
-        if (agentNode?.data.agentId) {
-          // Store the video ID, not the node ID
-          const newConnections = [...((agentNode.data.connections as string[]) || []), videoNode.data.videoId];
-          updateAgentConnections({
-            id: agentNode.data.agentId,
-            connections: newConnections,
-          }).catch((error) => {
-            console.error("Failed to update agent connections:", error);
-          });
-        }
-      }
-    }
-
-    // Now find all agent nodes that need content generation
-    const agentNodesToGenerate = agentNodes.filter(node => !node.data.draft);
-
-    setIsGeneratingAll(true);
-    setGenerationProgress({ current: 0, total: agentNodesToGenerate.length });
-
-    // Sort nodes by type priority: title → description → thumbnail → tweets
-    const typePriority = { title: 1, description: 2, thumbnail: 3, tweets: 4 };
-    const sortedNodes = agentNodesToGenerate.sort((a, b) => 
-      (typePriority[a.data.type as keyof typeof typePriority] || 5) - 
-      (typePriority[b.data.type as keyof typeof typePriority] || 5)
-    );
-
-    for (let i = 0; i < sortedNodes.length; i++) {
-      const node = sortedNodes[i];
-      setGenerationProgress({ current: i + 1, total: sortedNodes.length });
-      
-      try {
-        await handleGenerate(node.id);
-        // Small delay between generations to avoid rate limiting
-        if (i < sortedNodes.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      } catch (error) {
-        console.error(`Failed to generate ${node.data.type}:`, error);
-        // Continue with next node even if one fails
-      }
-    }
-
-    setIsGeneratingAll(false);
-    setGenerationProgress({ current: 0, total: 0 });
-    toast.success("All content generated successfully!");
-  }, [nodes, edges, handleGenerate, setEdges, setNodes, updateAgentConnections]);
-
-  const onConnect: OnConnect = useCallback(
-    (params) => {
-      // Validate connection: only allow video -> agent or agent -> agent
-      const sourceNode = nodes.find(n => n.id === params.source);
-      const targetNode = nodes.find(n => n.id === params.target);
-      
-      if (!sourceNode || !targetNode) return;
-      
-      // Check if this is a valid connection
-      const isValidConnection = 
-        (sourceNode.type === 'video' && targetNode.type === 'agent') ||
-        (sourceNode.type === 'agent' && targetNode.type === 'agent');
-      
-      if (!isValidConnection) {
-        toast.error("Can only connect video to agents or agents to agents");
-        return;
+      let videoData: { title?: string; transcription?: string } = {};
+      if (videoNode && videoNode.data.videoId) {
+        const video = projectVideos?.find((v: any) => v._id === videoNode.data.videoId);
+        videoData = {
+          title: videoNode.data.title as string,
+          transcription: video?.transcription,
+        };
       }
       
-      // Add the edge
-      setEdges((eds) => addEdge({...params, animated: true}, eds));
+      // Get relevant chat history for this agent
+      const agentHistory = chatMessages.filter(msg => msg.agentId === agentNode.id);
       
-      // Update target agent's connections
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === targetNode.id
+      // Call refine content action
+      const result = await refineContent({
+        agentId: agentNode.data.agentId as Id<"agents">,
+        userMessage: message.replace(mentionRegex, "").trim(), // Remove @mention from message
+        currentDraft: agentNode.data.draft || "",
+        agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets",
+        chatHistory: agentHistory.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        videoData,
+        profileData: userProfile ? {
+          channelName: userProfile.channelName,
+          contentType: userProfile.contentType,
+          niche: userProfile.niche,
+          tone: userProfile.tone,
+          targetAudience: userProfile.targetAudience,
+        } : undefined,
+      });
+      
+      // Add AI response
+      setChatMessages(prev => [...prev, {
+        id: `ai-${Date.now()}`,
+        role: "ai",
+        content: result.response,
+        timestamp: Date.now(),
+        agentId: agentNode.id,
+      }]);
+      
+      // Update node with new draft
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === agentNode.id
             ? {
                 ...node,
                 data: {
                   ...node.data,
-                  connections: [...((node.data.connections as string[]) || []), params.source as string],
+                  draft: result.updatedDraft,
                 },
               }
             : node
         )
       );
       
-      // Update connections in database if it's an agent
-      if (targetNode.type === 'agent' && targetNode.data.agentId) {
-        // Store the actual video/agent ID, not the node ID
-        let connectionId = params.source as string;
-        if (sourceNode.type === 'video' && sourceNode.data.videoId) {
-          connectionId = sourceNode.data.videoId;
-        } else if (sourceNode.type === 'agent' && sourceNode.data.agentId) {
-          connectionId = sourceNode.data.agentId;
-        }
-        
-        const newConnections = [...((targetNode.data.connections as string[]) || []), connectionId];
-        updateAgentConnections({
-          id: targetNode.data.agentId,
-          connections: newConnections,
-        }).catch((error) => {
-          console.error("Failed to update agent connections:", error);
-        });
-      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      toast.error("Failed to process chat message");
       
-      // Inform user about generation readiness
-      if (targetNode.type === 'agent' && !targetNode.data.draft) {
-        if (sourceNode.type === 'video') {
-          if (sourceNode.data.isTranscribing) {
-            toast.info("Video is still being transcribed. Generate once complete.");
-          } else if (sourceNode.data.hasTranscription) {
-            toast.success("Connected! Click Generate to create content.");
-          } else {
-            toast.warning("Connected! No transcription available - content will be less accurate.");
-          }
-        } else {
-          // Connected agent to agent
-          toast.success("Connected! Click Generate to create content using connected agent's output.");
+      setChatMessages(prev => [...prev, {
+        id: `ai-${Date.now()}`,
+        role: "ai",
+        content: "Sorry, I encountered an error processing your request. Please try again.",
+        timestamp: Date.now(),
+        agentId: agentNode.id,
+      }]);
+    } finally {
+      setIsChatGenerating(false);
+    }
+  }, [chatMessages, projectVideos, userProfile, refineContent, setNodes]);
+
+  // Handle chat button click - add @mention to input
+  const handleChatButtonClick = useCallback((nodeId: string) => {
+    const agentNode = nodesRef.current.find((n: any) => n.id === nodeId);
+    if (!agentNode || agentNode.type !== 'agent') return;
+    
+    const agentType = agentNode.data.type as string;
+    const mention = `@${agentType.toUpperCase()}_AGENT `;
+    
+    // Add mention to chat input
+    setChatInput(mention);
+  }, []);
+
+  // Generate content for all agent nodes (connect if needed)
+  const handleGenerateAll = useCallback(async () => {
+    // Find video node
+    const videoNode = nodes.find((node: any) => node.type === 'video');
+    if (!videoNode) {
+      toast.error("Please add a video first!");
+      return;
+    }
+    
+    // Find all agent nodes
+    const agentNodes = nodes.filter((node: any) => node.type === 'agent');
+    if (agentNodes.length === 0) {
+      toast.error("No agent nodes found!");
+      return;
+    }
+    
+    setIsGeneratingAll(true);
+    setGenerationProgress({ current: 0, total: agentNodes.length });
+    
+    // Ensure all agents are connected to video node
+    agentNodes.forEach((agentNode: any) => {
+      const existingEdge = edges.find((edge: any) => 
+        edge.source === videoNode.id && edge.target === agentNode.id
+      );
+      
+      if (!existingEdge) {
+        const newEdge: Edge = {
+          id: `e${videoNode.id}-${agentNode.id}`,
+          source: videoNode.id,
+          target: agentNode.id,
+          animated: true,
+        };
+        setEdges((eds: any) => [...eds, newEdge]);
+        
+        // Update agent connections in database
+        if (agentNode.data.agentId) {
+          updateAgentConnections({
+            id: agentNode.data.agentId as Id<"agents">,
+            connections: [videoNode.data.videoId as string],
+          }).catch((error: any) => {
+            console.error("Failed to update agent connections:", error);
+          });
+        }
+      }
+    });
+    
+    // Generate content for each agent
+    for (let i = 0; i < agentNodes.length; i++) {
+      const agentNode = agentNodes[i];
+      setGenerationProgress({ current: i + 1, total: agentNodes.length });
+      
+      try {
+        await handleGenerate(agentNode.id);
+      } catch (error) {
+        console.error(`Failed to generate content for ${agentNode.data.type}:`, error);
+        toast.error(`Failed to generate ${agentNode.data.type}`);
+      }
+    }
+    
+    setIsGeneratingAll(false);
+    setGenerationProgress({ current: 0, total: 0 });
+    toast.success("All content generated successfully!");
+  }, [nodes, edges, setEdges, handleGenerate, updateAgentConnections]);
+
+  const onConnect: OnConnect = useCallback(
+    (params) => {
+      const sourceNode = nodes.find((n: any) => n.id === params.source);
+      const targetNode = nodes.find((n: any) => n.id === params.target);
+      
+      // Allow connections from video to agent or agent to agent
+      if (!sourceNode || !targetNode) return;
+      
+      if (
+        (sourceNode.type === 'video' && targetNode.type === 'agent') ||
+        (sourceNode.type === 'agent' && targetNode.type === 'agent')
+      ) {
+        setEdges((eds: any) => addEdge(params, eds));
+        
+        // Update agent connections in database
+        if (targetNode.data.agentId && sourceNode.data.videoId) {
+          const currentConnections = targetNode.data.connections || [];
+          const newConnections = [...currentConnections, sourceNode.data.videoId];
+          
+          updateAgentConnections({
+            id: targetNode.data.agentId as Id<"agents">,
+            connections: newConnections,
+          }).catch((error: any) => {
+            console.error("Failed to update agent connections:", error);
+          });
+          
+          // Update node data
+          setNodes((nds: any) =>
+            nds.map((node: any) =>
+              node.id === targetNode.id
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      connections: newConnections,
+                    },
+                  }
+                : node
+            )
+          );
         }
       }
     },
-    [setEdges, nodes, setNodes, handleGenerate, updateAgentConnections]
+    [nodes, setEdges, setNodes, updateAgentConnections]
   );
 
-  const onDragOver = useCallback((event: DragEvent) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }, []);
-  
   // Handle content update from modal
   const handleContentUpdate = async (nodeId: string, newContent: string) => {
-    const node = nodes.find(n => n.id === nodeId);
+    const node = nodes.find((n: any) => n.id === nodeId);
     if (!node) return;
     
-    setNodes((nds) =>
-      nds.map((node) =>
+    setNodes((nds: any) =>
+      nds.map((node: any) =>
         node.id === nodeId
           ? { ...node, data: { ...node.data, draft: newContent } }
           : node
@@ -462,7 +581,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
     if (node.type === 'agent' && node.data.agentId) {
       try {
         await updateAgentDraft({
-          id: node.data.agentId,
+          id: node.data.agentId as Id<"agents">,
           draft: newContent,
           status: "ready",
         });
@@ -490,7 +609,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
           isUploading: true,
         },
       };
-      setNodes((nds) => nds.concat(tempNode));
+      setNodes((nds: any) => nds.concat(tempNode));
 
       // Step 1: Get upload URL from Convex
       const uploadUrl = await generateUploadUrl();
@@ -517,8 +636,8 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       if (!video) throw new Error("Failed to create video");
       
       // Step 4: Update node with real data including video URL
-      setNodes((nds) => 
-        nds.map((node) => 
+      setNodes((nds: any) => 
+        nds.map((node: any) => 
           node.id === tempNodeId
             ? {
                 ...node,
@@ -539,64 +658,66 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       
       toast.success("Video uploaded successfully!");
       
-      // Step 5: Start transcription
-      const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+      // Step 5: Transcribe video or extract audio first if too large
+      const fileSizeMB = file.size / (1024 * 1024);
+      const MAX_DIRECT_TRANSCRIBE_SIZE = 25; // 25MB limit for Whisper API
       
-      if (file.size > MAX_FILE_SIZE) {
-        // File is too large, need to extract audio
-        toast.info("Video is large. Extracting audio for transcription...");
-        
-        // Update node to show audio extraction
-        setNodes((nds) => 
-          nds.map((node) => 
-            node.id === `video_${video._id}`
-              ? {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    isExtracting: true,
-                  },
-                }
-              : node
-          )
-        );
-        
-        try {
+      try {
+        if (fileSizeMB > MAX_DIRECT_TRANSCRIBE_SIZE) {
+          // Show audio extraction progress
+          toast.info("Video is large. Extracting audio for transcription...");
+          
+          // Update node to show extraction status
+          setNodes((nds: any) =>
+            nds.map((node: any) =>
+              node.id === `video_${video._id}`
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      isTranscribing: false,
+                      isExtracting: true,
+                      extractionProgress: 0,
+                    },
+                  }
+                : node
+            )
+          );
+          
           // Extract audio from video
-          const audioFile = await extractAudioFromVideo(file, (progress) => {
-            // Update extraction progress
-            setNodes((nds) => 
-              nds.map((node) => 
-                node.id === `video_${video._id}`
-                  ? {
-                      ...node,
-                      data: {
-                        ...node.data,
-                        extractionProgress: Math.round(progress * 100),
-                      },
-                    }
-                  : node
-              )
-            );
+          const audioFile = await extractAudioFromVideo(file, {
+            onProgress: (progress) => {
+              setNodes((nds: any) =>
+                nds.map((node: any) =>
+                  node.id === `video_${video._id}`
+                    ? {
+                        ...node,
+                        data: {
+                          ...node.data,
+                          extractionProgress: Math.round(progress * 100),
+                        },
+                      }
+                    : node
+                )
+              );
+            },
           });
           
-          toast.success("Audio extracted! Uploading for transcription...");
-          
-          // Upload extracted audio
+          // Upload audio file
           const audioUploadUrl = await generateUploadUrl();
-          const audioUploadResult = await fetch(audioUploadUrl, {
+          const audioResult = await fetch(audioUploadUrl, {
             method: "POST",
             headers: { "Content-Type": audioFile.type },
             body: audioFile,
           });
           
-          if (!audioUploadResult.ok) throw new Error("Audio upload failed");
+          if (!audioResult.ok) throw new Error("Audio upload failed");
           
-          const { storageId: audioStorageId } = await audioUploadResult.json();
+          const { storageId: audioStorageId } = await audioResult.json();
           
-          // Update node - extraction complete, now transcribing
-          setNodes((nds) => 
-            nds.map((node) => 
+          // Update node to show transcription status
+          setNodes((nds: any) =>
+            nds.map((node: any) =>
               node.id === `video_${video._id}`
                 ? {
                     ...node,
@@ -604,7 +725,6 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
                       ...node.data,
                       isExtracting: false,
                       isTranscribing: true,
-                      extractionProgress: undefined,
                     },
                   }
                 : node
@@ -615,98 +735,71 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
           await transcribeVideo({
             videoId: video._id,
             storageId: audioStorageId,
-            fileType: 'audio',
+            fileType: "audio",
           });
-          
-          toast.success("Video transcribed successfully!");
-          
-        } catch (error: any) {
-          console.error("Audio extraction/transcription error:", error);
-          toast.error(`Failed to process video: ${error.message}`);
-          
-          // Update node to show failure
-          setNodes((nds) => 
-            nds.map((node) => 
-              node.id === `video_${video._id}`
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      isExtracting: false,
-                      isTranscribing: false,
-                      hasTranscription: false,
-                      extractionProgress: undefined,
-                    },
-                  }
-                : node
-            )
-          );
-          return;
-        }
-      } else {
-        // File is small enough, transcribe directly
-        toast.info("Starting transcription...");
-        
-        try {
+        } else {
+          // Direct transcription for smaller files
           await transcribeVideo({
             videoId: video._id,
             storageId: storageId,
-            fileType: 'video',
+            fileType: "video",
           });
-          
-          toast.success("Video transcribed successfully!");
-        } catch (error: any) {
-          console.error("Transcription error:", error);
-          const errorMessage = error.message || "Failed to transcribe video";
-          
-          if (errorMessage.includes("OPENAI_API_KEY")) {
-            toast.error("OpenAI API key not configured. Content will be generated without transcription.");
-          } else {
-            toast.error(`Transcription failed: ${errorMessage}`);
-          }
-          
-          // Update node to show transcription failed
-          setNodes((nds) => 
-            nds.map((node) => 
-              node.id === `video_${video._id}`
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      isTranscribing: false,
-                      hasTranscription: false,
-                    },
-                  }
-                : node
-            )
-          );
-          return;
         }
+        
+        toast.success("Video transcribed successfully!");
+        
+        // Update node with transcription complete
+        setNodes((nds: any) =>
+          nds.map((node: any) =>
+            node.id === `video_${video._id}`
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    isTranscribing: false,
+                    hasTranscription: true,
+                  },
+                }
+              : node
+          )
+        );
+        
+        // Force a re-render to pick up the new transcription data
+        setTranscriptionVersion(v => v + 1);
+      } catch (transcriptionError: any) {
+        console.error("Transcription error:", transcriptionError);
+        toast.error(transcriptionError.message || "Failed to transcribe video");
+        
+        // Update node to show transcription failed
+        setNodes((nds: any) =>
+          nds.map((node: any) =>
+            node.id === `video_${video._id}`
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    isTranscribing: false,
+                    isExtracting: false,
+                    hasTranscription: false,
+                  },
+                }
+              : node
+          )
+        );
       }
-      
-      // Update node to show transcription is complete
-      setNodes((nds) => 
-        nds.map((node) => 
-          node.id === `video_${video._id}`
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  isTranscribing: false,
-                  hasTranscription: true,
-                },
-              }
-            : node
-        )
-      );
-      
-      // Force a re-render to pick up the new transcription data
-      setTranscriptionVersion(v => v + 1);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload video");
+      toast.error(error.message || "Failed to upload video");
+      
+      // Remove the temporary node on error
+      setNodes((nds: any) => nds.filter((node: any) => !node.id.startsWith('video_temp_')));
     }
   };
+
+  const onDragOver = useCallback((event: DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
 
   const onDrop = useCallback(
     (event: DragEvent) => {
@@ -752,7 +845,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       });
 
       // Find the first video node to associate with this agent
-      const videoNode = nodes.find(n => n.type === 'video' && n.data.videoId);
+      const videoNode = nodes.find((n: any) => n.type === 'video' && n.data.videoId);
       if (!videoNode) {
         toast.error("Please add a video first before adding agents");
         return;
@@ -776,11 +869,12 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
             status: "idle",
             connections: [],
             onGenerate: () => handleGenerate(nodeId),
-            onChat: () => setSelectedNodeForChat(nodeId),
+            onChat: () => handleChatButtonClick(nodeId),
+            onView: () => setSelectedNodeForModal(nodeId),
           },
         };
 
-        setNodes((nds) => nds.concat(newNode));
+        setNodes((nds: any) => nds.concat(newNode));
         
         // Automatically create edge from video to agent
         const edgeId = `e${videoNode.id}-${nodeId}`;
@@ -790,7 +884,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
           target: nodeId,
           animated: true,
         };
-        setEdges((eds) => [...eds, newEdge]);
+        setEdges((eds: any) => [...eds, newEdge]);
         
         // Update agent's connections in database
         updateAgentConnections({
@@ -815,7 +909,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         toast.error("Failed to create agent");
       });
     },
-    [reactFlowInstance, setNodes, setEdges, handleVideoUpload, handleGenerate, nodes, createAgent, projectId, updateAgentConnections]
+    [reactFlowInstance, setNodes, setEdges, handleVideoUpload, handleGenerate, nodes, createAgent, projectId, updateAgentConnections, handleChatButtonClick]
   );
 
   // Load existing videos and agents from the project
@@ -847,11 +941,30 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
           status: agent.status,
           connections: agent.connections,
           onGenerate: () => handleGenerate(`agent_${agent.type}_${agent._id}`),
-          onChat: () => setSelectedNodeForChat(`agent_${agent.type}_${agent._id}`),
+          onChat: () => handleChatButtonClick(`agent_${agent.type}_${agent._id}`),
+          onView: () => setSelectedNodeForModal(`agent_${agent.type}_${agent._id}`),
         },
       }));
 
       setNodes([...videoNodes, ...agentNodes]);
+      
+      // Load chat history from agents
+      const allMessages: typeof chatMessages = [];
+      projectAgents.forEach((agent) => {
+        if (agent.chatHistory && agent.chatHistory.length > 0) {
+          const agentMessages = agent.chatHistory.map((msg, idx) => ({
+            id: `msg-${agent._id}-${idx}`,
+            role: msg.role,
+            content: msg.message,
+            timestamp: msg.timestamp,
+            agentId: `agent_${agent.type}_${agent._id}`,
+          }));
+          allMessages.push(...agentMessages);
+        }
+      });
+      // Sort messages by timestamp
+      allMessages.sort((a: any, b: any) => a.timestamp - b.timestamp);
+      setChatMessages(allMessages);
       
       // Reconstruct edges based on agent connections
       const edges: Edge[] = [];
@@ -884,218 +997,230 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       });
       
       setEdges(edges);
-      
-      // Load viewport if available from canvas state
-      if (canvasState && reactFlowInstance && canvasState.viewport) {
-        reactFlowInstance.setViewport(canvasState.viewport);
-      }
-      
       setHasLoadedFromDB(true);
     }
-  }, [projectVideos, projectAgents, hasLoadedFromDB, setNodes, setEdges, canvasState, reactFlowInstance, handleGenerate, setSelectedNodeForChat]);
+  }, [projectVideos, projectAgents, hasLoadedFromDB, setNodes, setEdges, handleGenerate, handleChatButtonClick]);
 
-  // Auto-save canvas state periodically
+  // Auto-save canvas state
   useEffect(() => {
-    if (!reactFlowInstance || !hasLoadedFromDB) return;
-
-    const saveState = () => {
-      const viewport = reactFlowInstance.getViewport();
-      // Temporarily disabled to debug persistence
-      // saveCanvasState({
-      //   projectId,
-      //   nodes: nodes.map(n => ({
-      //     id: n.id,
-      //     type: n.type || "agent",
-      //     position: n.position,
-      //     data: n.data,
-      //   })),
-      //   edges: edges.map(e => ({
-      //     id: e.id,
-      //     source: e.source,
-      //     target: e.target,
-      //     sourceHandle: e.sourceHandle || undefined,
-      //     targetHandle: e.targetHandle || undefined,
-      //   })),
-      //   viewport,
-      // }).catch((error) => {
-      //   console.error("Failed to save canvas state:", error);
-      // });
-    };
-
-    const interval = setInterval(saveState, 5000); // Save every 5 seconds
-    return () => clearInterval(interval);
+    if (!projectId || !hasLoadedFromDB) return;
+    
+    const saveTimeout = setTimeout(() => {
+      const viewport = reactFlowInstance?.getViewport() || { x: 0, y: 0, zoom: 1 };
+      
+      saveCanvasState({
+        projectId,
+        nodes: nodes.map((node: any) => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: node.data,
+        })),
+        edges: edges.map((edge: any) => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle,
+        })),
+        viewport,
+      }).catch((error) => {
+        console.error("Failed to save canvas state:", error);
+      });
+    }, 5000); // Save after 5 seconds of inactivity
+    
+    return () => clearTimeout(saveTimeout);
   }, [nodes, edges, reactFlowInstance, projectId, saveCanvasState, hasLoadedFromDB]);
 
   return (
-    <div className="flex h-[calc(100vh-var(--header-height))]">
-      {/* Sidebar with draggable agent nodes */}
-      <aside className={`${isSidebarCollapsed ? "w-16" : "w-64"} border-r bg-background transition-all duration-300 flex flex-col`}>
-        <div className={`flex-1 ${isSidebarCollapsed ? "p-2" : "p-4"}`}>
-          {!isSidebarCollapsed && (
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Agent Nodes</h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="h-8 w-8"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-          {isSidebarCollapsed && (
-            <div className="text-center mb-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="h-8 w-8"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-          
-          <div className="space-y-2">
-            <DraggableNode 
-              type="title" 
-              label={isSidebarCollapsed ? "" : "Title Agent"} 
-              icon={<FileText className="h-4 w-4" />}
-              collapsed={isSidebarCollapsed}
-            />
-            <DraggableNode 
-              type="description" 
-              label={isSidebarCollapsed ? "" : "Description Agent"} 
-              icon={<FileText className="h-4 w-4" />}
-              collapsed={isSidebarCollapsed}
-            />
-            <DraggableNode 
-              type="thumbnail" 
-              label={isSidebarCollapsed ? "" : "Thumbnail Agent"} 
-              icon={<Image className="h-4 w-4" />}
-              collapsed={isSidebarCollapsed}
-            />
-            <DraggableNode 
-              type="tweets" 
-              label={isSidebarCollapsed ? "" : "Tweets Agent"} 
-              icon={<Twitter className="h-4 w-4" />}
-              collapsed={isSidebarCollapsed}
-            />
-          </div>
-          
-          {!isSidebarCollapsed && (
-            <div className="mt-8">
-              <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-                Drag & Drop Video
-              </h3>
-              <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Drop video file onto canvas
-                </p>
+    <ReactFlowProvider>
+      <div className="flex h-[calc(100vh-var(--header-height))]">
+        {/* Sidebar with draggable agent nodes */}
+        <aside className={`${isSidebarCollapsed ? "w-16" : "w-64"} border-r bg-background transition-all duration-300 flex flex-col`}>
+          <div className={`flex-1 ${isSidebarCollapsed ? "p-2" : "p-4"}`}>
+            {!isSidebarCollapsed && (
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Agent Nodes</h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                  className="h-8 w-8"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
               </div>
-            </div>
-          )}
-          
-          {isSidebarCollapsed ? (
-            <div className="mt-8">
-              <Button
-                onClick={() => setIsSidebarCollapsed(false)}
-                size="icon"
-                variant="ghost"
-                className="w-full"
-                title="Upload Video"
-              >
-                <Upload className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : null}
-        </div>
-
-        <div className={`${isSidebarCollapsed ? "p-2" : "p-4"}`}>
-          <Button 
-            onClick={handleGenerateAll} 
-            disabled={isGeneratingAll}
-            className="w-full"
-            variant="default"
-            size={isSidebarCollapsed ? "icon" : "default"}
-            title={isSidebarCollapsed ? "Generate All Content" : undefined}
-          >
-            <Sparkles className={isSidebarCollapsed ? "h-4 w-4" : "mr-2 h-4 w-4"} />
-            {!isSidebarCollapsed && (isGeneratingAll 
-              ? `Generating ${generationProgress.current}/${generationProgress.total}...`
-              : "Generate All Content"
             )}
-          </Button>
-          {!isSidebarCollapsed && (
-            <p className="mt-2 text-xs text-muted-foreground text-center">
-              Connect all agents to video & generate content
-            </p>
-          )}
-        </div>
-      </aside>
+            {isSidebarCollapsed && (
+              <div className="text-center mb-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                  className="h-8 w-8"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <DraggableNode 
+                type="title" 
+                label={isSidebarCollapsed ? "" : "Title Agent"} 
+                icon={<FileText className="h-4 w-4" />}
+                collapsed={isSidebarCollapsed}
+              />
+              <DraggableNode 
+                type="description" 
+                label={isSidebarCollapsed ? "" : "Description Agent"} 
+                icon={<FileText className="h-4 w-4" />}
+                collapsed={isSidebarCollapsed}
+              />
+              <DraggableNode 
+                type="thumbnail" 
+                label={isSidebarCollapsed ? "" : "Thumbnail Agent"} 
+                icon={<Image className="h-4 w-4" />}
+                collapsed={isSidebarCollapsed}
+              />
+              <DraggableNode 
+                type="tweets" 
+                label={isSidebarCollapsed ? "" : "Tweets Agent"} 
+                icon={<Twitter className="h-4 w-4" />}
+                collapsed={isSidebarCollapsed}
+              />
+            </div>
+            
+            {!isSidebarCollapsed && (
+              <div className="mt-8">
+                <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+                  Drag & Drop Video
+                </h3>
+                <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Drop video file onto canvas
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {isSidebarCollapsed ? (
+              <div className="mt-8">
+                <Button
+                  onClick={() => setIsSidebarCollapsed(false)}
+                  size="icon"
+                  variant="ghost"
+                  className="w-full"
+                  title="Upload Video"
+                >
+                  <Upload className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : null}
+          </div>
 
-      {/* Canvas */}
-      <div className="flex-1" ref={reactFlowWrapper}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={(changes) => {
-            // Handle node deletions
-            changes.forEach((change) => {
-              if (change.type === 'remove') {
-                const nodeToDelete = nodes.find(n => n.id === change.id);
-                if (nodeToDelete) {
-                  // Delete from database
-                  if (nodeToDelete.type === 'video' && nodeToDelete.data.videoId) {
-                    deleteVideo({ id: nodeToDelete.data.videoId as Id<"videos"> })
-                      .then(() => toast.success("Video deleted"))
-                      .catch((error) => {
-                        console.error("Failed to delete video:", error);
-                        toast.error("Failed to delete video");
-                      });
-                  } else if (nodeToDelete.type === 'agent' && nodeToDelete.data.agentId) {
-                    deleteAgent({ id: nodeToDelete.data.agentId as Id<"agents"> })
-                      .then(() => toast.success(`${nodeToDelete.data.type} agent deleted`))
-                      .catch((error) => {
-                        console.error("Failed to delete agent:", error);
-                        toast.error("Failed to delete agent");
-                      });
+          <div className={`${isSidebarCollapsed ? "p-2" : "p-4"}`}>
+            <Button 
+              onClick={handleGenerateAll} 
+              disabled={isGeneratingAll}
+              className="w-full"
+              variant="default"
+              size={isSidebarCollapsed ? "icon" : "default"}
+              title={isSidebarCollapsed ? "Generate All Content" : undefined}
+            >
+              <Sparkles className={isSidebarCollapsed ? "h-4 w-4" : "mr-2 h-4 w-4"} />
+              {!isSidebarCollapsed && (isGeneratingAll 
+                ? `Generating ${generationProgress.current}/${generationProgress.total}...`
+                : "Generate All Content"
+              )}
+            </Button>
+            {!isSidebarCollapsed && (
+              <p className="mt-2 text-xs text-muted-foreground text-center">
+                Connect all agents to video & generate content
+              </p>
+            )}
+          </div>
+        </aside>
+
+        {/* Canvas */}
+        <div className="flex-1" ref={reactFlowWrapper}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={(changes: any) => {
+              // Handle node deletions
+              changes.forEach((change: any) => {
+                if (change.type === 'remove') {
+                  const nodeToDelete = nodes.find((n: any) => n.id === change.id);
+                  if (nodeToDelete) {
+                    // Delete from database
+                    if (nodeToDelete.type === 'video' && nodeToDelete.data.videoId) {
+                      deleteVideo({ id: nodeToDelete.data.videoId as Id<"videos"> })
+                        .then(() => toast.success("Video deleted"))
+                        .catch((error) => {
+                          console.error("Failed to delete video:", error);
+                          toast.error("Failed to delete video");
+                        });
+                    } else if (nodeToDelete.type === 'agent' && nodeToDelete.data.agentId) {
+                      deleteAgent({ id: nodeToDelete.data.agentId as Id<"agents"> })
+                        .then(() => toast.success(`${nodeToDelete.data.type} agent deleted`))
+                        .catch((error) => {
+                          console.error("Failed to delete agent:", error);
+                          toast.error("Failed to delete agent");
+                        });
+                    }
                   }
                 }
-              }
-            });
-            // Apply changes to state
-            onNodesChange(changes);
+              });
+              
+              // Apply changes to state
+              onNodesChange(changes);
+            }}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onInit={setReactFlowInstance}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            nodeTypes={nodeTypes}
+            fitView
+          >
+            <Background />
+            <Controls />
+            <MiniMap />
+          </ReactFlow>
+        </div>
+        
+        {/* Content Modal */}
+        <ContentModal
+          isOpen={!!selectedNodeForModal}
+          onClose={() => setSelectedNodeForModal(null)}
+          nodeData={selectedNodeForModal ? 
+            nodes.find((n: any) => n.id === selectedNodeForModal)?.data as { type: string; draft: string; thumbnailUrl?: string } | undefined || null 
+            : null}
+          onUpdate={(newContent) => {
+            if (selectedNodeForModal) {
+              handleContentUpdate(selectedNodeForModal, newContent);
+            }
           }}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onInit={setReactFlowInstance}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          nodeTypes={nodeTypes}
-          fitView
-        >
-          <Background />
-          <Controls />
-          <MiniMap />
-        </ReactFlow>
+        />
+        
+        {/* Floating Chat - Always Visible */}
+        <FloatingChat
+          agents={nodes
+            .filter((n: any) => n.type === 'agent')
+            .map((n: any) => ({
+              id: n.id,
+              type: n.data.type as string,
+              draft: n.data.draft as string,
+            }))}
+          messages={chatMessages}
+          onSendMessage={handleChatMessage}
+          isGenerating={isChatGenerating}
+          currentInputValue={chatInput}
+          onInputChange={setChatInput}
+        />
       </div>
-      
-      {/* Content Modal */}
-      <ContentModal
-        isOpen={!!selectedNodeForChat}
-        onClose={() => setSelectedNodeForChat(null)}
-        nodeData={selectedNodeForChat ? 
-          nodes.find(n => n.id === selectedNodeForChat)?.data as { type: string; draft: string } | undefined || null 
-          : null}
-        onUpdate={(newContent) => {
-          if (selectedNodeForChat) {
-            handleContentUpdate(selectedNodeForChat, newContent);
-          }
-        }}
-      />
-    </div>
+    </ReactFlowProvider>
   );
 }
 
@@ -1146,11 +1271,7 @@ function DraggableNode({
 }
 
 function Canvas({ projectId }: { projectId: Id<"projects"> }) {
-  return (
-    <ReactFlowProvider>
-      <CanvasContent projectId={projectId} />
-    </ReactFlowProvider>
-  );
+  return <CanvasContent projectId={projectId} />;
 }
 
 export default Canvas;
