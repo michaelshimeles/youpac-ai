@@ -63,7 +63,7 @@
 - [x] Implement node connection validation
 - [x] Add connection data flow between nodes
 - [x] Create visual connection indicators (animated edges)
-- [ ] Implement node deletion with confirmation
+- [x] Implement node deletion (persists to database)
 - [ ] Add node duplication functionality
 
 ### Chat Interface
@@ -180,6 +180,7 @@
 - ✅ Copy to clipboard functionality
 - ✅ Auto-saving canvas state every 5 seconds
 - ✅ Canvas state persistence between sessions
+- ✅ Full agent persistence (content, connections, positions)
 - ✅ Loading states and animations
 - ✅ Error handling with user feedback
 

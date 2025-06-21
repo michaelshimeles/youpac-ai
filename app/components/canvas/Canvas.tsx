@@ -35,12 +35,26 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [selectedNodeForChat, setSelectedNodeForChat] = useState<string | null>(null);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasLoadedFromDB, setHasLoadedFromDB] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
+  const [transcriptionVersion, setTranscriptionVersion] = useState(0);
+  
+  // Use refs to access current values in callbacks
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  
+  // Keep refs updated
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+  
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
   
   // Convex queries
-  const canvasState = useQuery(api.canvas.getState, { projectId });
+  const canvasState = null; // Temporarily disabled to ensure DB loading works
   const projectVideos = useQuery(api.videos.getByProject, { projectId });
   const projectAgents = useQuery(api.agents.getByProject, { projectId });
   const userProfile = useQuery(api.profiles.get);
@@ -48,18 +62,30 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   // Convex mutations
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createVideo = useMutation(api.videos.create);
+  const createAgent = useMutation(api.agents.create);
+  const updateAgentDraft = useMutation(api.agents.updateDraft);
+  const updateAgentConnections = useMutation(api.agents.updateConnections);
   const saveCanvasState = useMutation(api.canvas.saveState);
+  const deleteVideo = useMutation(api.videos.remove);
+  const deleteAgent = useMutation(api.agents.remove);
   
   // Convex actions for AI
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
+  const transcribeVideo = useAction(api.transcription.transcribeVideo);
 
   // Handle content generation for an agent node
   const handleGenerate = useCallback(async (nodeId: string) => {
-    const agentNode = nodes.find(n => n.id === nodeId);
-    if (!agentNode) return;
+    console.log("handleGenerate called for:", nodeId);
+    console.log("Current nodes:", nodesRef.current.map(n => n.id));
+    const agentNode = nodesRef.current.find(n => n.id === nodeId);
+    if (!agentNode) {
+      console.error("Agent node not found:", nodeId);
+      console.error("Available nodes:", nodesRef.current.map(n => ({ id: n.id, type: n.type })));
+      return;
+    }
     
     try {
-      // Update status to generating
+      // Update status to generating in UI
       setNodes((nds) =>
         nds.map((node) =>
           node.id === nodeId
@@ -68,21 +94,40 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         )
       );
       
+      // Also update status in database if we have an agentId
+      if (agentNode.data.agentId) {
+        await updateAgentDraft({
+          id: agentNode.data.agentId,
+          draft: agentNode.data.draft || "",
+          status: "generating",
+        });
+      }
+      
       // Find connected video node
-      const connectedVideoEdge = edges.find(e => e.target === nodeId && e.source?.includes('video'));
-      const videoNode = connectedVideoEdge ? nodes.find(n => n.id === connectedVideoEdge.source) : null;
+      const connectedVideoEdge = edgesRef.current.find(e => e.target === nodeId && e.source?.includes('video'));
+      const videoNode = connectedVideoEdge ? nodesRef.current.find(n => n.id === connectedVideoEdge.source) : null;
       
       // Find other connected agent nodes
-      const connectedAgentNodes = edges
+      const connectedAgentNodes = edgesRef.current
         .filter(e => e.target === nodeId && e.source?.includes('agent'))
-        .map(e => nodes.find(n => n.id === e.source))
+        .map(e => nodesRef.current.find(n => n.id === e.source))
         .filter(Boolean);
       
       // Prepare data for AI generation
-      const videoData = videoNode ? {
-        title: videoNode.data.title as string,
-        // In a real app, we'd fetch transcription here
-      } : {};
+      let videoData: { title?: string; transcription?: string } = {};
+      if (videoNode && videoNode.data.videoId) {
+        // Fetch the video with transcription from database
+        const video = projectVideos?.find(v => v._id === videoNode.data.videoId);
+        videoData = {
+          title: videoNode.data.title as string,
+          transcription: video?.transcription,
+        };
+        
+        // If no transcription, warn the user
+        if (!video?.transcription) {
+          toast.warning("Generating without transcription - results may be less accurate");
+        }
+      }
       
       const connectedAgentOutputs = connectedAgentNodes.map(n => ({
         type: n!.data.type as string,
@@ -104,9 +149,10 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         targetAudience: "General audience",
       };
       
-      // Generate content
+      // Generate content - pass videoId for fresh data lookup
       const result = await generateContent({
         agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets",
+        videoId: videoNode?.data.videoId as any, // Pass the video ID
         videoData,
         connectedAgentOutputs,
         profileData,
@@ -128,21 +174,39 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         )
       );
       
-      toast.success(`${agentNode.data.type} generated successfully!`);
-    } catch (error) {
-      console.error("Generation error:", error);
-      toast.error("Failed to generate content");
+      // Save to database if the node has an agentId
+      if (agentNode.data.agentId) {
+        await updateAgentDraft({
+          id: agentNode.data.agentId,
+          draft: result,
+          status: "ready",
+        });
+      }
       
-      // Reset status
+      toast.success(`${agentNode.data.type} generated successfully!`);
+    } catch (error: any) {
+      console.error("Generation error:", error);
+      toast.error(`Failed to generate ${agentNode.data.type}: ${error.message || 'Unknown error'}`);
+      
+      // Update status to error
       setNodes((nds) =>
         nds.map((node) =>
           node.id === nodeId
-            ? { ...node, data: { ...node.data, status: "idle" } }
+            ? { ...node, data: { ...node.data, status: "error" } }
             : node
         )
       );
+      
+      // Update error status in database
+      if (agentNode.data.agentId) {
+        await updateAgentDraft({
+          id: agentNode.data.agentId,
+          draft: agentNode.data.draft || "",
+          status: "error",
+        });
+      }
     }
-  }, [nodes, edges, generateContent, userProfile, setNodes]);
+  }, [generateContent, userProfile, setNodes, updateAgentDraft, projectVideos, transcriptionVersion]);
 
   // Generate content for all agent nodes (connect if needed)
   const handleGenerateAll = useCallback(async () => {
@@ -198,6 +262,21 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
           return node;
         })
       );
+      
+      // Update connections in database for each newly connected agent
+      for (const edge of newEdges) {
+        const agentNode = agentNodes.find(n => n.id === edge.target);
+        if (agentNode?.data.agentId) {
+          // Store the video ID, not the node ID
+          const newConnections = [...((agentNode.data.connections as string[]) || []), videoNode.data.videoId];
+          updateAgentConnections({
+            id: agentNode.data.agentId,
+            connections: newConnections,
+          }).catch((error) => {
+            console.error("Failed to update agent connections:", error);
+          });
+        }
+      }
     }
 
     // Now find all agent nodes that need content generation
@@ -232,7 +311,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
     setIsGeneratingAll(false);
     setGenerationProgress({ current: 0, total: 0 });
     toast.success("All content generated successfully!");
-  }, [nodes, edges, handleGenerate, setEdges, setNodes]);
+  }, [nodes, edges, handleGenerate, setEdges, setNodes, updateAgentConnections]);
 
   const onConnect: OnConnect = useCallback(
     (params) => {
@@ -270,15 +349,42 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         )
       );
       
-      // Auto-generate content for the target agent if it doesn't have any
+      // Update connections in database if it's an agent
+      if (targetNode.type === 'agent' && targetNode.data.agentId) {
+        // Store the actual video/agent ID, not the node ID
+        let connectionId = params.source as string;
+        if (sourceNode.type === 'video' && sourceNode.data.videoId) {
+          connectionId = sourceNode.data.videoId;
+        } else if (sourceNode.type === 'agent' && sourceNode.data.agentId) {
+          connectionId = sourceNode.data.agentId;
+        }
+        
+        const newConnections = [...((targetNode.data.connections as string[]) || []), connectionId];
+        updateAgentConnections({
+          id: targetNode.data.agentId,
+          connections: newConnections,
+        }).catch((error) => {
+          console.error("Failed to update agent connections:", error);
+        });
+      }
+      
+      // Inform user about generation readiness
       if (targetNode.type === 'agent' && !targetNode.data.draft) {
-        setTimeout(() => {
-          handleGenerate(targetNode.id);
-          toast.success(`Generating ${targetNode.data.type} content...`);
-        }, 500); // Small delay for better UX
+        if (sourceNode.type === 'video') {
+          if (sourceNode.data.isTranscribing) {
+            toast.info("Video is still being transcribed. Generate once complete.");
+          } else if (sourceNode.data.hasTranscription) {
+            toast.success("Connected! Click Generate to create content.");
+          } else {
+            toast.warning("Connected! No transcription available - content will be less accurate.");
+          }
+        } else {
+          // Connected agent to agent
+          toast.success("Connected! Click Generate to create content using connected agent's output.");
+        }
       }
     },
-    [setEdges, nodes, setNodes, handleGenerate]
+    [setEdges, nodes, setNodes, handleGenerate, updateAgentConnections]
   );
 
   const onDragOver = useCallback((event: DragEvent) => {
@@ -287,7 +393,10 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   }, []);
   
   // Handle content update from modal
-  const handleContentUpdate = (nodeId: string, newContent: string) => {
+  const handleContentUpdate = async (nodeId: string, newContent: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    
     setNodes((nds) =>
       nds.map((node) =>
         node.id === nodeId
@@ -295,7 +404,23 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
           : node
       )
     );
-    toast.success("Content updated!");
+    
+    // Save to database if it's an agent with an ID
+    if (node.type === 'agent' && node.data.agentId) {
+      try {
+        await updateAgentDraft({
+          id: node.data.agentId,
+          draft: newContent,
+          status: "ready",
+        });
+        toast.success("Content updated!");
+      } catch (error) {
+        console.error("Failed to update agent content:", error);
+        toast.error("Failed to save content");
+      }
+    } else {
+      toast.success("Content updated!");
+    }
   };
 
   // Handle video file upload
@@ -352,6 +477,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
                   storageId,
                   videoUrl: video.videoUrl,
                   title: video.title,
+                  isTranscribing: true,
                 },
               }
             : node
@@ -359,6 +485,58 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
       );
       
       toast.success("Video uploaded successfully!");
+      
+      // Step 5: Start transcription
+      toast.info("Starting transcription...");
+      transcribeVideo({
+        videoId: video._id,
+        storageId: storageId,
+      }).then(() => {
+        toast.success("Video transcribed successfully!");
+        // Update node to show transcription is complete
+        setNodes((nds) => 
+          nds.map((node) => 
+            node.id === `video_${video._id}`
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    isTranscribing: false,
+                    hasTranscription: true,
+                  },
+                }
+              : node
+          )
+        );
+        // Force a re-render to pick up the new transcription data
+        setTranscriptionVersion(v => v + 1);
+      }).catch((error) => {
+        console.error("Transcription error:", error);
+        // Show specific error message if available
+        const errorMessage = error.message || "Failed to transcribe video";
+        if (errorMessage.includes("too large")) {
+          toast.error("Video is too large for transcription (max 25MB). You can still generate content without transcription.");
+        } else if (errorMessage.includes("OPENAI_API_KEY")) {
+          toast.error("OpenAI API key not configured. Content will be generated without transcription.");
+        } else {
+          toast.error(`Transcription failed: ${errorMessage}`);
+        }
+        // Update node to show transcription failed
+        setNodes((nds) => 
+          nds.map((node) => 
+            node.id === `video_${video._id}`
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    isTranscribing: false,
+                    hasTranscription: false,
+                  },
+                }
+              : node
+          )
+        );
+      });
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Failed to upload video");
@@ -398,41 +576,79 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         y: event.clientY,
       });
 
-      const nodeId = `agent_${type}_${Date.now()}`;
-      const newNode: Node = {
-        id: nodeId,
-        type: "agent",
-        position,
-        data: {
-          type,
-          draft: "",
-          status: "idle",
-          connections: [],
-          onGenerate: () => handleGenerate(nodeId),
-          onChat: () => setSelectedNodeForChat(nodeId),
-        },
-      };
-
-      setNodes((nds) => nds.concat(newNode));
-    },
-    [reactFlowInstance, setNodes, handleVideoUpload, handleGenerate]
-  );
-
-  // Load existing canvas state when component mounts
-  useEffect(() => {
-    if (!hasLoaded && canvasState) {
-      setNodes(canvasState.nodes || []);
-      setEdges(canvasState.edges || []);
-      if (reactFlowInstance && canvasState.viewport) {
-        reactFlowInstance.setViewport(canvasState.viewport);
+      // Find the first video node to associate with this agent
+      const videoNode = nodes.find(n => n.type === 'video' && n.data.videoId);
+      if (!videoNode) {
+        toast.error("Please add a video first before adding agents");
+        return;
       }
-      setHasLoaded(true);
-    }
-  }, [canvasState, hasLoaded, reactFlowInstance, setNodes, setEdges]);
+
+      // Create agent in database
+      createAgent({
+        videoId: videoNode.data.videoId as Id<"videos">,
+        type: type as "title" | "description" | "thumbnail" | "tweets",
+        canvasPosition: position,
+      }).then((agentId) => {
+        const nodeId = `agent_${type}_${agentId}`;
+        const newNode: Node = {
+          id: nodeId,
+          type: "agent",
+          position,
+          data: {
+            agentId, // Store the database ID
+            type,
+            draft: "",
+            status: "idle",
+            connections: [],
+            onGenerate: () => {
+              console.log("onGenerate callback triggered for:", nodeId);
+              handleGenerate(nodeId);
+            },
+            onChat: () => setSelectedNodeForChat(nodeId),
+          },
+        };
+
+        setNodes((nds) => nds.concat(newNode));
+        
+        // Automatically create edge from video to agent
+        const edgeId = `e${videoNode.id}-${nodeId}`;
+        const newEdge: Edge = {
+          id: edgeId,
+          source: videoNode.id,
+          target: nodeId,
+          animated: true,
+        };
+        setEdges((eds) => [...eds, newEdge]);
+        
+        // Update agent's connections in database
+        updateAgentConnections({
+          id: agentId,
+          connections: [videoNode.data.videoId as string],
+        }).catch((error) => {
+          console.error("Failed to update agent connections:", error);
+        });
+        
+        toast.success(`${type} agent added and connected to video`);
+        
+        // Just inform about transcription status, don't auto-generate
+        if (videoNode.data.isTranscribing) {
+          toast.info("Video is still being transcribed. Generate once complete.");
+        } else if (videoNode.data.hasTranscription) {
+          toast.info("Ready to generate content - click Generate on the agent node");
+        } else {
+          toast.warning("No transcription available - content will be less accurate");
+        }
+      }).catch((error) => {
+        console.error("Failed to create agent:", error);
+        toast.error("Failed to create agent");
+      });
+    },
+    [reactFlowInstance, setNodes, setEdges, handleVideoUpload, handleGenerate, nodes, createAgent, projectId, updateAgentConnections]
+  );
 
   // Load existing videos and agents from the project
   useEffect(() => {
-    if (!hasLoaded && projectVideos && projectAgents && !canvasState) {
+    if (!hasLoadedFromDB && projectVideos !== undefined && projectAgents !== undefined) {
       const videoNodes: Node[] = projectVideos.map((video) => ({
         id: `video_${video._id}`,
         type: "video",
@@ -442,6 +658,8 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
           title: video.title,
           videoUrl: video.videoUrl,
           storageId: video.fileId,
+          hasTranscription: !!video.transcription,
+          isTranscribing: false,
         },
       }));
 
@@ -450,50 +668,93 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         type: "agent",
         position: agent.canvasPosition,
         data: {
+          agentId: agent._id, // Store the database ID
           type: agent.type,
           draft: agent.draft,
           status: agent.status,
           connections: agent.connections,
-          onGenerate: () => handleGenerate(`agent_${agent.type}_${agent._id}`),
+          onGenerate: () => {
+            console.log("onGenerate callback triggered for loaded agent:", `agent_${agent.type}_${agent._id}`);
+            handleGenerate(`agent_${agent.type}_${agent._id}`);
+          },
           onChat: () => setSelectedNodeForChat(`agent_${agent.type}_${agent._id}`),
         },
       }));
 
       setNodes([...videoNodes, ...agentNodes]);
-      setHasLoaded(true);
+      
+      // Reconstruct edges based on agent connections
+      const edges: Edge[] = [];
+      projectAgents.forEach((agent) => {
+        agent.connections.forEach((connectionId: string) => {
+          // Find the source node by its data ID
+          let sourceNodeId: string | null = null;
+          
+          // Check if it's a video ID
+          const videoNode = videoNodes.find(vn => vn.data.videoId === connectionId);
+          if (videoNode) {
+            sourceNodeId = videoNode.id;
+          } else {
+            // Check if it's an agent ID
+            const agentNode = agentNodes.find(an => an.data.agentId === connectionId);
+            if (agentNode) {
+              sourceNodeId = agentNode.id;
+            }
+          }
+          
+          if (sourceNodeId) {
+            edges.push({
+              id: `e${sourceNodeId}-agent_${agent.type}_${agent._id}`,
+              source: sourceNodeId,
+              target: `agent_${agent.type}_${agent._id}`,
+              animated: true,
+            });
+          }
+        });
+      });
+      
+      setEdges(edges);
+      
+      // Load viewport if available from canvas state
+      if (canvasState && reactFlowInstance && canvasState.viewport) {
+        reactFlowInstance.setViewport(canvasState.viewport);
+      }
+      
+      setHasLoadedFromDB(true);
     }
-  }, [projectVideos, projectAgents, canvasState, hasLoaded, setNodes, handleGenerate]);
+  }, [projectVideos, projectAgents, hasLoadedFromDB, setNodes, setEdges, canvasState, reactFlowInstance, handleGenerate, setSelectedNodeForChat]);
 
   // Auto-save canvas state periodically
   useEffect(() => {
-    if (!reactFlowInstance || !hasLoaded) return;
+    if (!reactFlowInstance || !hasLoadedFromDB) return;
 
     const saveState = () => {
       const viewport = reactFlowInstance.getViewport();
-      saveCanvasState({
-        projectId,
-        nodes: nodes.map(n => ({
-          id: n.id,
-          type: n.type || "agent",
-          position: n.position,
-          data: n.data,
-        })),
-        edges: edges.map(e => ({
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          sourceHandle: e.sourceHandle || undefined,
-          targetHandle: e.targetHandle || undefined,
-        })),
-        viewport,
-      }).catch((error) => {
-        console.error("Failed to save canvas state:", error);
-      });
+      // Temporarily disabled to debug persistence
+      // saveCanvasState({
+      //   projectId,
+      //   nodes: nodes.map(n => ({
+      //     id: n.id,
+      //     type: n.type || "agent",
+      //     position: n.position,
+      //     data: n.data,
+      //   })),
+      //   edges: edges.map(e => ({
+      //     id: e.id,
+      //     source: e.source,
+      //     target: e.target,
+      //     sourceHandle: e.sourceHandle || undefined,
+      //     targetHandle: e.targetHandle || undefined,
+      //   })),
+      //   viewport,
+      // }).catch((error) => {
+      //   console.error("Failed to save canvas state:", error);
+      // });
     };
 
     const interval = setInterval(saveState, 5000); // Save every 5 seconds
     return () => clearInterval(interval);
-  }, [nodes, edges, reactFlowInstance, projectId, saveCanvasState, hasLoaded]);
+  }, [nodes, edges, reactFlowInstance, projectId, saveCanvasState, hasLoadedFromDB]);
 
   return (
     <div className="flex h-[calc(100vh-var(--header-height))]">
@@ -542,7 +803,34 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={(changes) => {
+            // Handle node deletions
+            changes.forEach((change) => {
+              if (change.type === 'remove') {
+                const nodeToDelete = nodes.find(n => n.id === change.id);
+                if (nodeToDelete) {
+                  // Delete from database
+                  if (nodeToDelete.type === 'video' && nodeToDelete.data.videoId) {
+                    deleteVideo({ id: nodeToDelete.data.videoId })
+                      .then(() => toast.success("Video deleted"))
+                      .catch((error) => {
+                        console.error("Failed to delete video:", error);
+                        toast.error("Failed to delete video");
+                      });
+                  } else if (nodeToDelete.type === 'agent' && nodeToDelete.data.agentId) {
+                    deleteAgent({ id: nodeToDelete.data.agentId })
+                      .then(() => toast.success(`${nodeToDelete.data.type} agent deleted`))
+                      .catch((error) => {
+                        console.error("Failed to delete agent:", error);
+                        toast.error("Failed to delete agent");
+                      });
+                  }
+                }
+              }
+            });
+            // Apply changes to state
+            onNodesChange(changes);
+          }}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onInit={setReactFlowInstance}

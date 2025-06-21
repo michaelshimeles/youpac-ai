@@ -50,7 +50,7 @@ interface ExtendedNodeProps extends NodeProps {
   };
 }
 
-export const AgentNode = memo(({ data, selected }: ExtendedNodeProps) => {
+export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
   const config = agentConfig[data.type];
   const Icon = config.icon;
 
@@ -117,7 +117,14 @@ export const AgentNode = memo(({ data, selected }: ExtendedNodeProps) => {
           size="sm" 
           variant="default" 
           className="flex-1"
-          onClick={data.onGenerate}
+          onClick={() => {
+            console.log("Generate button clicked", { nodeId: id, onGenerate: !!data.onGenerate, status: data.status });
+            if (data.onGenerate) {
+              data.onGenerate();
+            } else {
+              console.error("No onGenerate function provided for node:", id);
+            }
+          }}
           disabled={data.status === "generating"}
         >
           {data.status === "generating" ? (

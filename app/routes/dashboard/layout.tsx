@@ -3,6 +3,7 @@ import { Outlet, redirect, useLoaderData } from "react-router";
 import { AppSidebar } from "~/components/dashboard/app-sidebar";
 import { SiteHeader } from "~/components/dashboard/site-header";
 import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
+import { useState, useEffect } from "react";
 import type { Route } from "./+types/layout";
 
 export async function loader(args: Route.LoaderArgs) {
@@ -18,9 +19,24 @@ export async function loader(args: Route.LoaderArgs) {
 
 export default function DashboardLayout() {
   const { user } = useLoaderData();
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    // Get initial state from localStorage
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sidebar-open");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+
+  // Save to localStorage whenever state changes
+  useEffect(() => {
+    localStorage.setItem("sidebar-open", String(sidebarOpen));
+  }, [sidebarOpen]);
 
   return (
     <SidebarProvider
+      open={sidebarOpen}
+      onOpenChange={setSidebarOpen}
       style={
         {
           "--sidebar-width": "calc(var(--spacing) * 72)",

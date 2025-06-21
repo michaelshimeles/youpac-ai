@@ -118,6 +118,26 @@ export const getById = query({
   },
 });
 
+// New query to get video with transcription for AI generation
+export const getWithTranscription = query({
+  args: { id: v.id("videos") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const userId = identity.subject;
+
+    const video = await ctx.db.get(args.id);
+    if (!video || video.userId !== userId) {
+      return null;
+    }
+
+    return {
+      title: video.title,
+      transcription: video.transcription,
+    };
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("videos") },
   handler: async (ctx, args) => {

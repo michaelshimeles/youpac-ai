@@ -26,6 +26,10 @@ export const create = mutation({
       throw new Error("Video not found or unauthorized");
     }
 
+    if (!video.projectId) {
+      throw new Error("Video must belong to a project");
+    }
+
     return await ctx.db.insert("agents", {
       videoId: args.videoId,
       userId,

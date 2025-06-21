@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Play, Film, Loader2 } from "lucide-react";
+import { Play, Film, Loader2, FileText, AlertCircle } from "lucide-react";
 import { Card } from "~/components/ui/card";
 
 export interface VideoNodeData {
@@ -10,6 +10,8 @@ export interface VideoNodeData {
   storageId?: string;
   thumbnail?: string;
   isUploading?: boolean;
+  isTranscribing?: boolean;
+  hasTranscription?: boolean;
 }
 
 export const VideoNode = memo(({ data, selected }: NodeProps) => {
@@ -56,9 +58,31 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
       
-      <p className="text-sm font-medium truncate">
-        {videoData.title || "Untitled Video"}
-      </p>
+      <div className="space-y-1">
+        <p className="text-sm font-medium truncate">
+          {videoData.title || "Untitled Video"}
+        </p>
+        
+        {/* Transcription status */}
+        {videoData.isTranscribing && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>Transcribing...</span>
+          </div>
+        )}
+        {!videoData.isTranscribing && videoData.hasTranscription && (
+          <div className="flex items-center gap-1 text-xs text-green-600">
+            <FileText className="h-3 w-3" />
+            <span>Transcribed</span>
+          </div>
+        )}
+        {!videoData.isTranscribing && videoData.hasTranscription === false && (
+          <div className="flex items-center gap-1 text-xs text-yellow-600">
+            <AlertCircle className="h-3 w-3" />
+            <span>No transcription</span>
+          </div>
+        )}
+      </div>
       
       <Handle
         type="source"

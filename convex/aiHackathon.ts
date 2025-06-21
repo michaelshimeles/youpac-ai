@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
+import { api } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
@@ -12,6 +13,7 @@ export const generateContentSimple = action({
       v.literal("thumbnail"),
       v.literal("tweets")
     ),
+    videoId: v.optional(v.id("videos")),
     videoData: v.object({
       title: v.optional(v.string()),
       transcription: v.optional(v.string()),
@@ -37,12 +39,31 @@ export const generateContentSimple = action({
     if (!identity) throw new Error("Unauthorized");
 
     try {
+      // If we have a videoId, fetch the latest video data with transcription
+      let videoData = args.videoData;
+      if (args.videoId) {
+        const freshVideoData = await ctx.runQuery(api.videos.getWithTranscription, {
+          id: args.videoId,
+        });
+        if (freshVideoData && freshVideoData.transcription) {
+          videoData = {
+            title: freshVideoData.title || args.videoData.title,
+            transcription: freshVideoData.transcription,
+          };
+          console.log(`Using transcription for ${args.agentType} generation (${freshVideoData.transcription.length} chars)`);
+        }
+      }
       const prompt = buildPrompt(
         args.agentType,
-        args.videoData,
+        videoData, // Use the fresh video data
         args.connectedAgentOutputs,
         args.profileData
       );
+
+      // Log if generating without transcription
+      if (!videoData.transcription) {
+        console.log(`Generating ${args.agentType} without transcription - using title only`);
+      }
 
       const { text: generatedContent } = await generateText({
         model: openai("gpt-4o-mini"),
@@ -62,10 +83,10 @@ export const generateContentSimple = action({
 
 function getSystemPrompt(agentType: string): string {
   const prompts = {
-    title: "You are an expert YouTube title creator. Create engaging, SEO-friendly titles that maximize click-through rates while accurately representing the video content. Keep titles under 60 characters when possible.",
-    description: "You are an expert YouTube description writer. Create comprehensive, SEO-optimized descriptions that include relevant keywords, provide value to viewers, and encourage engagement. Include timestamps if applicable.",
-    thumbnail: "You are an expert YouTube thumbnail designer. Describe compelling thumbnail concepts that grab attention, clearly communicate the video's value, and follow YouTube best practices. Focus on visual elements, text overlay suggestions, and color schemes.",
-    tweets: "You are an expert social media marketer. Create engaging Twitter/X threads that promote YouTube videos. Write concise, engaging tweets that drive traffic to the video while providing value to the Twitter audience.",
+    title: "You are an expert YouTube title creator. Create ONE engaging, SEO-friendly title that DIRECTLY relates to the video transcription provided. The title must accurately represent what is discussed in the video. Keep it under 60 characters. Do NOT create generic titles - make it specific to the actual content.",
+    description: "You are an expert YouTube description writer. Create a comprehensive, SEO-optimized description based on the actual video transcription. Include relevant keywords from the video content, provide value to viewers, and encourage engagement. Include timestamps if you can identify different sections from the transcription.",
+    thumbnail: "You are an expert YouTube thumbnail designer. Based on the video transcription, describe a compelling thumbnail concept that accurately represents the video content. Focus on visual elements that relate to what's discussed in the video, suggest text overlays based on key points, and recommend color schemes that match the video's topic.",
+    tweets: "You are an expert social media marketer. Create engaging Twitter/X posts that promote this specific YouTube video based on its transcription. Write concise tweets that highlight the actual key points discussed in the video to drive traffic while providing value.",
   };
 
   return prompts[agentType as keyof typeof prompts] || prompts.title;
@@ -83,14 +104,27 @@ function buildPrompt(
     targetAudience?: string;
   }
 ): string {
-  let prompt = `Generate ${agentType} content for a YouTube video.\n\n`;
+  let prompt = "";
 
-  // Add video data
-  if (videoData.title) {
-    prompt += `Video Title: ${videoData.title}\n`;
-  }
+  // Emphasize transcription-based generation
   if (videoData.transcription) {
-    prompt += `Video Transcription: ${videoData.transcription.slice(0, 1000)}...\n\n`;
+    prompt += `IMPORTANT: Generate ${agentType} content based on this actual video transcription. Make sure your output directly relates to what's discussed in the video.\n\n`;
+    
+    // Include more of the transcription for better context (up to 3000 chars)
+    const transcriptionPreview = videoData.transcription.length > 3000 
+      ? videoData.transcription.slice(0, 3000) + "..."
+      : videoData.transcription;
+    prompt += `VIDEO TRANSCRIPTION:\n${transcriptionPreview}\n\n`;
+    
+    if (videoData.title) {
+      prompt += `Current Video Title: ${videoData.title}\n\n`;
+    }
+  } else {
+    prompt += `Generate ${agentType} content for a YouTube video.\n\n`;
+    if (videoData.title) {
+      prompt += `Video Title: ${videoData.title}\n`;
+    }
+    prompt += `Note: No transcription available. Please generate content based on the title and any connected content.\n\n`;
   }
 
   // Add connected agent outputs
