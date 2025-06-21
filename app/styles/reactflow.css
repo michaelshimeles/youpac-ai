@@ -1,0 +1,17 @@
+/* ReactFlow styles */
+@import "@xyflow/react/dist/style.css";
+
+/* Custom canvas styles */
+.react-flow__node-custom {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background: #555;
+  border: 2px solid #fff;
+}

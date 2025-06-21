@@ -1,0 +1,123 @@
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+
+export const create = mutation({
+  args: {
+    title: v.optional(v.string()),
+    videoUrl: v.optional(v.string()),
+    fileId: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
+    canvasPosition: v.object({
+      x: v.number(),
+      y: v.number(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const userId = identity.subject;
+
+    // If we have a storageId, get the URL from Convex storage
+    let videoUrl = args.videoUrl;
+    if (args.storageId) {
+      const url = await ctx.storage.getUrl(args.storageId);
+      if (url) {
+        videoUrl = url;
+      }
+    }
+
+    const videoId = await ctx.db.insert("videos", {
+      userId,
+      title: args.title,
+      videoUrl,
+      fileId: args.fileId || args.storageId,
+      canvasPosition: args.canvasPosition,
+      createdAt: Date.now(),
+    });
+    
+    // Return the created video with its URL
+    const video = await ctx.db.get(videoId);
+    return video;
+  },
+});
+
+export const update = mutation({
+  args: {
+    id: v.id("videos"),
+    title: v.optional(v.string()),
+    transcription: v.optional(v.string()),
+    canvasPosition: v.optional(v.object({
+      x: v.number(),
+      y: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const userId = identity.subject;
+
+    const video = await ctx.db.get(args.id);
+    if (!video || video.userId !== userId) {
+      throw new Error("Video not found or unauthorized");
+    }
+
+    const { id, ...updates } = args;
+    await ctx.db.patch(args.id, updates);
+  },
+});
+
+export const getByUser = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const userId = identity.subject;
+
+    return await ctx.db
+      .query("videos")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const getById = query({
+  args: { id: v.id("videos") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const userId = identity.subject;
+
+    const video = await ctx.db.get(args.id);
+    if (!video || video.userId !== userId) {
+      throw new Error("Video not found or unauthorized");
+    }
+
+    return video;
+  },
+});
+
+export const remove = mutation({
+  args: { id: v.id("videos") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const userId = identity.subject;
+
+    const video = await ctx.db.get(args.id);
+    if (!video || video.userId !== userId) {
+      throw new Error("Video not found or unauthorized");
+    }
+
+    // Delete associated agents
+    const agents = await ctx.db
+      .query("agents")
+      .withIndex("by_video", (q) => q.eq("videoId", args.id))
+      .collect();
+    
+    for (const agent of agents) {
+      await ctx.db.delete(agent._id);
+    }
+
+    await ctx.db.delete(args.id);
+  },
+});

@@ -1,0 +1,209 @@
+{
+  "buildManifest": {
+    "serverBundles": {
+      "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0": {
+        "id": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+        "file": "build/server/nodejs_eyJydW50aW1lIjoibm9kZWpzIn0/index.js",
+        "config": {
+          "runtime": "nodejs"
+        }
+      }
+    },
+    "routeIdToServerBundleId": {
+      "routes/home": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/sign-in": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/sign-up": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/pricing": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/success": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/subscription-required": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/dashboard/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/dashboard/chat": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/dashboard/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+    },
+    "routes": {
+      "root": {
+        "path": "",
+        "id": "root",
+        "file": "app/root.tsx",
+        "config": {}
+      },
+      "routes/home": {
+        "id": "routes/home",
+        "parentId": "root",
+        "file": "app/routes/home.tsx",
+        "index": true,
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/sign-in": {
+        "id": "routes/sign-in",
+        "parentId": "root",
+        "file": "app/routes/sign-in.tsx",
+        "path": "sign-in/*",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/sign-up": {
+        "id": "routes/sign-up",
+        "parentId": "root",
+        "file": "app/routes/sign-up.tsx",
+        "path": "sign-up/*",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/pricing": {
+        "id": "routes/pricing",
+        "parentId": "root",
+        "file": "app/routes/pricing.tsx",
+        "path": "pricing",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/success": {
+        "id": "routes/success",
+        "parentId": "root",
+        "file": "app/routes/success.tsx",
+        "path": "success",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/subscription-required": {
+        "id": "routes/subscription-required",
+        "parentId": "root",
+        "file": "app/routes/subscription-required.tsx",
+        "path": "subscription-required",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/dashboard/layout": {
+        "id": "routes/dashboard/layout",
+        "parentId": "root",
+        "file": "app/routes/dashboard/layout.tsx",
+        "config": {}
+      },
+      "routes/dashboard/index": {
+        "id": "routes/dashboard/index",
+        "parentId": "routes/dashboard/layout",
+        "file": "app/routes/dashboard/index.tsx",
+        "path": "dashboard",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/dashboard/chat": {
+        "id": "routes/dashboard/chat",
+        "parentId": "routes/dashboard/layout",
+        "file": "app/routes/dashboard/chat.tsx",
+        "path": "dashboard/chat",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/dashboard/settings": {
+        "id": "routes/dashboard/settings",
+        "parentId": "routes/dashboard/layout",
+        "file": "app/routes/dashboard/settings.tsx",
+        "path": "dashboard/settings",
+        "config": {
+          "runtime": "nodejs"
+        }
+      }
+    }
+  },
+  "reactRouterConfig": {
+    "appDirectory": "/Users/michaelshimeles/Desktop/rsk/app",
+    "basename": "/",
+    "buildDirectory": "/Users/michaelshimeles/Desktop/rsk/build",
+    "future": {
+      "unstable_middleware": false,
+      "unstable_optimizeDeps": false,
+      "unstable_splitRouteModules": false,
+      "unstable_subResourceIntegrity": false,
+      "unstable_viteEnvironmentApi": false
+    },
+    "routes": {
+      "root": {
+        "path": "",
+        "id": "root",
+        "file": "root.tsx"
+      },
+      "routes/home": {
+        "id": "routes/home",
+        "parentId": "root",
+        "file": "routes/home.tsx",
+        "index": true
+      },
+      "routes/sign-in": {
+        "id": "routes/sign-in",
+        "parentId": "root",
+        "file": "routes/sign-in.tsx",
+        "path": "sign-in/*"
+      },
+      "routes/sign-up": {
+        "id": "routes/sign-up",
+        "parentId": "root",
+        "file": "routes/sign-up.tsx",
+        "path": "sign-up/*"
+      },
+      "routes/pricing": {
+        "id": "routes/pricing",
+        "parentId": "root",
+        "file": "routes/pricing.tsx",
+        "path": "pricing"
+      },
+      "routes/success": {
+        "id": "routes/success",
+        "parentId": "root",
+        "file": "routes/success.tsx",
+        "path": "success"
+      },
+      "routes/subscription-required": {
+        "id": "routes/subscription-required",
+        "parentId": "root",
+        "file": "routes/subscription-required.tsx",
+        "path": "subscription-required"
+      },
+      "routes/dashboard/layout": {
+        "id": "routes/dashboard/layout",
+        "parentId": "root",
+        "file": "routes/dashboard/layout.tsx"
+      },
+      "routes/dashboard/index": {
+        "id": "routes/dashboard/index",
+        "parentId": "routes/dashboard/layout",
+        "file": "routes/dashboard/index.tsx",
+        "path": "dashboard"
+      },
+      "routes/dashboard/chat": {
+        "id": "routes/dashboard/chat",
+        "parentId": "routes/dashboard/layout",
+        "file": "routes/dashboard/chat.tsx",
+        "path": "dashboard/chat"
+      },
+      "routes/dashboard/settings": {
+        "id": "routes/dashboard/settings",
+        "parentId": "routes/dashboard/layout",
+        "file": "routes/dashboard/settings.tsx",
+        "path": "dashboard/settings"
+      }
+    },
+    "routeDiscovery": {
+      "mode": "lazy",
+      "manifestPath": "/__manifest"
+    },
+    "serverBuildFile": "index.js",
+    "serverModuleFormat": "esm",
+    "ssr": true
+  },
+  "viteConfig": {
+    "build": {
+      "assetsDir": "assets"
+    }
+  }
+}
