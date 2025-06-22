@@ -82,7 +82,7 @@ export const Navbar = ({
               </button>
             </div>
 
-            <div className="absolute inset-0 m-auto hidden size-fit lg:block">
+            {/* <div className="absolute inset-0 m-auto hidden size-fit lg:block">
               <ul className="flex gap-8 text-sm">
                 {menuItems.map((item, index) => (
                   <li key={index}>
@@ -95,7 +95,7 @@ export const Navbar = ({
                   </li>
                 ))}
               </ul>
-            </div>
+            </div> */}
 
             <div className="bg-background in-data-[state=active]:block lg:in-data-[state=active]:flex mb-6 hidden w-full flex-wrap items-center justify-end space-y-8 rounded-3xl border p-6 shadow-2xl shadow-zinc-300/20 md:flex-nowrap lg:m-0 lg:flex lg:w-fit lg:gap-6 lg:space-y-0 lg:border-transparent lg:bg-transparent lg:p-0 lg:shadow-none dark:shadow-none dark:lg:bg-transparent">
               <div className="lg:hidden">
@@ -114,7 +114,7 @@ export const Navbar = ({
               </div>
               <div className="flex w-full flex-col space-y-3 sm:flex-row sm:gap-3 sm:space-y-0 md:w-fit">
                 <Link
-                  to="https://github.com/youtube-ai-assistant"
+                  to="https://github.com/michaelshimeles/youpac-ai"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center"

@@ -1,172 +1,128 @@
-import { memo } from "react";
+"use client";
+
+// this is a client component
+import { useEffect } from "react";
 import { Link } from "react-router";
-import { LogoIcon } from "~/components/logo";
-import {
-  Convex,
-  OpenAI,
-  ReactIcon,
-  YouTube,
-  TailwindIcon,
-  Typescript,
-  ClerkIcon,
-} from "~/components/logos";
-import { Button } from "~/components/ui/button";
-import { cn } from "~/lib/utils";
+import { renderCanvas, ShineBorder, TypeWriter } from "~/components/ui/hero-designali";
+import { Plus } from "lucide-react"; 
+import { Button } from "~/components/ui/button"; 
 import { Navbar } from "./navbar";
-import { ArrowRight, Sparkles, Video, Palette, Share2, Bot } from "lucide-react";
 
 export default function Hero({
   loaderData,
 }: {
   loaderData?: { isSignedIn: boolean };
 }) {
+  const talkAbout = [
+    "Video Titles",
+    "Descriptions",
+    "Thumbnails",
+    "Social Posts",
+    "SEO Content",
+    "AI Magic",
+    "YouTube Growth",
+  ];
+
+  useEffect(() => {
+    renderCanvas();
+  }, []);
+
   return (
-    <section id="hero" className="relative overflow-hidden">
+    <main className="overflow-hidden">
+    <section id="home">
       <Navbar loaderData={loaderData} />
-      
-      {/* Background with gradient and pattern */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-primary/10 dark:from-primary/10 dark:to-primary/5">
-        <div className="absolute inset-0 bg-grid-black/[0.02] dark:bg-grid-white/[0.02]" />
-      </div>
-      
-      {/* Animated gradient orbs */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-32 h-80 w-80 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-32 h-80 w-80 rounded-full bg-gradient-to-tr from-blue-500/30 to-primary/30 blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
-      </div>
-      
-      <div className="relative py-24 md:py-32">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl text-center">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary ring-1 ring-inset ring-primary/20 mb-8">
-              <Sparkles className="h-4 w-4" />
-              <span>AI-Powered Content Creation</span>
-            </div>
-            
-            {/* Main heading with gradient */}
-            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl md:text-7xl">
-              <span className="block">Package Your</span>
-              <span className="block bg-gradient-to-r from-blue-500 via-primary to-cyan-500 bg-clip-text text-transparent">
-                YouTube Content
+   <div className="absolute inset-0 max-md:hidden top-[400px] -z-10 h-[400px] w-full bg-transparent bg-[linear-gradient(to_right,#57534e_1px,transparent_1px),linear-gradient(to_bottom,#57534e_1px,transparent_1px)] bg-[size:3rem_3rem] opacity-20 [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)] dark:bg-[linear-gradient(to_right,#a8a29e_1px,transparent_1px),linear-gradient(to_bottom,#a8a29e_1px,transparent_1px)]"></div>
+      <div className="flex flex-col items-center justify-center px-6 text-center">
+        <div className="mb-6 mt-10 sm:justify-center md:mb-4 md:mt-40">
+          <div className="relative flex items-center rounded-full border bg-popover px-3 py-1 text-xs text-primary/60">
+            Introducing YouPac AI.
+            <Link
+              to="/dashboard"
+              rel="noreferrer"
+              className="ml-1 flex items-center font-semibold"
+            >
+              <div
+                className="absolute inset-0 hover:font-semibold hover:text-primary flex"
+                aria-hidden="true"
+              />
+              Explore <span aria-hidden="true"></span>
+            </Link>
+          </div>
+        </div>
+
+        <div className="mx-auto max-w-5xl">
+                     <div className="border-text-primary relative mx-auto h-full bg-background border py-12 p-6 [mask-image:radial-gradient(800rem_96rem_at_center,white,transparent)]">
+
+            <h1 className="flex flex-col text-center text-5xl font-semibold leading-none tracking-tight md:flex-col md:text-8xl lg:flex-row lg:text-8xl">
+              <Plus
+                strokeWidth={4}
+                className="text-primary absolute -left-5 -top-5 h-10 w-10"
+              />
+              <Plus
+                strokeWidth={4}
+                className="text-primary absolute -bottom-5 -left-5 h-10 w-10"
+              />
+              <Plus
+                strokeWidth={4}
+                className="text-primary absolute -right-5 -top-5 h-10 w-10"
+              />
+              <Plus
+                strokeWidth={4}
+                className="text-primary absolute -bottom-5 -right-5 h-10 w-10"
+              />
+              <span>
+                Package Your YouTube Content Better With{" "}
+                <span className="bg-gradient-to-r from-blue-500 via-primary to-cyan-500 bg-clip-text text-transparent">AI</span>
               </span>
-              <span className="block">Better With AI</span>
             </h1>
-            
-            {/* Description */}
-            <p className="mt-6 text-lg leading-8 text-muted-foreground sm:text-xl max-w-2xl mx-auto">
-              Generate compelling titles, descriptions, stunning thumbnails, and viral social media posts. 
-              All powered by cutting-edge AI, designed for YouTube creators.
-            </p>
-            
-            {/* CTA Buttons */}
-            <div className="mt-10 flex items-center justify-center gap-4 flex-wrap">
-              <Button size="lg" className="group" asChild>
-                <Link
-                  to={
-                    loaderData?.isSignedIn
-                      ? "/dashboard"
-                      : "/sign-up"
-                  }
-                  prefetch="viewport"
-                >
-                  {loaderData?.isSignedIn
-                    ? "Go to Dashboard"
-                    : "Start Creating for Free"}
-                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </Button>
-              <Button variant="outline" size="lg" asChild>
-                <Link
-                  to="https://github.com/youtube-ai-assistant"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                  </svg>
-                  Star on GitHub
-                </Link>
-              </Button>
+            <div className="flex items-center mt-4 justify-center gap-1">
+              <span className="relative flex h-3 w-3 items-center justify-center">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+              </span>
+              <p className="text-xs text-green-500">Available Now</p>
             </div>
-            
-            {/* Feature highlights */}
-            <div className="mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4 max-w-3xl mx-auto">
-              <FeatureCard icon={Video} title="Smart Titles" />
-              <FeatureCard icon={Palette} title="AI Thumbnails" />
-              <FeatureCard icon={Bot} title="SEO Descriptions" />
-              <FeatureCard icon={Share2} title="Social Posts" />
-            </div>
-            
-            {/* Tech stack */}
-            <div className="mt-20">
-              <p className="text-sm font-medium text-muted-foreground mb-8">Built with cutting-edge technology</p>
-              <div className="flex flex-wrap justify-center gap-4 md:gap-8">
-                <IntegrationCard className="hover:scale-110 transition-transform">
-                  <YouTube />
-                </IntegrationCard>
-                <IntegrationCard className="hover:scale-110 transition-transform">
-                  <OpenAI />
-                </IntegrationCard>
-                <IntegrationCard className="hover:scale-110 transition-transform">
-                  <Convex />
-                </IntegrationCard>
-                <IntegrationCard className="hover:scale-110 transition-transform">
-                  <ReactIcon />
-                </IntegrationCard>
-                <IntegrationCard className="hover:scale-110 transition-transform">
-                  <TailwindIcon />
-                </IntegrationCard>
-                <IntegrationCard className="hover:scale-110 transition-transform">
-                  <Typescript />
-                </IntegrationCard>
-                <IntegrationCard className="hover:scale-110 transition-transform">
-                  <ClerkIcon />
-                </IntegrationCard>
-              </div>
-            </div>
+          </div>
+
+          <h1 className="mt-8 text-2xl md:text-2xl">
+            Generate compelling titles, descriptions, stunning thumbnails, and viral social media posts.
+          </h1>
+
+          <p className="text-primary/60 py-4">
+            All powered by cutting-edge AI, designed for YouTube creators.
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <Link to={loaderData?.isSignedIn ? "/dashboard" : "/sign-up"}>
+              <ShineBorder
+                borderWidth={3}
+                className="border cursor-pointer h-auto w-auto p-2 bg-white/5 backdrop-blur-md dark:bg-black/5"
+                color={["#FF007F", "#39FF14", "#00FFFF"]}
+              >
+                <Button className="w-full rounded-xl" >
+                  Start Creating
+                </Button>
+              </ShineBorder>
+            </Link> 
+            <Link to={"https://github.com/michaelshimeles/youpac-ai"} target="_blank">
+              <Button className="rounded-xl" variant="outline">View on GitHub</Button>
+            </Link>
           </div>
         </div>
       </div>
+      <canvas
+        className="pointer-events-none absolute inset-0 mx-auto"
+        id="canvas"
+      ></canvas>
     </section>
-  );
-}
-
-// Feature card component
-const FeatureCard = ({ icon: Icon, title }: { icon: any; title: string }) => {
-  return (
-    <div className="group relative rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5">
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Icon className="h-8 w-8 text-primary mb-3 mx-auto" />
-      <p className="text-sm font-medium">{title}</p>
-    </div>
+     <div
+        className="absolute left-1/2 top-0 -z-10 -translate-x-1/2"
+        style={{
+          width: "1512px",
+          height: "550px",
+          background: "radial-gradient(ellipse at center, rgba(59, 130, 246, 0.15) 0%, transparent 50%)",
+        }}
+        role="presentation"
+      />
+     </main>
   );
 };
-
-const IntegrationCard = memo(({
-  children,
-  className,
-  borderClassName,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  borderClassName?: string;
-}) => {
-  return (
-    <div
-      className={cn(
-        "bg-card/50 backdrop-blur-sm relative flex size-16 rounded-xl shadow-sm",
-        className
-      )}
-    >
-      <div
-        role="presentation"
-        className={cn(
-          "absolute inset-0 rounded-xl border border-border/50",
-          borderClassName
-        )}
-      />
-      <div className="relative z-20 m-auto size-fit *:size-7">{children}</div>
-    </div>
-  );
-});
