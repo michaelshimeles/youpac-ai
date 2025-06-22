@@ -213,32 +213,69 @@ export const generateThumbnail = action({
       
       console.log("[Thumbnail] Extracted text overlay:", textOverlay);
       
-      // Build a highly detailed prompt that recreates the uploaded images
-      // Limit the visual description to avoid token limits
-      const shortDescription = visualDescription.length > 800 ? 
-        visualDescription.substring(0, 800) + "..." : 
-        visualDescription;
+      // Build a comprehensive prompt for gpt-image-1 that includes video context
+      let gptImagePrompt = "Create a YouTube thumbnail based on this video content:\n\n";
       
-      let dallePrompt = `YouTube thumbnail: ${shortDescription}\n\n`;
-      
-      dallePrompt += `Add bold text overlay: "${textOverlay}". `;
-      dallePrompt += `Professional YouTube thumbnail, high contrast, vibrant colors, 16:9 aspect ratio. `;
-      
-      if (args.profileData?.contentType) {
-        dallePrompt += `${args.profileData.contentType} content style. `;
+      // Add AI-generated video title from connected agents
+      const titleFromAgent = args.connectedAgentOutputs.find(output => output.type === "title");
+      if (titleFromAgent && titleFromAgent.content) {
+        gptImagePrompt += `VIDEO TITLE: ${titleFromAgent.content}\n\n`;
+      } else if (videoData.title) {
+        // Fallback to filename if no AI title available
+        gptImagePrompt += `VIDEO FILENAME: ${videoData.title}\n\n`;
       }
       
+      // Add transcription summary if available
+      if (videoData.transcription) {
+        const transcriptSummary = videoData.transcription.slice(0, 300);
+        gptImagePrompt += `VIDEO CONTENT: ${transcriptSummary}...\n\n`;
+      }
+      
+      // Add visual description from the uploaded frames
+      const shortDescription = visualDescription.length > 400 ? 
+        visualDescription.substring(0, 400) + "..." : 
+        visualDescription;
+      gptImagePrompt += `VISUAL ELEMENTS: ${shortDescription}\n\n`;
+      
+      // Add design requirements
+      gptImagePrompt += "DESIGN REQUIREMENTS:\n";
+      gptImagePrompt += `- Bold text overlay: "${textOverlay}"\n`;
+      gptImagePrompt += "- Eye-catching YouTube thumbnail style\n";
+      gptImagePrompt += "- High contrast and vibrant colors\n";
+      gptImagePrompt += "- Professional quality\n";
+      
+      // Add channel style if available
+      if (args.profileData) {
+        gptImagePrompt += `\nCHANNEL STYLE: ${args.profileData.channelName} - ${args.profileData.niche}\n`;
+        if (args.profileData.contentType) {
+          gptImagePrompt += `Content type: ${args.profileData.contentType}\n`;
+        }
+      }
+      
+      // Add any specific context from the user
       if (args.additionalContext) {
-        dallePrompt += `${args.additionalContext} `;
+        gptImagePrompt += `\nSPECIFIC REQUIREMENTS: ${args.additionalContext}\n`;
+      }
+      
+      // Add other connected agent outputs (descriptions, etc)
+      const otherAgentOutputs = args.connectedAgentOutputs
+        .filter(output => output.type !== "title" && output.type !== "thumbnail");
+      if (otherAgentOutputs.length > 0) {
+        gptImagePrompt += "\nOTHER CONTEXT:\n";
+        otherAgentOutputs.forEach(output => {
+          if (output.type === "description" && output.content) {
+            gptImagePrompt += `- Video Description: ${output.content.slice(0, 200)}...\n`;
+          }
+        });
       }
       
       // Ensure prompt doesn't exceed limit
-      if (dallePrompt.length > 1000) {
-        dallePrompt = dallePrompt.substring(0, 1000) + "...";
+      if (gptImagePrompt.length > 1000) {
+        gptImagePrompt = gptImagePrompt.substring(0, 1000) + "...";
       }
       
       console.log("[Thumbnail] Generating thumbnail with gpt-image-1...");
-      console.log("[Thumbnail] Prompt:", dallePrompt.substring(0, 200) + "...");
+      console.log("[Thumbnail] Prompt:", gptImagePrompt.substring(0, 200) + "...");
       
       // Convert the first frame to use with image editing
       const firstFrame = args.videoFrames[0];
@@ -267,7 +304,7 @@ export const generateThumbnail = action({
       const imageResponse = await openai.images.edit({
         model: "gpt-image-1",
         image: imageFiles[0],
-        prompt: dallePrompt,
+        prompt: gptImagePrompt,
         size: "1536x1024",
       });
       
@@ -333,13 +370,13 @@ export const generateThumbnail = action({
       console.log("[Thumbnail] Final image URL:", generatedImageUrl.substring(0, 100) + "...");
       
       // Combine the concept with generation details
-      const fullConcept = `${thumbnailConcept}\n\n=== Generated Thumbnail ===\nText Overlay: "${textOverlay}"\nGeneration Prompt: ${dallePrompt}`;
+      const fullConcept = `${thumbnailConcept}\n\n=== Generated Thumbnail ===\nText Overlay: "${textOverlay}"\nGeneration Prompt: ${gptImagePrompt}`;
       
       // Return the result with permanent URL
       return {
         concept: fullConcept,
         imageUrl: generatedImageUrl,
-        prompt: `=== Original Requirements ===\n${thumbnailPrompt}\n\n=== AI Analysis ===\n${thumbnailConcept}\n\n=== Generation Prompt ===\n${dallePrompt}`,
+        prompt: `=== Original Requirements ===\n${thumbnailPrompt}\n\n=== AI Analysis ===\n${thumbnailConcept}\n\n=== Generation Prompt ===\n${gptImagePrompt}`,
         storageId,
       };
     } catch (error: any) {
