@@ -1,6 +1,6 @@
 import { memo, useState, useRef, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "./ReactFlowComponents";
-import { Play, Film, Loader2, FileText, AlertCircle, RefreshCw } from "lucide-react";
+import { Play, Film, Loader2, FileText, AlertCircle, RefreshCw, Sparkles, Clock, HardDrive } from "lucide-react";
 import { Card } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import {
@@ -59,22 +59,40 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
     return `${mb.toFixed(1)} MB`;
   };
   return (
-    <Card className={`w-80 p-4 ${selected ? "ring-2 ring-primary" : ""}`}>
-      <div className="flex items-center gap-2 mb-3">
-        <Film className="h-5 w-5 text-primary" />
-        <h3 className="font-semibold">Video</h3>
-      </div>
+    <div className={`relative group ${selected ? "scale-105" : ""} transition-transform duration-200`}>
+      {/* Glow effect when selected */}
+      {selected && (
+        <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 via-purple-500/20 to-primary/20 rounded-2xl blur-lg animate-pulse" />
+      )}
+      
+      <Card className={`relative w-80 p-5 border-muted/50 shadow-xl bg-gradient-to-b from-background to-background/90 backdrop-blur-sm transition-all duration-300 hover:shadow-2xl ${selected ? "border-primary/50" : ""}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm">
+              <Film className="h-5 w-5 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">Video Source</h3>
+              <p className="text-xs text-muted-foreground">Input media</p>
+            </div>
+          </div>
+          <Sparkles className="h-4 w-4 text-muted-foreground/50" />
+        </div>
       
       {videoData.isUploading ? (
-        <div className="mb-3 aspect-video bg-muted rounded flex items-center justify-center">
+        <div className="mb-3 aspect-video bg-gradient-to-br from-muted/50 to-muted/30 rounded-xl flex items-center justify-center">
           <div className="text-center">
-            <Loader2 className="h-8 w-8 text-muted-foreground animate-spin mx-auto mb-2" />
-            <p className="text-xs text-muted-foreground">Uploading...</p>
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+              <Loader2 className="relative h-10 w-10 text-primary animate-spin mx-auto mb-3" />
+            </div>
+            <p className="text-sm font-medium">Uploading video...</p>
+            <p className="text-xs text-muted-foreground mt-1">Please wait</p>
           </div>
         </div>
       ) : videoData.videoUrl ? (
         <div 
-          className="relative mb-3 aspect-video bg-black rounded overflow-hidden cursor-pointer"
+          className="relative mb-3 aspect-video bg-black rounded-xl overflow-hidden cursor-pointer group/video shadow-lg"
           onClick={() => {
             if (videoData.onVideoClick) {
               videoData.onVideoClick();
@@ -114,9 +132,12 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
                 preload="metadata"
                 muted
               />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-all duration-200 hover:bg-black/40">
-                <div className="bg-white/90 rounded-full p-3 shadow-lg transform transition-transform hover:scale-110">
-                  <Play className="h-6 w-6 text-gray-800 ml-0.5" />
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/50 via-black/20 to-transparent transition-all duration-300 group-hover/video:bg-black/40">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white rounded-full blur-xl opacity-50 group-hover/video:opacity-70 transition-opacity" />
+                  <div className="relative bg-white rounded-full p-4 shadow-2xl transform transition-all duration-300 group-hover/video:scale-110">
+                    <Play className="h-6 w-6 text-black ml-0.5" />
+                  </div>
                 </div>
               </div>
               {/* Duration badge */}
@@ -159,79 +180,113 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
           )}
         </div>
       ) : videoData.thumbnail ? (
-        <div className="relative mb-3 aspect-video bg-muted rounded overflow-hidden">
+        <div className="relative mb-3 aspect-video bg-black rounded-xl overflow-hidden shadow-lg">
           <img 
             src={videoData.thumbnail} 
             alt={videoData.title || "Video thumbnail"} 
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <Play className="h-8 w-8 text-white" />
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/50 via-black/20 to-transparent">
+            <div className="bg-white/90 rounded-full p-3 shadow-lg">
+              <Play className="h-6 w-6 text-gray-800 ml-0.5" />
+            </div>
           </div>
         </div>
       ) : (
-        <div className="mb-3 aspect-video bg-muted rounded flex items-center justify-center">
-          <Film className="h-8 w-8 text-muted-foreground" />
+        <div className="mb-3 aspect-video bg-gradient-to-br from-muted/50 to-muted/30 rounded-xl flex items-center justify-center border border-dashed border-muted-foreground/20">
+          <div className="text-center">
+            <Film className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
+            <p className="text-xs text-muted-foreground">No video loaded</p>
+          </div>
         </div>
       )}
       
-      <div className="space-y-1">
-        <p className="text-sm font-medium truncate">
-          {videoData.title || "Untitled Video"}
-        </p>
-        
-        {/* File info */}
-        {(videoData.duration || videoData.fileSize) && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {formatDuration(videoData.duration) && (
-              <span>{formatDuration(videoData.duration)}</span>
-            )}
-            {formatDuration(videoData.duration) && formatFileSize(videoData.fileSize) && (
-              <span>•</span>
-            )}
-            {formatFileSize(videoData.fileSize) && (
-              <span>{formatFileSize(videoData.fileSize)}</span>
-            )}
-          </div>
-        )}
-        
-        {/* Transcription status */}
-        {videoData.isExtracting && (
-          <div className="flex items-center gap-1 text-xs text-blue-600">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Extracting audio... {videoData.extractionProgress ? `${videoData.extractionProgress}%` : ''}</span>
-          </div>
-        )}
-        {!videoData.isExtracting && videoData.isTranscribing && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Transcribing...</span>
-          </div>
-        )}
-        {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription && (
-          <div className="flex items-center gap-1 text-xs text-green-600">
-            <FileText className="h-3 w-3" />
-            <span>Transcribed</span>
-          </div>
-        )}
-        {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription === false && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1 text-xs text-yellow-600 cursor-help">
-                  <AlertCircle className="h-3 w-3" />
-                  <span>{videoData.transcriptionError ? "Transcription failed" : "No transcription"}</span>
+      <div className="space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground truncate">
+            {videoData.title || "Untitled Video"}
+          </p>
+          
+          {/* File info with icons */}
+          {(videoData.duration || videoData.fileSize) && (
+            <div className="flex items-center gap-3 mt-2">
+              {formatDuration(videoData.duration) && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>{formatDuration(videoData.duration)}</span>
                 </div>
-              </TooltipTrigger>
-              {videoData.transcriptionError && (
-                <TooltipContent className="max-w-xs">
-                  <p className="text-sm">{videoData.transcriptionError}</p>
-                  <p className="text-xs text-muted-foreground mt-1">The video was uploaded successfully.</p>
-                </TooltipContent>
               )}
-            </Tooltip>
-          </TooltipProvider>
-        )}
+              {formatFileSize(videoData.fileSize) && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <HardDrive className="h-3 w-3" />
+                  <span>{formatFileSize(videoData.fileSize)}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
+        {/* Transcription status card */}
+        <div className="rounded-lg bg-muted/50 p-3 border border-border/50">
+          {videoData.isExtracting && (
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <div className="absolute inset-0 bg-blue-500/20 rounded-full blur animate-pulse" />
+                <Loader2 className="relative h-4 w-4 animate-spin text-blue-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-medium">Extracting audio...</p>
+                {videoData.extractionProgress && (
+                  <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 transition-all duration-300"
+                      style={{ width: `${videoData.extractionProgress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {!videoData.isExtracting && videoData.isTranscribing && (
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur animate-pulse" />
+                <Loader2 className="relative h-4 w-4 animate-spin text-primary" />
+              </div>
+              <p className="text-xs font-medium">Transcribing audio...</p>
+            </div>
+          )}
+          {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription && (
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-full bg-green-500/10">
+                <FileText className="h-3.5 w-3.5 text-green-500" />
+              </div>
+              <p className="text-xs font-medium text-green-600">Transcription ready</p>
+            </div>
+          )}
+          {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription === false && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 cursor-help">
+                    <div className="p-1 rounded-full bg-yellow-500/10">
+                      <AlertCircle className="h-3.5 w-3.5 text-yellow-600" />
+                    </div>
+                    <p className="text-xs font-medium text-yellow-600">
+                      {videoData.transcriptionError ? "Transcription failed" : "No transcription"}
+                    </p>
+                  </div>
+                </TooltipTrigger>
+                {videoData.transcriptionError && (
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm">{videoData.transcriptionError}</p>
+                    <p className="text-xs text-muted-foreground mt-1">The video was uploaded successfully.</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </div>
       
       {/* Error action button */}
@@ -240,10 +295,10 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
         <Button
           variant="outline"
           size="sm"
-          className="mt-2 w-full"
+          className="mt-2 w-full hover:bg-primary/10 hover:border-primary/50 transition-all"
           onClick={videoData.onRetryTranscription}
         >
-          <RefreshCw className="h-3 w-3 mr-1" />
+          <RefreshCw className="h-3 w-3 mr-1.5" />
           Retry Transcription
         </Button>
       )}
@@ -252,9 +307,11 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
         type="source"
         position={Position.Right}
         id="video-output"
-        style={{ background: "#555" }}
+        className="!w-3 !h-3 !bg-gradient-to-r !from-blue-500 !to-cyan-500 !border-2 !border-background"
+        style={{ top: '50%' }}
       />
     </Card>
+    </div>
   );
 });
 

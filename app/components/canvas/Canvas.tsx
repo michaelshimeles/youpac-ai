@@ -2052,7 +2052,21 @@ function InnerCanvas({
         <div className="flex-1" ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={edges.map(edge => ({
+              ...edge,
+              animated: enableEdgeAnimations && !isDragging,
+              style: { 
+                stroke: '#6366f1',
+                strokeWidth: 2,
+                strokeOpacity: 0.5
+              },
+              markerEnd: {
+                type: 'arrowclosed',
+                color: '#6366f1',
+                width: 20,
+                height: 20,
+              }
+            }))}
             onNodesChange={onNodesChange}
             onNodeDragStart={() => setIsDragging(true)}
             onNodeDragStop={async (_event: any, node: any) => {
@@ -2096,9 +2110,39 @@ function InnerCanvas({
             maxZoom={2}
             preventScrolling={false}
           >
-            <Background />
-            <Controls />
-            {showMiniMap && <MiniMap />}
+            <Background 
+              variant="dots" 
+              gap={32} 
+              size={1.5}
+              color="#000000"
+              style={{ opacity: 0.05 }}
+            />
+            <Controls 
+              className="!shadow-xl !border !border-border/50 !bg-background/95 !backdrop-blur-sm"
+              showZoom={true}
+              showFitView={true}
+              showInteractive={true}
+            />
+            {showMiniMap && (
+              <MiniMap 
+                className="!shadow-xl !border !border-border/50 !bg-background/95 !backdrop-blur-sm"
+                nodeColor={(node) => {
+                  if (node.type === 'video') return '#3b82f6';
+                  if (node.type === 'agent') {
+                    const agentType = node.data?.type;
+                    if (agentType === 'title') return '#3b82f6';
+                    if (agentType === 'description') return '#10b981';
+                    if (agentType === 'thumbnail') return '#a855f7';
+                    if (agentType === 'tweets') return '#eab308';
+                  }
+                  return '#6b7280';
+                }}
+                nodeStrokeWidth={3}
+                nodeStrokeColor="#000"
+                pannable
+                zoomable
+              />
+            )}
           </ReactFlow>
         </div>
         

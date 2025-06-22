@@ -8,7 +8,12 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  Hash,
+  Palette,
+  Zap,
+  Bot
 } from "lucide-react";
 import { Card } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -24,24 +29,36 @@ export interface AgentNodeData {
 
 const agentConfig = {
   title: {
-    icon: FileText,
-    label: "Title Agent",
-    color: "text-blue-500",
+    icon: Hash,
+    label: "Title Generator",
+    description: "Create engaging titles",
+    color: "blue",
+    gradient: "from-blue-500/20 to-cyan-500/20",
+    iconColor: "text-blue-500",
   },
   description: {
     icon: FileText,
-    label: "Description Agent",
-    color: "text-green-500",
+    label: "Description Writer",
+    description: "SEO-optimized descriptions",
+    color: "green",
+    gradient: "from-green-500/20 to-emerald-500/20",
+    iconColor: "text-green-500",
   },
   thumbnail: {
-    icon: Image,
-    label: "Thumbnail Agent",
-    color: "text-purple-500",
+    icon: Palette,
+    label: "Thumbnail Designer",
+    description: "Eye-catching visuals",
+    color: "purple",
+    gradient: "from-purple-500/20 to-pink-500/20",
+    iconColor: "text-purple-500",
   },
   tweets: {
-    icon: Twitter,
-    label: "Tweets Agent",
-    color: "text-sky-500",
+    icon: Zap,
+    label: "Social Media",
+    description: "Viral tweets & posts",
+    color: "yellow",
+    gradient: "from-yellow-500/20 to-orange-500/20",
+    iconColor: "text-yellow-500",
   },
 };
 
@@ -75,51 +92,76 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
   } as const;
 
   return (
-    <Card className={`w-72 p-4 ${selected ? "ring-2 ring-primary" : ""}`}>
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="agent-input"
-        style={{ background: "#555" }}
-      />
+    <div className={`relative group ${selected ? "scale-105" : ""} transition-transform duration-200`}>
+      {/* Glow effect when selected */}
+      {selected && (
+        <div className={`absolute -inset-1 bg-gradient-to-r ${config.gradient} rounded-2xl blur-lg animate-pulse`} />
+      )}
       
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Icon className={`h-5 w-5 ${config.color}`} />
-          <h3 className="font-semibold">{config.label}</h3>
+      <Card className={`relative w-72 p-5 border-muted/50 shadow-xl bg-gradient-to-b from-background to-background/90 backdrop-blur-sm transition-all duration-300 hover:shadow-2xl ${selected ? "border-primary/50" : ""}`}>
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="agent-input"
+          className={`!w-3 !h-3 !bg-gradient-to-r ${config.gradient} !border-2 !border-background`}
+          style={{ top: '50%' }}
+        />
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg bg-gradient-to-br ${config.gradient} backdrop-blur-sm`}>
+              <Icon className={`h-5 w-5 ${config.iconColor}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">{config.label}</h3>
+              <p className="text-xs text-muted-foreground">{config.description}</p>
+            </div>
+          </div>
+          {data.status !== "idle" && (
+            <div className="flex items-center gap-1.5">
+              {statusIcons[data.status]}
+              <Bot className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          )}
         </div>
-        <Badge variant={statusColors[data.status]} className="flex items-center gap-1">
-          {statusIcons[data.status]}
-          {data.status}
-        </Badge>
-      </div>
       
       {data.type === "thumbnail" && data.thumbnailUrl ? (
-        <div className="mb-3 cursor-pointer" onClick={data.onView}>
-          <div className="aspect-video relative rounded-lg overflow-hidden bg-muted">
+        <div className="mb-4 cursor-pointer group/content" onClick={data.onView}>
+          <div className="aspect-video relative rounded-xl overflow-hidden bg-black shadow-lg transition-all duration-300 hover:shadow-xl">
             <img 
               src={data.thumbnailUrl} 
               alt="Generated thumbnail" 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover/content:scale-105"
             />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/content:opacity-100 transition-opacity" />
           </div>
           {data.draft && (
-            <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+            <p className="text-xs text-muted-foreground mt-2 line-clamp-2 px-1">
               {data.draft}
             </p>
           )}
         </div>
       ) : data.draft ? (
-        <div className="mb-3 cursor-pointer hover:bg-muted/50 rounded p-2 -m-2 transition-colors" onClick={data.onView}>
-          <p className="text-sm text-muted-foreground line-clamp-3">
-            {data.draft}
-          </p>
+        <div className="mb-4 cursor-pointer group/content" onClick={data.onView}>
+          <div className="rounded-lg bg-muted/50 p-4 border border-border/50 transition-all duration-200 hover:bg-muted/70 hover:border-border">
+            <p className="text-sm text-foreground/80 line-clamp-3 leading-relaxed">
+              {data.draft}
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="mb-3 p-4 border-2 border-dashed border-muted rounded-lg">
-          <p className="text-sm text-muted-foreground text-center">
-            No content generated yet
-          </p>
+        <div className="mb-4">
+          <div className="rounded-lg bg-gradient-to-br from-muted/30 to-muted/10 p-8 border border-dashed border-muted-foreground/20">
+            <div className="text-center">
+              <Sparkles className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                No content generated yet
+              </p>
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                Click Generate to create content
+              </p>
+            </div>
+          </div>
         </div>
       )}
       
@@ -127,39 +169,42 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
         <Button 
           size="sm" 
           variant="outline" 
-          className="flex-1"
+          className="flex-1 hover:bg-primary/10 hover:border-primary/50 transition-all"
           onClick={data.onChat}
           disabled={data.status === "generating"}
         >
-          <MessageSquare className="h-3 w-3 mr-1" />
+          <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
           Chat
         </Button>
         {data.status === "ready" && data.draft ? (
           <Button 
             size="sm" 
             variant="outline" 
-            className="flex-1"
+            className="flex-1 hover:bg-primary/10 hover:border-primary/50 transition-all"
             onClick={data.onRegenerate}
             disabled={data.status === "generating"}
           >
-            <RefreshCw className="h-3 w-3 mr-1" />
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
             Regenerate
           </Button>
         ) : (
           <Button 
             size="sm" 
             variant="default" 
-            className="flex-1"
+            className={`flex-1 bg-gradient-to-r ${config.gradient} hover:opacity-90 transition-all text-foreground font-medium shadow-sm`}
             onClick={data.onGenerate}
             disabled={data.status === "generating"}
           >
             {data.status === "generating" ? (
               <>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                 Generating...
               </>
             ) : (
-              "Generate"
+              <>
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                Generate
+              </>
             )}
           </Button>
         )}
@@ -169,9 +214,11 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
         type="source"
         position={Position.Right}
         id="agent-output"
-        style={{ background: "#555" }}
+        className={`!w-3 !h-3 !bg-gradient-to-r ${config.gradient} !border-2 !border-background`}
+        style={{ top: '50%' }}
       />
     </Card>
+    </div>
   );
 });
 
