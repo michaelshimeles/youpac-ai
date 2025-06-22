@@ -116,7 +116,7 @@ export function TwitterThreadPreview({
   };
 
   return (
-    <div className="w-full max-w-xl mx-auto space-y-0">
+    <div className="w-full max-w-2xl mx-auto space-y-0">
       {tweetArray.map((tweet, index) => {
         const engagement = getEngagement(index);
         const isLiked = likedTweets.has(tweet.id);

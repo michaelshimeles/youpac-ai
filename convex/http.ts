@@ -122,6 +122,26 @@ http.route({
           fileType: file.type,
           fileSizeMB: (file.size / 1024 / 1024).toFixed(2),
         });
+        
+        // Check file size before processing
+        const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+        if (file.size > MAX_SIZE) {
+          return new Response(JSON.stringify({ 
+            error: "File size exceeds 20MB limit. Please use a smaller file or compress the audio.",
+            details: {
+              fileSize: file.size,
+              maxSize: MAX_SIZE,
+              fileSizeMB: (file.size / 1024 / 1024).toFixed(2),
+              maxSizeMB: 20
+            }
+          }), {
+            status: 413, // Payload Too Large
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*",
+            },
+          });
+        }
       }
       
       // Forward the request to ElevenLabs

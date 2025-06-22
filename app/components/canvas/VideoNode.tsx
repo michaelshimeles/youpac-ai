@@ -236,7 +236,7 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
                 <Loader2 className="relative h-4 w-4 animate-spin text-blue-500" />
               </div>
               <div className="flex-1">
-                <p className="text-xs font-medium">Transcribing video...</p>
+                <p className="text-xs font-medium">Extracting audio...</p>
                 {videoData.transcriptionProgress && (
                   <p className="text-[10px] text-muted-foreground mt-0.5">{videoData.transcriptionProgress}</p>
                 )}

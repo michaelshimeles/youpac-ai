@@ -60,7 +60,7 @@ export function YouTubePreview({
   };
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl mx-auto">
       <div className="space-y-4">
         {/* Video Player */}
         <Card className="relative aspect-video bg-black overflow-hidden">

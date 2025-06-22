@@ -1,6 +1,32 @@
 # 📝 YouTube AI Assistant - To-Do List
 
-## 🔴 HIGH PRIORITY (Do These First!)
+## 🎯 FOCUS: UX & FTUE (First Time User Experience)
+
+### 🔴 IMMEDIATE - Smooth Onboarding
+- [ ] Welcome tour/tutorial for first-time users
+- [ ] Sample project with pre-filled content
+- [ ] Interactive tooltips on hover
+- [ ] "What's this?" help buttons
+- [ ] Onboarding checklist sidebar
+- [ ] Video walkthrough modal
+
+### 🟡 QUICK WINS - Better User Feedback
+- [ ] Loading skeletons instead of spinners
+- [ ] Progress bars for all async operations
+- [ ] Success animations (confetti, checkmarks)
+- [ ] Better error messages with solutions
+- [ ] Undo notifications with action buttons
+- [ ] Empty states with helpful CTAs
+
+### 🟢 POLISH - Delightful Interactions
+- [ ] Smooth page transitions
+- [ ] Micro-animations on interactions
+- [ ] Drag preview for nodes
+- [ ] Sound effects (optional)
+- [ ] Keyboard shortcuts overlay (?)
+- [ ] Command palette (Cmd+K)
+
+## 🚀 Original High Priority Features
 
 ### Video Features 🎬
 - [ ] Support YouTube URL input (not just file upload)
@@ -66,10 +92,12 @@
 
 ## 💡 Known Issues to Fix
 
-1. **Video Issues**
-   - [x] Large videos (>100MB) fail silently ✅ IMPROVED - Now shows clear error with suggestions
-   - [x] Some video formats not supported ✅ IMPROVED - Clear error message for unsupported formats
-   - [x] Transcription timeout on long videos ✅ SOLVED - Added ElevenLabs API support for files up to 1GB!
+1. **UX/FTUE Issues** 🎯 NEW FOCUS
+   - [ ] First-time users don't know where to start
+   - [ ] No clear indication of what each agent does
+   - [ ] Canvas feels empty before video upload
+   - [ ] No sample content to explore
+   - [ ] Settings page needs better organization
 
 2. **Performance**
    - [ ] Canvas lag with many nodes
@@ -83,34 +111,34 @@
    - [ ] Large image uploads may fail for refinement
    - [ ] Connection errors when uploading to OpenAI
 
-## 📊 Feature Prioritization (Easiest → Hardest)
+## 📊 UX/FTUE Prioritization (Easiest → Hardest)
 
-### 🟢 EASIEST (15-30 mins each)
-1. **Show word count in content modal**
-2. **Add "Clear All" button for content**
-3. **Add generation time estimate**
-4. **Add loading progress for video upload**
-5. **Add keyboard shortcuts guide**
+### 🟢 EASIEST UX WINS (15-30 mins each)
+1. **Empty states with helpful CTAs**
+2. **Interactive tooltips on hover**
+3. **"What's this?" help buttons**
+4. **Better error messages with solutions**
+5. **Loading skeletons for projects grid**
 
-### 🟡 MEDIUM (1-2 hours each)
-1. **Handle video processing errors more gracefully**
-2. **Chat history persistence**
-3. **Export chat as context**
-4. **Suggested prompts/questions**
-5. **Canvas zoom presets**
-6. **Custom node colors**
+### 🟡 MEDIUM UX (1-2 hours each)
+1. **Welcome tour/tutorial overlay**
+2. **Progress bars for all operations**
+3. **Success animations (confetti)**
+4. **Onboarding checklist sidebar**
+5. **Command palette (Cmd+K)**
+6. **Smooth page transitions**
 
-### 🔴 HARDER (2-4 hours each)
-1. **Support YouTube URL input**
-2. **Content variations (generate 3 options)**
-3. **Generation history with rollback**
-4. **Profile templates**
-5. **Undo/Redo functionality**
+### 🔴 HARDER UX (2-4 hours each)
+1. **Sample project with pre-filled content**
+2. **Video walkthrough modal**
+3. **Undo notifications with actions**
+4. **Drag preview for nodes**
+5. **Interactive canvas tutorial**
 
-### ⚫ HARDEST (4+ hours each)
+### ⚫ Original Feature List (4+ hours each)
 1. **Direct publish to YouTube**
-2. **Video trimming/clipping**
-3. **Language translation**
-4. **Voice input**
-5. **SEO scoring**
+2. **Support YouTube URL input**
+3. **Video trimming/clipping**
+4. **Content variations (3 options)**
+5. **Profile templates**
 6. **Real-time collaboration**

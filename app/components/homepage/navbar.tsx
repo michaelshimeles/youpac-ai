@@ -9,8 +9,6 @@ import { cn } from "~/lib/utils";
 const menuItems = [
   { name: "Home", href: "#hero" },
   { name: "Features", href: "#features" },
-  { name: "Team", href: "#team" },
-  { name: "Pricing", href: "#pricing" },
 ];
 
 export const Navbar = ({
@@ -71,7 +69,7 @@ export const Navbar = ({
                 className="flex items-center space-x-2 font-semibold text-xl"
                 prefetch="viewport"
               >
-                <img src="/youtube-ai-logo.png" alt="YouTube AI Logo" className="h-12 w-12" />
+                YouPac AI
               </Link>
 
               <button

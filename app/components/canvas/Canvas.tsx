@@ -10,6 +10,8 @@ import { VideoProcessingHelp } from "~/components/VideoProcessingHelp";
 import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
 import { createRetryAction, handleVideoError } from "~/lib/video-error-handler";
 import { extractVideoMetadata } from "~/lib/video-metadata";
+
+import { compressAudioFile, isFileTooLarge, getFileSizeMB } from "~/lib/audio-compression";
 import { AgentNode } from "./AgentNode";
 import { ContentModal } from "./ContentModal";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
@@ -1731,9 +1733,31 @@ function InnerCanvas({
               description: `Processing ${file.name}...`,
             });
             
+            // Check if file needs compression
+            let fileToTranscribe = file;
+            if (isFileTooLarge(file, 20)) {
+              const fileSizeMB = getFileSizeMB(file);
+              toast.info(`Compressing ${fileSizeMB.toFixed(1)}MB file for transcription...`);
+              
+              try {
+                const compressedBlob = await compressAudioFile(file, {
+                  targetBitrate: 64, // 64 kbps for speech
+                  targetSampleRate: 16000, // 16 kHz for speech recognition
+                  mono: true // Mono is sufficient for transcription
+                });
+                
+                fileToTranscribe = new File([compressedBlob], file.name, { type: 'audio/wav' });
+                const compressedSizeMB = getFileSizeMB(fileToTranscribe);
+                toast.success(`Compressed to ${compressedSizeMB.toFixed(1)}MB`);
+              } catch (compressionError) {
+                console.error("Audio compression failed:", compressionError);
+                toast.warning("Compression failed, attempting with original file...");
+              }
+            }
+            
             // Create FormData for ElevenLabs
             const formData = new FormData();
-            formData.append("file", file);
+            formData.append("file", fileToTranscribe);
             formData.append("model_id", "scribe_v1");
             
             // Get the Convex site URL - it should be in format https://xxxxx.convex.site
@@ -1986,9 +2010,31 @@ function InnerCanvas({
           const blob = await response.blob();
           const file = new File([blob], video?.title || "video.mp4", { type: blob.type });
           
+          // Check if file needs compression
+          let fileToTranscribe = file;
+          if (isFileTooLarge(file, 20)) {
+            const fileSizeMB = getFileSizeMB(file);
+            toast.info(`Compressing ${fileSizeMB.toFixed(1)}MB file for transcription...`);
+            
+            try {
+              const compressedBlob = await compressAudioFile(file, {
+                targetBitrate: 64, // 64 kbps for speech
+                targetSampleRate: 16000, // 16 kHz for speech recognition
+                mono: true // Mono is sufficient for transcription
+              });
+              
+              fileToTranscribe = new File([compressedBlob], file.name, { type: 'audio/wav' });
+              const compressedSizeMB = getFileSizeMB(fileToTranscribe);
+              toast.success(`Compressed to ${compressedSizeMB.toFixed(1)}MB`);
+            } catch (compressionError) {
+              console.error("Audio compression failed:", compressionError);
+              toast.warning("Compression failed, attempting with original file...");
+            }
+          }
+          
           // Create FormData for ElevenLabs
           const formData = new FormData();
-          formData.append("file", file);
+          formData.append("file", fileToTranscribe);
           formData.append("model_id", "scribe_v1");
           
           // Get the Convex site URL - it should be in format https://xxxxx.convex.site
@@ -2241,8 +2287,10 @@ function InnerCanvas({
           storageId: video.fileId,
           duration: video.duration,
           fileSize: video.fileSize,
-          hasTranscription: !!video.transcription || video.transcriptionStatus === "completed",
-          isTranscribing: video.transcriptionStatus === "processing",
+          // Transcription flow: idle -> processing -> completed (with transcription text)
+          // Sometimes status is "completed" but transcription text hasn't propagated yet
+          hasTranscription: !!video.transcription,
+          isTranscribing: video.transcriptionStatus === "processing" || (video.transcriptionStatus === "completed" && !video.transcription),
           transcriptionError: video.transcriptionStatus === "failed" ? video.transcriptionError : null,
           transcriptionProgress: video.transcriptionProgress || null,
           onVideoClick: () => handleVideoClick({

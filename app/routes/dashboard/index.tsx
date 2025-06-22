@@ -2,8 +2,8 @@ import { Link } from "react-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { useState } from "react";
-import { Plus, Video, Calendar, Archive, MoreVertical } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Video, Calendar, Archive, MoreVertical, Settings, User, ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -36,15 +36,32 @@ import { formatDistanceToNow } from "date-fns";
 
 export default function Page() {
   const projects = useQuery(api.projects.list, { includeArchived: false });
+  const profile = useQuery(api.profiles.get);
   const createProject = useMutation(api.projects.create);
   const archiveProject = useMutation(api.projects.update);
   const deleteProject = useMutation(api.projects.remove);
   
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [newProject, setNewProject] = useState({
     title: "",
     description: "",
   });
+
+  // Check if profile is incomplete on first visit
+  useEffect(() => {
+    if (profile !== undefined) {
+      const isIncomplete = !profile || !profile.channelName || !profile.contentType || !profile.niche;
+      if (isIncomplete && !localStorage.getItem('profileDialogDismissed')) {
+        setShowProfileDialog(true);
+      }
+    }
+  }, [profile]);
+
+  const handleDismissProfileDialog = () => {
+    setShowProfileDialog(false);
+    localStorage.setItem('profileDialogDismissed', 'true');
+  };
 
   const handleCreateProject = async () => {
     if (!newProject.title.trim()) {
@@ -96,6 +113,63 @@ export default function Page() {
 
   return (
     <div className="space-y-6 p-6">
+      {/* Profile Completion Dialog */}
+      <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+              <DialogTitle className="text-xl">Complete Your Profile</DialogTitle>
+            </div>
+            <DialogDescription className="text-base">
+              Set up your YouTube channel profile to get personalized AI-generated content that matches your style and audience.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg border bg-muted/50 p-4">
+              <h4 className="font-medium mb-2 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Why complete your profile?
+              </h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>AI generates content tailored to your channel's niche</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>Matches your unique tone and communication style</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span>Targets your specific audience demographics</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDismissProfileDialog}
+              className="sm:flex-1"
+            >
+              Skip for now
+            </Button>
+            <Button asChild className="sm:flex-1 gap-2">
+              <Link to="/dashboard/settings">
+                <Settings className="h-4 w-4" />
+                Go to Settings
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Projects</h1>
@@ -104,13 +178,23 @@ export default function Page() {
           </p>
         </div>
         
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Project
+        <div className="flex items-center gap-3">
+          {profile && (!profile.channelName || !profile.contentType || !profile.niche) && (
+            <Button variant="outline" size="sm" asChild className="gap-2">
+              <Link to="/dashboard/settings">
+                <User className="h-4 w-4" />
+                Complete Profile
+              </Link>
             </Button>
-          </DialogTrigger>
+          )}
+          
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Project
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>
@@ -149,7 +233,8 @@ export default function Page() {
               <Button onClick={handleCreateProject}>Create Project</Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {projects === undefined ? (

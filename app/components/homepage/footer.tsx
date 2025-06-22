@@ -2,14 +2,11 @@ import { Link } from "react-router";
 
 export default function FooterSection() {
   return (
-    <footer className="py-16 md:py-32">
+    <footer className="py-16">
       <div className="mx-auto max-w-5xl px-6">
-        <Link to="/" aria-label="go home" className="mx-auto block size-fit">
-          <img src="/youtube-ai-logo.png" alt="YouTube AI Logo" className="h-12 w-12" />
-        </Link>
         <div className="my-8 flex flex-wrap justify-center gap-6 text-sm">
           <Link
-            to="https://x.com/youtubeai"
+            to="https://x.com/rasmickyy"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="X/Twitter"
@@ -31,7 +28,7 @@ export default function FooterSection() {
         </div>
         <span className="text-muted-foreground block text-center text-sm">
           {" "}
-          © {new Date().getFullYear()} YouTube AI Assistant, All rights reserved
+          © {new Date().getFullYear()} YouPac AI, All rights reserved
         </span>
       </div>
     </footer>

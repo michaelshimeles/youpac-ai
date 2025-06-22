@@ -165,7 +165,7 @@ export function SharedCanvas({ data }: SharedCanvasProps) {
                 />
                 <MiniMap 
                   className="!bottom-4 !right-4 !shadow-xl !border !border-border/50 !bg-background/95 !backdrop-blur-sm"
-                  nodeColor={(node) => {
+                  nodeColor={(node: any) => {
                     if (node.type === 'video') return '#3b82f6';
                     if (node.type === 'agent') {
                       const agentType = node.data?.type;
@@ -183,10 +183,15 @@ export function SharedCanvas({ data }: SharedCanvasProps) {
           
           {/* Preview Modal - Open by default for shared views */}
           <PreviewModal
-            open={previewOpen}
-            onOpenChange={setPreviewOpen}
-            content={previewContent}
-            isReadOnly={true}
+            isOpen={previewOpen}
+            onClose={() => setPreviewOpen(false)}
+            title={previewContent.title}
+            description={previewContent.description}
+            thumbnailUrl={previewContent.thumbnailUrl}
+            tweets={previewContent.tweets}
+            videoUrl={previewContent.videoUrl}
+            duration={video.duration}
+            channelName={previewContent.channelName}
           />
         </ReactFlowProvider>
       )}

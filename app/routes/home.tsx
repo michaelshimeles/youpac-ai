@@ -1,8 +1,6 @@
 import { getAuth } from "@clerk/react-router/ssr.server";
-import ContentSection from "~/components/homepage/content";
 import Footer from "~/components/homepage/footer";
-import Integrations from "~/components/homepage/integrations";
-import Team from "~/components/homepage/team";
+import HeroSection from "~/components/homepage/hero";
 import type { Route } from "./+types/home";
 
 export function meta({ }: Route.MetaArgs) {
@@ -62,9 +60,7 @@ export async function loader(args: Route.LoaderArgs) {
 export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <>
-      <Integrations loaderData={loaderData} />
-      <ContentSection />
-      <Team />
+      <HeroSection loaderData={loaderData} />
       <Footer />
     </>
   );
