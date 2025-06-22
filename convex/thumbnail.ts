@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { api } from "./_generated/api";
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 
 export const generateThumbnail = action({
   args: {
@@ -40,7 +40,7 @@ export const generateThumbnail = action({
     ),
     additionalContext: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<{ concept: string; imageUrl: string }> => {
+  handler: async (ctx, args): Promise<{ concept: string; imageUrl: string; prompt?: string; storageId?: string }> => {
     console.log("[Thumbnail] Starting thumbnail generation process");
     console.log("[Thumbnail] Args received:", {
       agentType: args.agentType,
@@ -89,146 +89,259 @@ export const generateThumbnail = action({
         throw new Error("No video frames provided for thumbnail generation.");
       }
       
-      // Step 1: Analyze video frames with GPT-4 Vision to understand visual content
-      console.log("[Thumbnail] Step 1: Building frame analysis prompt");
-      const frameAnalysisPrompt = buildFrameAnalysisPrompt(
-        videoData,
-        args.connectedAgentOutputs,
-        args.profileData,
-        args.additionalContext
-      );
-      console.log("[Thumbnail] Frame analysis prompt length:", frameAnalysisPrompt.length);
+      // Validate that we have at least one image
+      if (!args.videoFrames || args.videoFrames.length === 0) {
+        throw new Error("No images provided for thumbnail generation.");
+      }
 
-      const visionMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      // Build a comprehensive prompt for thumbnail generation
+      console.log("[Thumbnail] Building thumbnail generation prompt");
+      
+      let thumbnailPrompt = "Create an eye-catching YouTube thumbnail with the following requirements:\n\n";
+      
+      if (videoData.title) {
+        thumbnailPrompt += `Video Title: ${videoData.title}\n`;
+      }
+      
+      if (videoData.transcription) {
+        const summary = videoData.transcription.slice(0, 500);
+        thumbnailPrompt += `\nVideo Content Summary: ${summary}...\n`;
+      }
+      
+      if (args.connectedAgentOutputs.length > 0) {
+        thumbnailPrompt += "\nRelated content:\n";
+        args.connectedAgentOutputs.forEach(({ type, content }) => {
+          if (type === "title") {
+            thumbnailPrompt += `- Title suggestion: ${content}\n`;
+          }
+        });
+      }
+      
+      if (args.profileData) {
+        thumbnailPrompt += `\nChannel Style:\n`;
+        thumbnailPrompt += `- ${args.profileData.channelName} (${args.profileData.niche})\n`;
+        thumbnailPrompt += `- Content Type: ${args.profileData.contentType}\n`;
+        if (args.profileData.tone) {
+          thumbnailPrompt += `- Tone: ${args.profileData.tone}\n`;
+        }
+      }
+      
+      if (args.additionalContext) {
+        thumbnailPrompt += `\nSpecific requirements: ${args.additionalContext}\n`;
+      }
+      
+      thumbnailPrompt += `\nDesign Requirements:\n`;
+      thumbnailPrompt += `1. High contrast and vibrant colors\n`;
+      thumbnailPrompt += `2. Clear, readable text overlay (3-5 words max)\n`;
+      thumbnailPrompt += `3. Emotional facial expressions if applicable\n`;
+      thumbnailPrompt += `4. 16:9 aspect ratio optimized for YouTube\n`;
+      thumbnailPrompt += `5. Professional quality that stands out in search results\n`;
+      
+      console.log("[Thumbnail] Prompt created, length:", thumbnailPrompt.length);
+      
+      // First, analyze the uploaded images with GPT-4 Vision
+      console.log("[Thumbnail] Analyzing uploaded images with GPT-4 Vision...");
+      console.log("[Thumbnail] Number of input images:", args.videoFrames.length);
+      
+      const analysisMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         {
           role: "system",
-          content: "You are an expert YouTube thumbnail designer and video analyst. Analyze the provided video frames and context to create a compelling thumbnail concept.",
+          content: "You are an expert YouTube thumbnail designer. Analyze the provided images and create a detailed thumbnail concept that will maximize click-through rates.",
         },
         {
           role: "user",
           content: [
-            { type: "text", text: frameAnalysisPrompt },
+            { type: "text", text: thumbnailPrompt + "\n\nAnalyze these images and describe the perfect YouTube thumbnail based on them. Be specific about visual elements, colors, composition, and text overlay suggestions." },
             ...args.videoFrames.map((frame) => ({
               type: "image_url" as const,
               image_url: {
                 url: frame.dataUrl,
-                detail: "low" as const,
+                detail: "high" as const,
               },
             })),
           ],
         },
       ];
-
-      console.log("[Thumbnail] Calling GPT-4o to analyze frames...");
-      console.log("[Thumbnail] Vision messages count:", visionMessages.length);
-      console.log("[Thumbnail] Number of frames being analyzed:", args.videoFrames.length);
       
-      const visionResponse = await openai.chat.completions.create({
-        model: "gpt-4o", // Updated model that supports vision
-        messages: visionMessages,
-        max_tokens: 500,
+      const analysisResponse = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: analysisMessages,
+        max_tokens: 800,
         temperature: 0.7,
       });
-
-      const thumbnailConcept = visionResponse.choices[0].message.content || "";
-      console.log("[Thumbnail] GPT-4o response received");
-      console.log("[Thumbnail] Thumbnail concept:", thumbnailConcept.substring(0, 200) + "...");
-
-      // Step 2: Generate thumbnail image with DALL-E 3
-      console.log("[Thumbnail] Step 2: Building DALL-E prompt");
-      const imagePrompt = buildDallePrompt(thumbnailConcept, args.profileData);
-      console.log("[Thumbnail] DALL-E prompt:", imagePrompt.substring(0, 300) + "...");
-      console.log("[Thumbnail] DALL-E prompt length:", imagePrompt.length);
-
-      console.log("[Thumbnail] Calling DALL-E 3 to generate image...");
       
-      // Ensure prompt is safe and within limits
-      const safeImagePrompt = imagePrompt.slice(0, 4000); // DALL-E 3 has a 4000 character limit
+      const thumbnailConcept = analysisResponse.choices[0].message.content || "";
+      console.log("[Thumbnail] Analysis complete. Concept:", thumbnailConcept.substring(0, 200) + "...");
       
-      try {
-        const imageResponse = await openai.images.generate({
-          model: "dall-e-3",
-          prompt: safeImagePrompt,
-          size: "1792x1024", // 16:9 aspect ratio for YouTube thumbnails
-          quality: "standard",
-          n: 1,
-        });
+      // Now ask GPT-4 to create a very detailed description of what it sees in the images
+      console.log("[Thumbnail] Getting detailed visual description...");
+      
+      const descriptionMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content: "You are a visual description expert. Describe EXACTLY what you see in these images in extreme detail, including: people's appearance, facial expressions, clothing, poses, backgrounds, objects, colors, lighting, and composition. Be as specific as possible.",
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Describe these images in extreme detail. I need to recreate them as a YouTube thumbnail." },
+            ...args.videoFrames.map((frame) => ({
+              type: "image_url" as const,
+              image_url: {
+                url: frame.dataUrl,
+                detail: "high" as const,
+              },
+            })),
+          ],
+        },
+      ];
+      
+      const descriptionResponse = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: descriptionMessages,
+        max_tokens: 1000,
+        temperature: 0.3, // Lower temperature for accurate descriptions
+      });
+      
+      const visualDescription = descriptionResponse.choices[0].message.content || "";
+      console.log("[Thumbnail] Visual description obtained");
+      
+      // Extract key elements from the concept
+      const textOverlayMatch = thumbnailConcept.match(/text overlay[:\s]+["']?([^"'\n]+)["']?/i) ||
+                             thumbnailConcept.match(/text[:\s]+["']?([^"'\n]{3,30})["']?/i);
+      const textOverlay = textOverlayMatch ? textOverlayMatch[1].trim() : "WATCH THIS";
+      
+      console.log("[Thumbnail] Extracted text overlay:", textOverlay);
+      
+      // Build a highly detailed prompt that recreates the uploaded images
+      // Limit the visual description to avoid token limits
+      const shortDescription = visualDescription.length > 800 ? 
+        visualDescription.substring(0, 800) + "..." : 
+        visualDescription;
+      
+      let dallePrompt = `YouTube thumbnail: ${shortDescription}\n\n`;
+      
+      dallePrompt += `Add bold text overlay: "${textOverlay}". `;
+      dallePrompt += `Professional YouTube thumbnail, high contrast, vibrant colors, 16:9 aspect ratio. `;
+      
+      if (args.profileData?.contentType) {
+        dallePrompt += `${args.profileData.contentType} content style. `;
+      }
+      
+      if (args.additionalContext) {
+        dallePrompt += `${args.additionalContext} `;
+      }
+      
+      // Ensure prompt doesn't exceed limit
+      if (dallePrompt.length > 1000) {
+        dallePrompt = dallePrompt.substring(0, 1000) + "...";
+      }
+      
+      console.log("[Thumbnail] Generating thumbnail with gpt-image-1...");
+      console.log("[Thumbnail] Prompt:", dallePrompt.substring(0, 200) + "...");
+      
+      // Convert the first frame to use with image editing
+      const firstFrame = args.videoFrames[0];
+      if (!firstFrame) {
+        throw new Error("No frames available for thumbnail generation");
+      }
 
-        console.log("[Thumbnail] DALL-E 3 response received");
-        console.log("[Thumbnail] Image response data:", imageResponse.data?.[0]);
-        
-        // Handle both URL and base64 responses
-        let imageUrl: string;
-        const imageData = imageResponse.data?.[0];
-        
-        if (imageData?.url) {
-          imageUrl = imageData.url;
-          console.log("[Thumbnail] Got image URL from response");
-        } else if (imageData?.b64_json) {
-        console.log("[Thumbnail] Got base64 image, uploading to storage...");
+      // Process all frames as reference images
+      const imageFiles = await Promise.all(
+        args.videoFrames.slice(0, 3).map(async (frame, index) => {
+          const base64Data = frame.dataUrl.split(',')[1];
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const imageBlob = new Blob([bytes], { type: 'image/png' });
+          return toFile(imageBlob, `frame-${index}.png`, {
+            type: 'image/png',
+          });
+        })
+      );
+
+      // Use images.edit with the first image as base
+      console.log("[Thumbnail] Using images.edit API...");
+      const imageResponse = await openai.images.edit({
+        model: "gpt-image-1",
+        image: imageFiles[0],
+        prompt: dallePrompt,
+        size: "1536x1024",
+      });
+      
+      
+      console.log("[Thumbnail] Image generation completed");
+      
+      // Get the generated image - handle both URL and base64 formats
+      const imageData = imageResponse.data?.[0];
+      if (!imageData) {
+        throw new Error("No image data returned from generation");
+      }
+      
+      let generatedImageUrl: string;
+      let storageId: string;
+      
+      if (imageData.b64_json) {
+        // Handle base64 response
+        console.log("[Thumbnail] Received base64 image data");
+        const base64Data = imageData.b64_json;
         
         // Convert base64 to blob
-        const base64Data = imageData.b64_json;
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'image/png' });
+        const imageBlob = new Blob([bytes], { type: 'image/png' });
         
-        // Upload to Convex storage
-        const uploadUrl = await ctx.runMutation(api.files.generateUploadUrl);
-        console.log("[Thumbnail] Got upload URL, uploading image...");
+        // Store in Convex storage
+        console.log("[Thumbnail] Storing base64 image in Convex storage...");
+        storageId = await ctx.storage.store(imageBlob);
+        const url = await ctx.storage.getUrl(storageId);
         
-        const uploadResponse = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": "image/png" },
-          body: blob,
-        });
-        
-        if (!uploadResponse.ok) {
-          throw new Error("Failed to upload thumbnail image to storage");
+        if (!url) {
+          throw new Error("Failed to get URL for stored image");
         }
+        generatedImageUrl = url;
+        console.log("[Thumbnail] Image stored successfully");
+      } else if (imageData.url) {
+        // Handle URL response (fallback)
+        generatedImageUrl = imageData.url;
         
-        const { storageId } = await uploadResponse.json();
-        console.log("[Thumbnail] Image uploaded to storage:", storageId);
-        
-        // Get the URL from storage
-        const storageUrl = await ctx.runQuery(api.files.getUrl, { storageId });
-        if (!storageUrl) {
-          throw new Error("Failed to get storage URL for thumbnail");
+        // Download and store URL-based image
+        console.log("[Thumbnail] Downloading image from URL...");
+        const imageResponse2 = await fetch(generatedImageUrl);
+        if (!imageResponse2.ok) {
+          throw new Error("Failed to download generated image");
         }
         
-        imageUrl = storageUrl;
-        console.log("[Thumbnail] Got storage URL for thumbnail");
+        const downloadedImageBlob = await imageResponse2.blob();
+        console.log("[Thumbnail] Storing URL image in Convex storage...");
+        storageId = await ctx.storage.store(downloadedImageBlob);
+        const permanentUrl = await ctx.storage.getUrl(storageId);
+        
+        if (!permanentUrl) {
+          throw new Error("Failed to get permanent URL for stored image");
+        }
+        generatedImageUrl = permanentUrl;
       } else {
-        console.error("[Thumbnail] No image URL or base64 in response:", imageResponse);
-        throw new Error("Failed to generate thumbnail image - no URL or base64 data");
+        throw new Error("No image URL or base64 data in response");
       }
       
-        console.log("[Thumbnail] Image generated successfully");
-        console.log("[Thumbnail] Final image URL:", imageUrl!.substring(0, 100) + "...");
-
-        return {
-          concept: thumbnailConcept,
-          imageUrl: imageUrl!,
-        };
-      } catch (imageError: any) {
-        console.error("[Thumbnail] Image generation failed:", imageError);
-        console.error("[Thumbnail] Error details:", imageError.message);
-        
-        // If DALL-E fails due to safety system, return concept without image
-        if (imageError.message?.includes('safety system')) {
-          console.warn("[Thumbnail] Safety system triggered, returning concept only");
-          return {
-            concept: thumbnailConcept,
-            imageUrl: '', // Return empty URL to indicate no image was generated
-          };
-        }
-        
-        throw imageError;
-      }
+      console.log("[Thumbnail] Final image URL:", generatedImageUrl.substring(0, 100) + "...");
+      
+      // Combine the concept with generation details
+      const fullConcept = `${thumbnailConcept}\n\n=== Generated Thumbnail ===\nText Overlay: "${textOverlay}"\nGeneration Prompt: ${dallePrompt}`;
+      
+      // Return the result with permanent URL
+      return {
+        concept: fullConcept,
+        imageUrl: generatedImageUrl,
+        prompt: `=== Original Requirements ===\n${thumbnailPrompt}\n\n=== AI Analysis ===\n${thumbnailConcept}\n\n=== Generation Prompt ===\n${dallePrompt}`,
+        storageId,
+      };
     } catch (error: any) {
       console.error("[Thumbnail] Error generating thumbnail:", error);
       console.error("[Thumbnail] Error type:", error.constructor.name);
@@ -244,92 +357,4 @@ export const generateThumbnail = action({
   },
 });
 
-function buildFrameAnalysisPrompt(
-  videoData: { title?: string; transcription?: string },
-  connectedOutputs: Array<{ type: string; content: string }>,
-  profileData?: {
-    channelName: string;
-    contentType: string;
-    niche: string;
-    tone?: string;
-    targetAudience?: string;
-  },
-  additionalContext?: string
-): string {
-  let prompt = "Analyze these video frames and create a YouTube thumbnail concept.\n\n";
 
-  if (videoData.title) {
-    prompt += `Video Title: ${videoData.title}\n`;
-  }
-
-  if (videoData.transcription) {
-    const transcriptionPreview = videoData.transcription.length > 1000
-      ? videoData.transcription.slice(0, 1000) + "..."
-      : videoData.transcription;
-    prompt += `\nVideo Content Summary (from transcription):\n${transcriptionPreview}\n`;
-  }
-
-  if (connectedOutputs.length > 0) {
-    prompt += "\nRelated content:\n";
-    connectedOutputs.forEach(({ type, content }) => {
-      if (type === "title") {
-        prompt += `Generated Title: ${content}\n`;
-      }
-    });
-  }
-
-  if (profileData) {
-    prompt += "\nChannel Style:\n";
-    prompt += `- ${profileData.channelName} (${profileData.niche})\n`;
-    prompt += `- Content Type: ${profileData.contentType}\n`;
-    if (profileData.tone) {
-      prompt += `- Tone: ${profileData.tone}\n`;
-    }
-  }
-
-  if (additionalContext) {
-    prompt += "\nUser's specific requirements:\n";
-    prompt += additionalContext + "\n";
-  }
-
-  prompt += `
-\nBased on the video frames and context, create a thumbnail concept that:
-1. Accurately represents the video content
-2. Uses visual elements from the frames
-3. Suggests compelling text overlay (if needed)
-4. Recommends color scheme and composition
-5. Captures attention while staying true to the content
-${additionalContext ? '6. IMPORTANT: Incorporates the user\'s specific requirements mentioned above' : ''}
-
-Provide a detailed description of the thumbnail design, including:
-- Main visual elements to highlight
-- Text overlay suggestions (keep it short and impactful)
-- Color palette
-- Composition and layout
-- Any effects or styling recommendations`;
-
-  return prompt;
-}
-
-function buildDallePrompt(concept: string, profileData?: any): string {
-  // Clean the concept to avoid safety triggers
-  const cleanedConcept = concept
-    .replace(/shocked/gi, 'surprised')
-    .replace(/explosive/gi, 'dynamic')
-    .replace(/volcano/gi, 'mountain with effects')
-    .substring(0, 2000); // Limit concept length
-  
-  let prompt = "Create a safe, family-friendly YouTube thumbnail image. ";
-  prompt += cleanedConcept;
-  
-  // Add style guidelines
-  prompt += "\n\nStyle: Professional YouTube thumbnail with high contrast, vibrant colors, clear readable text, 16:9 aspect ratio.";
-  
-  if (profileData?.tone) {
-    prompt += ` Match the ${profileData.tone} tone.`;
-  }
-  
-  prompt += " Ensure all content is appropriate for all audiences.";
-  
-  return prompt;
-}

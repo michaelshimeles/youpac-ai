@@ -56,6 +56,7 @@ export const updateDraft = mutation({
       v.literal("error")
     )),
     thumbnailUrl: v.optional(v.string()),
+    thumbnailStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -74,6 +75,10 @@ export const updateDraft = mutation({
     
     if (args.thumbnailUrl !== undefined) {
       updateData.thumbnailUrl = args.thumbnailUrl;
+    }
+    
+    if (args.thumbnailStorageId !== undefined) {
+      updateData.thumbnailStorageId = args.thumbnailStorageId;
     }
 
     await ctx.db.patch(args.id, updateData);

@@ -77,6 +77,7 @@ export default defineSchema({
     ),
     draft: v.string(),
     thumbnailUrl: v.optional(v.string()),
+    thumbnailStorageId: v.optional(v.id("_storage")),
     connections: v.array(v.string()),
     chatHistory: v.array(
       v.object({

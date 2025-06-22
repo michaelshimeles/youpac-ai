@@ -257,11 +257,32 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
             </div>
           )}
           {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription && (
-            <div className="flex items-center gap-2">
-              <div className="p-1 rounded-full bg-green-500/10">
-                <FileText className="h-3.5 w-3.5 text-green-500" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-full bg-green-500/10">
+                  <FileText className="h-3.5 w-3.5 text-green-500" />
+                </div>
+                <p className="text-xs font-medium text-green-600">Transcription ready</p>
               </div>
-              <p className="text-xs font-medium text-green-600">Transcription ready</p>
+              {videoData.onRetryTranscription && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 hover:bg-primary/10"
+                        onClick={videoData.onRetryTranscription}
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Re-transcribe video</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
           )}
           {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription === false && (

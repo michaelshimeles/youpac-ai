@@ -220,7 +220,7 @@ export function FloatingChat({
         const agentType = part.replace("_AGENT", "").toLowerCase();
         const label = agentLabels[agentType as keyof typeof agentLabels];
         return (
-          <span key={index} className="text-primary font-medium">
+          <span key={index} className="text-white underline font-medium">
             @{label || part}
           </span>
         );

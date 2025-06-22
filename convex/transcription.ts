@@ -53,8 +53,19 @@ export const transcribeVideo = action({
         file,
         model: "whisper-1",
         response_format: "text",
+        language: "en", // Specify English for better accuracy
+        // Remove hardcoded prompt to let Whisper adapt to the actual content
       });
 
+      // Log transcription result for debugging
+      console.log(`Transcription completed. Length: ${transcriptionResponse.length} characters`);
+      console.log(`First 200 chars: "${transcriptionResponse.substring(0, 200)}..."`);
+      
+      // Basic quality check
+      if (transcriptionResponse.length < 50) {
+        console.warn("Transcription seems too short, might be an issue with audio quality");
+      }
+      
       // Update the video with transcription
       await ctx.runMutation(api.transcription.updateVideoTranscription, {
         videoId: args.videoId,

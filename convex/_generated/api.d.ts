@@ -18,6 +18,7 @@ import type * as http from "../http.js";
 import type * as profiles from "../profiles.js";
 import type * as projects from "../projects.js";
 import type * as thumbnail from "../thumbnail.js";
+import type * as thumbnailGPTImage from "../thumbnailGPTImage.js";
 import type * as transcription from "../transcription.js";
 import type * as users from "../users.js";
 import type * as videoJobs from "../videoJobs.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   profiles: typeof profiles;
   projects: typeof projects;
   thumbnail: typeof thumbnail;
+  thumbnailGPTImage: typeof thumbnailGPTImage;
   transcription: typeof transcription;
   users: typeof users;
   videoJobs: typeof videoJobs;

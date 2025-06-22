@@ -24,6 +24,7 @@ import { PreviewModal } from "~/components/preview/PreviewModal";
 import { handleVideoError, createRetryAction } from "~/lib/video-error-handler";
 import { VideoProcessingHelp } from "~/components/VideoProcessingHelp";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
+import { PromptModal } from "./PromptModal";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
@@ -92,6 +93,8 @@ function InnerCanvas({
   const [showMiniMap, setShowMiniMap] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [nodesToDelete, setNodesToDelete] = useState<Node[]>([]);
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [selectedPrompt, setSelectedPrompt] = useState<{ agentType: string; prompt: string } | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     // Get initial state from localStorage
     if (typeof window !== "undefined") {
@@ -169,11 +172,21 @@ function InnerCanvas({
     }
     
     try {
-      // Update status to generating in UI
+      // Update status to generating in UI with initial progress
       setNodes((nds: any) =>
         nds.map((node: any) =>
           node.id === nodeId
-            ? { ...node, data: { ...node.data, status: "generating" } }
+            ? { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  status: "generating",
+                  generationProgress: {
+                    stage: "Preparing...",
+                    percent: 0
+                  }
+                } 
+              }
             : node
         )
       );
@@ -197,6 +210,24 @@ function InnerCanvas({
         .map((e: any) => nodesRef.current.find((n: any) => n.id === e.source))
         .filter(Boolean);
       
+      // Update progress: Gathering context
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === nodeId
+            ? { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  generationProgress: {
+                    stage: "Gathering context...",
+                    percent: 20
+                  }
+                } 
+              }
+            : node
+        )
+      );
+
       // Prepare data for AI generation
       let videoData: { 
         title?: string; 
@@ -242,9 +273,28 @@ function InnerCanvas({
         targetAudience: "General audience",
       };
       
+      // Update progress: Analyzing content
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === nodeId
+            ? { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  generationProgress: {
+                    stage: "Analyzing content...",
+                    percent: 40
+                  }
+                } 
+              }
+            : node
+        )
+      );
+
       // Generate content based on agent type
       let result: string;
       let thumbnailUrl: string | undefined;
+      let thumbnailStorageId: string | undefined;
       
       if (agentNode.data.type === "thumbnail" && thumbnailImages) {
         // For thumbnail agent, use uploaded images
@@ -268,6 +318,24 @@ function InnerCanvas({
         );
         console.log("[Canvas] Images converted to data URLs:", frames.length);
         
+        // Update progress: Generating with AI
+        setNodes((nds: any) =>
+          nds.map((node: any) =>
+            node.id === nodeId
+              ? { 
+                  ...node, 
+                  data: { 
+                    ...node.data, 
+                    generationProgress: {
+                      stage: "Creating thumbnail design...",
+                      percent: 60
+                    }
+                  } 
+                }
+              : node
+          )
+        );
+
         // Generate thumbnail with vision API
         console.log("[Canvas] Calling generateThumbnail action with:", {
           videoId: videoNode?.data.videoId,
@@ -297,22 +365,98 @@ function InnerCanvas({
         
         result = thumbnailResult.concept;
         thumbnailUrl = thumbnailResult.imageUrl;
+        thumbnailStorageId = thumbnailResult.storageId;
+        
+        // Store the prompt for thumbnail too
+        if (thumbnailResult.prompt) {
+          setNodes((nds: any) =>
+            nds.map((node: any) =>
+              node.id === nodeId
+                ? { 
+                    ...node, 
+                    data: { 
+                      ...node.data, 
+                      lastPrompt: thumbnailResult.prompt
+                    } 
+                  }
+                : node
+            )
+          );
+        }
         
         // If no image was generated due to safety issues, inform the user
         if (!thumbnailUrl) {
           toast.warning("Thumbnail concept created, but image generation was blocked by safety filters. Try uploading different images or adjusting your requirements.");
         }
       } else {
+        // Update progress based on agent type
+        const progressMessages = {
+          title: "Crafting compelling title...",
+          description: "Writing SEO-optimized description...",
+          tweets: "Creating viral social content..."
+        };
+        
+        setNodes((nds: any) =>
+          nds.map((node: any) =>
+            node.id === nodeId
+              ? { 
+                  ...node, 
+                  data: { 
+                    ...node.data, 
+                    generationProgress: {
+                      stage: progressMessages[agentNode.data.type as keyof typeof progressMessages] || "Generating content...",
+                      percent: 60
+                    }
+                  } 
+                }
+              : node
+          )
+        );
+
         // Use regular content generation for other agent types
-        result = await generateContent({
+        const generationResult = await generateContent({
           agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets",
           videoId: videoNode?.data.videoId as Id<"videos"> | undefined,
           videoData,
           connectedAgentOutputs,
           profileData,
         });
+        result = generationResult.content;
+        
+        // Store the prompt for viewing later
+        setNodes((nds: any) =>
+          nds.map((node: any) =>
+            node.id === nodeId
+              ? { 
+                  ...node, 
+                  data: { 
+                    ...node.data, 
+                    lastPrompt: generationResult.prompt
+                  } 
+                }
+              : node
+          )
+        );
       }
       
+      // Update progress: Finalizing
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === nodeId
+            ? { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  generationProgress: {
+                    stage: "Finalizing...",
+                    percent: 90
+                  }
+                } 
+              }
+            : node
+        )
+      );
+
       // Update node with generated content
       console.log("[Canvas] Updating node with generated content");
       if (agentNode.data.type === "thumbnail") {
@@ -329,6 +473,7 @@ function InnerCanvas({
                   draft: result,
                   thumbnailUrl: thumbnailUrl,
                   status: "ready",
+                  generationProgress: undefined, // Clear progress when done
                 },
               }
             : node
@@ -342,6 +487,7 @@ function InnerCanvas({
           draft: result,
           status: "ready",
           thumbnailUrl: thumbnailUrl,
+          thumbnailStorageId: thumbnailStorageId as Id<"_storage"> | undefined,
         });
       }
       
@@ -364,7 +510,14 @@ function InnerCanvas({
       setNodes((nds: any) =>
         nds.map((node: any) =>
           node.id === nodeId
-            ? { ...node, data: { ...node.data, status: "error" } }
+            ? { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  status: "error",
+                  generationProgress: undefined // Clear progress on error
+                } 
+              }
             : node
         )
       );
@@ -667,14 +820,14 @@ function InnerCanvas({
     setTimeout(() => setChatInput(''), 100);
   }, []);
 
-  // Handle regenerate button click - open chat with context
-  const handleRegenerateClick = useCallback((nodeId: string) => {
+  // Handle regenerate button click - immediate regeneration
+  const handleRegenerateClick = useCallback(async (nodeId: string) => {
     const agentNode = nodesRef.current.find((n: any) => n.id === nodeId);
     if (!agentNode || agentNode.type !== 'agent') return;
     
     const agentType = agentNode.data.type as string;
     
-    // Special handling for thumbnail regeneration
+    // Special handling for thumbnail regeneration - needs new images
     if (agentType === 'thumbnail') {
       // Open thumbnail upload modal for new images
       setPendingThumbnailNode(nodeId);
@@ -689,24 +842,45 @@ function InnerCanvas({
         agentId: nodeId,
       }]);
     } else {
-      // For other agents, open chat with pre-filled message
-      const mention = `@${agentType.toUpperCase()}_AGENT Regenerate with changes: `;
+      // For other agents, trigger immediate regeneration
+      toast.info(`Regenerating ${agentType}...`);
       
-      // Add mention to chat input and open chat if minimized
-      setChatInput(mention);
-      // Clear it after a short delay to prevent continuous updates
-      setTimeout(() => setChatInput(''), 100);
-      
-      // Add a context message to the chat
+      // Add a system message to chat history
       setChatMessages(prev => [...prev, {
         id: `system-${Date.now()}`,
         role: "ai",
-        content: `Ready to regenerate ${agentType} content. Please describe what changes you'd like to make.`,
+        content: `🔄 Regenerating ${agentType} content...`,
         timestamp: Date.now(),
         agentId: nodeId,
       }]);
+      
+      try {
+        // Call handleGenerate directly for immediate regeneration
+        await handleGenerate(nodeId);
+        
+        // Add success message to chat
+        setChatMessages(prev => [...prev, {
+          id: `system-${Date.now()}`,
+          role: "ai",
+          content: `✨ Successfully regenerated ${agentType} content! The new version is ready.`,
+          timestamp: Date.now(),
+          agentId: nodeId,
+        }]);
+      } catch (error) {
+        console.error("Regeneration failed:", error);
+        toast.error(`Failed to regenerate ${agentType}`);
+        
+        // Add error message to chat
+        setChatMessages(prev => [...prev, {
+          id: `system-${Date.now()}`,
+          role: "ai",
+          content: `❌ Failed to regenerate ${agentType}. Please try again.`,
+          timestamp: Date.now(),
+          agentId: nodeId,
+        }]);
+      }
     }
-  }, []);
+  }, [handleGenerate]);
 
   // Generate content for all agent nodes (connect if needed)
   const handleGenerateAll = useCallback(async () => {
@@ -1440,6 +1614,12 @@ function InnerCanvas({
         return;
       }
 
+      // Clear the old transcription first
+      await updateVideo({
+        id: videoId as any,
+        clearTranscription: true,
+      });
+
       // Update node to show transcribing state
       setNodes((nds: any) =>
         nds.map((node: any) =>
@@ -1449,6 +1629,7 @@ function InnerCanvas({
                 data: {
                   ...node.data,
                   isTranscribing: true,
+                  hasTranscription: false,
                   transcriptionError: null,
                 },
               }
@@ -1568,6 +1749,13 @@ function InnerCanvas({
             onChat: () => handleChatButtonClick(nodeId),
             onView: () => setSelectedNodeForModal(nodeId),
             onRegenerate: () => handleRegenerateClick(nodeId),
+            onViewPrompt: () => {
+              const node = nodesRef.current.find((n: any) => n.id === nodeId);
+              if (node?.data?.lastPrompt) {
+                setSelectedPrompt({ agentType: node.data.type, prompt: node.data.lastPrompt });
+                setPromptModalOpen(true);
+              }
+            },
           },
         };
 
@@ -1632,7 +1820,7 @@ function InnerCanvas({
             duration: video.duration,
             fileSize: video.fileSize,
           }),
-          onRetryTranscription: video.transcriptionStatus === "failed" ? () => retryTranscription(video._id) : undefined,
+          onRetryTranscription: () => retryTranscription(video._id),
         },
       }));
 
@@ -1651,6 +1839,13 @@ function InnerCanvas({
           onChat: () => handleChatButtonClick(`agent_${agent.type}_${agent._id}`),
           onView: () => setSelectedNodeForModal(`agent_${agent.type}_${agent._id}`),
           onRegenerate: () => handleRegenerateClick(`agent_${agent.type}_${agent._id}`),
+          onViewPrompt: () => {
+            const node = nodesRef.current.find((n: any) => n.id === `agent_${agent.type}_${agent._id}`);
+            if (node?.data?.lastPrompt) {
+              setSelectedPrompt({ agentType: node.data.type, prompt: node.data.lastPrompt });
+              setPromptModalOpen(true);
+            }
+          },
         },
       }));
 
@@ -1823,20 +2018,28 @@ function InnerCanvas({
       
       console.log("Saving canvas state with viewport:", viewport);
       
+      // Filter out function properties from node data
+      const serializableNodes = nodes.map((node: any) => ({
+        id: node.id,
+        type: node.type,
+        position: node.position,
+        data: Object.fromEntries(
+          Object.entries(node.data).filter(([, value]) => {
+            // Filter out functions and undefined values
+            return typeof value !== 'function' && value !== undefined;
+          })
+        ),
+      }));
+      
       saveCanvasState({
         projectId,
-        nodes: nodes.map((node: any) => ({
-          id: node.id,
-          type: node.type,
-          position: node.position,
-          data: node.data,
-        })),
+        nodes: serializableNodes,
         edges: edges.map((edge: any) => ({
           id: edge.id,
           source: edge.source,
           target: edge.target,
-          sourceHandle: edge.sourceHandle,
-          targetHandle: edge.targetHandle,
+          sourceHandle: edge.sourceHandle || undefined,
+          targetHandle: edge.targetHandle || undefined,
         })),
         viewport: {
           x: viewport.x,
@@ -2049,10 +2252,10 @@ function InnerCanvas({
         </aside>
 
         {/* Canvas */}
-        <div className="flex-1" ref={reactFlowWrapper}>
+        <div className="flex-1 relative" ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes}
-            edges={edges.map(edge => ({
+            edges={edges.map((edge: any) => ({
               ...edge,
               animated: enableEdgeAnimations && !isDragging,
               style: { 
@@ -2112,10 +2315,10 @@ function InnerCanvas({
           >
             <Background 
               variant="dots" 
-              gap={32} 
-              size={1.5}
-              color="#000000"
-              style={{ opacity: 0.05 }}
+              gap={16} 
+              size={1}
+              color="#94a3b8"
+              style={{ opacity: 0.4 }}
             />
             <Controls 
               className="!shadow-xl !border !border-border/50 !bg-background/95 !backdrop-blur-sm"
@@ -2126,7 +2329,7 @@ function InnerCanvas({
             {showMiniMap && (
               <MiniMap 
                 className="!shadow-xl !border !border-border/50 !bg-background/95 !backdrop-blur-sm"
-                nodeColor={(node) => {
+                nodeColor={(node: any) => {
                   if (node.type === 'video') return '#3b82f6';
                   if (node.type === 'agent') {
                     const agentType = node.data?.type;
@@ -2183,6 +2386,16 @@ function InnerCanvas({
             title={selectedVideo.title}
             duration={selectedVideo.duration}
             fileSize={selectedVideo.fileSize}
+          />
+        )}
+        
+        {/* Prompt Modal */}
+        {selectedPrompt && (
+          <PromptModal
+            open={promptModalOpen}
+            onOpenChange={setPromptModalOpen}
+            agentType={selectedPrompt.agentType}
+            prompt={selectedPrompt.prompt}
           />
         )}
         

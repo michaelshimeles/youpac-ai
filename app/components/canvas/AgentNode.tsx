@@ -13,7 +13,8 @@ import {
   Hash,
   Palette,
   Zap,
-  Bot
+  Bot,
+  Brain
 } from "lucide-react";
 import { Card } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -25,6 +26,11 @@ export interface AgentNodeData {
   thumbnailUrl?: string;
   status: "idle" | "generating" | "ready" | "error";
   connections: string[];
+  generationProgress?: {
+    stage: string;
+    percent: number;
+  };
+  lastPrompt?: string;
 }
 
 const agentConfig = {
@@ -68,10 +74,31 @@ interface ExtendedNodeProps {
     onChat?: () => void;
     onView?: () => void;
     onRegenerate?: () => void;
+    onViewPrompt?: () => void;
   };
   selected?: boolean;
   id: string;
 }
+
+// Helper function to clean up draft text
+const cleanDraftText = (draft: string, type: string): string => {
+  if (!draft) return '';
+  
+  // For title type, remove common markdown patterns
+  if (type === 'title') {
+    // Remove **Title: prefix and trailing **
+    let cleaned = draft.replace(/^\*\*Title:\s*/i, '');
+    cleaned = cleaned.replace(/\*\*/g, '');
+    // Remove quotes if they wrap the entire title
+    cleaned = cleaned.trim();
+    if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+      cleaned = cleaned.slice(1, -1);
+    }
+    return cleaned.trim();
+  }
+  
+  return draft;
+};
 
 export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
   const config = agentConfig[data.type];
@@ -117,15 +144,53 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
               <p className="text-xs text-muted-foreground">{config.description}</p>
             </div>
           </div>
-          {data.status !== "idle" && (
-            <div className="flex items-center gap-1.5">
-              {statusIcons[data.status]}
-              <Bot className="h-3.5 w-3.5 text-muted-foreground" />
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            {data.status !== "idle" && (
+              <div className="flex items-center gap-1.5">
+                {statusIcons[data.status]}
+                <Bot className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+            )}
+            {data.lastPrompt && data.status === "ready" && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 hover:bg-primary/10"
+                onClick={data.onViewPrompt}
+                title="View generation prompt"
+              >
+                <Brain className="h-4 w-4 text-primary" />
+              </Button>
+            )}
+          </div>
         </div>
       
-      {data.type === "thumbnail" && data.thumbnailUrl ? (
+      {/* Show progress when generating */}
+      {data.status === "generating" && data.generationProgress && (
+        <div className="mb-4">
+          <div className="rounded-lg bg-primary/10 p-4 border border-primary/20">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur animate-pulse" />
+                <Loader2 className="relative h-5 w-5 animate-spin text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">{data.generationProgress.stage}</p>
+                <p className="text-xs text-muted-foreground">Generating amazing content...</p>
+              </div>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-500 ease-out"
+                style={{ width: `${data.generationProgress.percent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Regular content display */}
+      {data.status !== "generating" && (data.type === "thumbnail" && data.thumbnailUrl ? (
         <div className="mb-4 cursor-pointer group/content" onClick={data.onView}>
           <div className="aspect-video relative rounded-xl overflow-hidden bg-black shadow-lg transition-all duration-300 hover:shadow-xl">
             <img 
@@ -137,7 +202,7 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
           </div>
           {data.draft && (
             <p className="text-xs text-muted-foreground mt-2 line-clamp-2 px-1">
-              {data.draft}
+              {cleanDraftText(data.draft, data.type)}
             </p>
           )}
         </div>
@@ -145,7 +210,7 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
         <div className="mb-4 cursor-pointer group/content" onClick={data.onView}>
           <div className="rounded-lg bg-muted/50 p-4 border border-border/50 transition-all duration-200 hover:bg-muted/70 hover:border-border">
             <p className="text-sm text-foreground/80 line-clamp-3 leading-relaxed">
-              {data.draft}
+              {cleanDraftText(data.draft, data.type)}
             </p>
           </div>
         </div>
@@ -163,13 +228,13 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
             </div>
           </div>
         </div>
-      )}
+      ))}
       
       <div className="flex items-center gap-2">
         <Button 
           size="sm" 
           variant="outline" 
-          className="flex-1 hover:bg-primary/10 hover:border-primary/50 transition-all"
+          className="flex-1 hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-all"
           onClick={data.onChat}
           disabled={data.status === "generating"}
         >
@@ -180,7 +245,7 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
           <Button 
             size="sm" 
             variant="outline" 
-            className="flex-1 hover:bg-primary/10 hover:border-primary/50 transition-all"
+            className="flex-1 hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-all"
             onClick={data.onRegenerate}
             disabled={data.status === "generating"}
           >

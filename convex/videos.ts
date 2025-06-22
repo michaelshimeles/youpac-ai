@@ -53,6 +53,7 @@ export const update = mutation({
       x: v.number(),
       y: v.number(),
     })),
+    clearTranscription: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -64,8 +65,18 @@ export const update = mutation({
       throw new Error("Video not found or unauthorized");
     }
 
-    const { id, ...updates } = args;
-    await ctx.db.patch(args.id, updates);
+    const { id, clearTranscription, ...updates } = args;
+    
+    // If clearTranscription is true, clear the transcription and reset status
+    if (clearTranscription) {
+      await ctx.db.patch(args.id, {
+        transcription: undefined,
+        transcriptionStatus: "idle",
+        transcriptionError: undefined,
+      });
+    } else {
+      await ctx.db.patch(args.id, updates);
+    }
   },
 });
 

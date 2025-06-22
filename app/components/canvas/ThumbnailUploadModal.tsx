@@ -63,8 +63,8 @@ export function ThumbnailUploadModal({ isOpen, onClose, onUpload, isGenerating }
         <DialogHeader>
           <DialogTitle>Upload Images for Thumbnail</DialogTitle>
           <DialogDescription>
-            Upload 1-3 images that will be used to generate your YouTube thumbnail. 
-            These images will be analyzed along with your video title to create the perfect thumbnail.
+            Upload 1-3 images that will be used to generate a YouTube thumbnail. 
+            The AI will analyze your images and create a professional thumbnail based on them with text overlays.
           </DialogDescription>
         </DialogHeader>
 
@@ -136,10 +136,10 @@ export function ThumbnailUploadModal({ isOpen, onClose, onUpload, isGenerating }
           <div className="text-sm text-muted-foreground">
             <p className="font-medium mb-1">Tips for best results:</p>
             <ul className="list-disc list-inside space-y-1 text-xs">
-              <li>Use high-quality images related to your video content</li>
-              <li>Include images with clear subjects or key visual elements</li>
-              <li>Mix close-ups with wider shots for variety</li>
-              <li>Avoid images with too much text</li>
+              <li>Upload images that represent your video content</li>
+              <li>The AI will analyze and recreate them as a professional thumbnail</li>
+              <li>Text overlays will be added automatically</li>
+              <li>The final thumbnail will be optimized for YouTube</li>
             </ul>
           </div>
         </div>
