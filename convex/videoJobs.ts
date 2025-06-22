@@ -53,18 +53,43 @@ export const transcribeInBackground = internalAction({
     try {
       // Get the file URL from storage
       const fileUrl = await ctx.storage.getUrl(args.storageId);
-      if (!fileUrl) throw new Error("Could not get file URL");
+      if (!fileUrl) {
+        throw new Error("Could not access the video file. The file may have been deleted or corrupted.");
+      }
 
-      // Download the file
-      const response = await fetch(fileUrl);
-      if (!response.ok) throw new Error("Failed to fetch file");
+      // Download the file with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      const blob = await response.blob();
+      let response;
+      let blob;
+      
+      try {
+        response = await fetch(fileUrl, { signal: controller.signal });
+        clearTimeout(timeout);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+        }
+        
+        blob = await response.blob();
+      } catch (fetchError: any) {
+        clearTimeout(timeout);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Download timeout: The file took too long to download.');
+        }
+        throw new Error(`Network error while downloading file: ${fetchError.message}`);
+      }
       
       // Check file size
       const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
       if (blob.size > MAX_FILE_SIZE) {
-        throw new Error(`File is too large (${(blob.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 25MB.`);
+        throw new Error(`File is too large (${(blob.size / 1024 / 1024).toFixed(1)}MB). Maximum size for transcription is 25MB. For larger files, please use audio extraction.`);
+      }
+      
+      // Check if blob is valid
+      if (blob.size === 0) {
+        throw new Error('The file appears to be empty or corrupted.');
       }
       
       // Convert blob to File object
@@ -72,13 +97,32 @@ export const transcribeInBackground = internalAction({
       const fileType = args.fileType === 'audio' ? 'audio/mp3' : 'video/mp4';
       const file = new File([blob], fileName, { type: blob.type || fileType });
 
-      // Transcribe using Whisper API
+      // Transcribe using Whisper API with error handling
       console.log(`Transcribing ${args.fileType || 'video'} file (${(blob.size / 1024 / 1024).toFixed(1)}MB)...`);
-      const transcriptionResponse = await openai.audio.transcriptions.create({
-        file,
-        model: "whisper-1",
-        response_format: "text",
-      });
+      
+      let transcriptionResponse: string;
+      try {
+        transcriptionResponse = await openai.audio.transcriptions.create({
+          file,
+          model: "whisper-1",
+          response_format: "text",
+        });
+      } catch (whisperError: any) {
+        console.error("Whisper API error:", whisperError);
+        
+        // Handle specific Whisper API errors
+        if (whisperError.status === 413) {
+          throw new Error('File too large for Whisper API. Please try a shorter video.');
+        } else if (whisperError.status === 400) {
+          throw new Error('Invalid audio format. The video might be corrupted or use an unsupported codec.');
+        } else if (whisperError.status === 429) {
+          throw new Error('Too many transcription requests. Please try again later.');
+        } else if (whisperError.message?.includes('timeout')) {
+          throw new Error('Transcription timeout. The video might be too long.');
+        } else {
+          throw new Error(`Transcription failed: ${whisperError.message || 'Unknown error'}`);
+        }
+      }
 
       // Update the video with transcription
       await ctx.runMutation(internal.videoJobs.updateTranscription, {
@@ -87,13 +131,19 @@ export const transcribeInBackground = internalAction({
       });
       
       console.log("Transcription completed successfully");
+      
+      // Validate transcription
+      if (!transcriptionResponse || transcriptionResponse.trim().length === 0) {
+        throw new Error('No speech detected in the video. The video might be silent or contain only music.');
+      }
     } catch (error: any) {
       console.error("Transcription error:", error);
+      console.error("Error stack:", error.stack);
       
-      // Update video to mark transcription as failed
+      // Update video to mark transcription as failed with detailed error
       await ctx.runMutation(internal.videoJobs.markTranscriptionFailed, {
         videoId: args.videoId,
-        error: error.message,
+        error: error.message || 'Unknown transcription error',
       });
     }
   },

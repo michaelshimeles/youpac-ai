@@ -1,7 +1,14 @@
 import { memo, useState, useRef, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "./ReactFlowComponents";
-import { Play, Film, Loader2, FileText, AlertCircle } from "lucide-react";
+import { Play, Film, Loader2, FileText, AlertCircle, RefreshCw } from "lucide-react";
 import { Card } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 export interface VideoNodeData {
   title?: string;
@@ -18,6 +25,7 @@ export interface VideoNodeData {
   extractionProgress?: number;
   transcriptionError?: string | null;
   onVideoClick?: () => void;
+  onRetryTranscription?: () => void;
 }
 
 export const VideoNode = memo(({ data, selected }: NodeProps) => {
@@ -207,12 +215,38 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
           </div>
         )}
         {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription === false && (
-          <div className="flex items-center gap-1 text-xs text-yellow-600" title={videoData.transcriptionError || undefined}>
-            <AlertCircle className="h-3 w-3" />
-            <span>{videoData.transcriptionError ? "Transcription failed" : "No transcription"}</span>
-          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 text-xs text-yellow-600 cursor-help">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>{videoData.transcriptionError ? "Transcription failed" : "No transcription"}</span>
+                </div>
+              </TooltipTrigger>
+              {videoData.transcriptionError && (
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">{videoData.transcriptionError}</p>
+                  <p className="text-xs text-muted-foreground mt-1">The video was uploaded successfully.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
+      
+      {/* Error action button */}
+      {!videoData.isUploading && !videoData.isTranscribing && !videoData.isExtracting && 
+       videoData.transcriptionError && videoData.onRetryTranscription && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-2 w-full"
+          onClick={videoData.onRetryTranscription}
+        >
+          <RefreshCw className="h-3 w-3 mr-1" />
+          Retry Transcription
+        </Button>
+      )}
       
       <Handle
         type="source"

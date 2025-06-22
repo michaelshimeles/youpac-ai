@@ -228,21 +228,6 @@ export default function Page() {
                     </DropdownMenu>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  {project.thumbnail ? (
-                    <div className="aspect-video rounded-md bg-muted overflow-hidden">
-                      <img
-                        src={project.thumbnail}
-                        alt={project.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="aspect-video rounded-md bg-muted flex items-center justify-center">
-                      <Video className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                  )}
-                </CardContent>
                 <CardFooter>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Calendar className="mr-1 h-3 w-3" />

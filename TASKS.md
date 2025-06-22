@@ -8,9 +8,7 @@
 
 ### Export & Sharing 📤
 - [ ] Share canvas link (read-only)
-- [ ] Export as PDF report
 - [ ] Direct publish to YouTube (API integration)
-- [ ] Export all content as ZIP file
 
 ## 🟡 MEDIUM PRIORITY (Nice to Have)
 

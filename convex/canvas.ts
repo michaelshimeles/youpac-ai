@@ -26,7 +26,7 @@ export const saveState = mutation({
     ),
     viewport: v.object({
       x: v.number(),
-      y: v.number(),
+      y: v.number(), 
       zoom: v.number(),
     }),
   },
@@ -41,6 +41,14 @@ export const saveState = mutation({
       throw new Error("Project not found or unauthorized");
     }
 
+    // Use viewport as-is, only validate that it's not completely broken
+    const viewport = args.viewport;
+    const validatedViewport = {
+      x: isFinite(viewport.x) ? viewport.x : 0,
+      y: isFinite(viewport.y) ? viewport.y : 0,
+      zoom: (isFinite(viewport.zoom) && viewport.zoom > 0) ? viewport.zoom : 1,
+    };
+
     const existing = await ctx.db
       .query("projectCanvases")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -50,7 +58,7 @@ export const saveState = mutation({
       await ctx.db.patch(existing._id, {
         nodes: args.nodes,
         edges: args.edges,
-        viewport: args.viewport,
+        viewport: validatedViewport,
         updatedAt: Date.now(),
       });
     } else {
@@ -59,7 +67,7 @@ export const saveState = mutation({
         projectId: args.projectId,
         nodes: args.nodes,
         edges: args.edges,
-        viewport: args.viewport,
+        viewport: validatedViewport,
         updatedAt: Date.now(),
       });
     }

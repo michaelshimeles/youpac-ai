@@ -58,7 +58,7 @@ export const generateThumbnail = action({
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       console.error("[Thumbnail] OpenAI API key not configured");
-      throw new Error("OpenAI API key not configured");
+      throw new Error("Thumbnail generation service is not configured. Please contact support.");
     }
 
     const openai = new OpenAI({ apiKey });
@@ -84,6 +84,11 @@ export const generateThumbnail = action({
         }
       }
 
+      // Validate inputs
+      if (!args.videoFrames || args.videoFrames.length === 0) {
+        throw new Error("No video frames provided for thumbnail generation.");
+      }
+      
       // Step 1: Analyze video frames with GPT-4 Vision to understand visual content
       console.log("[Thumbnail] Step 1: Building frame analysis prompt");
       const frameAnalysisPrompt = buildFrameAnalysisPrompt(

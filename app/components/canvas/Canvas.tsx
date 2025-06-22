@@ -7,7 +7,6 @@ import type {
 } from "./ReactFlowComponents";
 import { VideoNode } from "./VideoNode";
 import { AgentNode } from "./AgentNode";
-import { VideoInfoNode } from "./VideoInfoNode";
 import { ContentModal } from "./ContentModal";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { toast } from "sonner";
@@ -16,18 +15,19 @@ import type { Id } from "convex/_generated/dataModel";
 import { Button } from "~/components/ui/button";
 import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Upload, GripVertical, Eye, X, Map } from "lucide-react";
 import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
-import { extractFramesFromVideo } from "~/lib/video-frames";
 import { extractVideoMetadata } from "~/lib/video-metadata";
 import { FloatingChat } from "./FloatingChat";
 import { ReactFlowWrapper } from "./ReactFlowWrapper";
 import { ThumbnailUploadModal } from "./ThumbnailUploadModal";
 import { VideoPlayerModal } from "./VideoPlayerModal";
 import { PreviewModal } from "~/components/preview/PreviewModal";
+import { handleVideoError, createRetryAction } from "~/lib/video-error-handler";
+import { VideoProcessingHelp } from "~/components/VideoProcessingHelp";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
   agent: AgentNode,
-  videoInfo: VideoInfoNode,
 };
 
 function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
@@ -78,9 +78,9 @@ function InnerCanvas({
   const [selectedNodeForModal, setSelectedNodeForModal] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState<string>("");
   const [hasLoadedFromDB, setHasLoadedFromDB] = useState(false);
+  const [hasInitializedViewport, setHasInitializedViewport] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
-  const [transcriptionVersion, setTranscriptionVersion] = useState(0);
   const [thumbnailModalOpen, setThumbnailModalOpen] = useState(false);
   const [pendingThumbnailNode, setPendingThumbnailNode] = useState<string | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -89,6 +89,8 @@ function InnerCanvas({
   const [enableEdgeAnimations, setEnableEdgeAnimations] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [showMiniMap, setShowMiniMap] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [nodesToDelete, setNodesToDelete] = useState<Node[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     // Get initial state from localStorage
     if (typeof window !== "undefined") {
@@ -142,6 +144,8 @@ function InnerCanvas({
   const updateAgentPosition = useMutation(api.agents.updatePosition);
   const saveCanvasState = useMutation(api.canvas.saveState);
   const scheduleTranscription = useMutation(api.videoJobs.scheduleTranscription);
+  const deleteVideo = useMutation(api.videos.remove);
+  const deleteAgent = useMutation(api.agents.remove);
   
   // Convex actions for AI
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
@@ -374,7 +378,7 @@ function InnerCanvas({
         });
       }
     }
-  }, [generateContent, generateThumbnail, userProfile, setNodes, updateAgentDraft, projectVideos, transcriptionVersion]);
+  }, [generateContent, generateThumbnail, userProfile, setNodes, updateAgentDraft, projectVideos]);
   
   // Handle thumbnail image upload
   const handleThumbnailUpload = useCallback(async (images: File[]) => {
@@ -822,6 +826,68 @@ function InnerCanvas({
     },
     [nodes, setEdges, setNodes, updateAgentConnections]
   );
+  
+  // Perform the actual deletion
+  const performDeletion = useCallback(
+    async (nodes: Node[]) => {
+      for (const node of nodes) {
+        try {
+          if (node.type === 'video' && node.data.videoId) {
+            // Delete video from database (this also deletes associated agents)
+            await deleteVideo({ id: node.data.videoId as Id<"videos"> });
+            toast.success("Video and associated content deleted");
+            
+          } else if (node.type === 'agent' && node.data.agentId) {
+            // Delete agent from database
+            await deleteAgent({ id: node.data.agentId as Id<"agents"> });
+            toast.success("Agent deleted");
+          }
+        } catch (error) {
+          console.error("Failed to delete node:", error);
+          toast.error("Failed to delete node");
+          
+          // Re-add the node if deletion failed
+          setNodes((nds: any) => [...nds, node]);
+        }
+      }
+    },
+    [deleteVideo, deleteAgent, setNodes]
+  );
+  
+  // Handle node deletion
+  const onNodesDelete = useCallback(
+    (nodes: Node[]) => {
+      console.log("🗑️ Nodes marked for deletion:", nodes);
+      console.log("Node types:", nodes.map(n => n.type));
+      
+      // Check if any nodes have important data
+      const hasVideo = nodes.some((n: any) => n.type === 'video');
+      const hasAgent = nodes.some((n: any) => n.type === 'agent' && n.data.draft);
+      
+      if (hasVideo || hasAgent) {
+        // Store nodes for deletion and show dialog
+        setNodesToDelete(nodes);
+        setDeleteDialogOpen(true);
+        return false; // Prevent React Flow from deleting immediately
+      } else {
+        // For non-important nodes (like videoInfo), delete immediately
+        performDeletion(nodes);
+        return true;
+      }
+    },
+    [performDeletion]
+  );
+  
+  // Handle deletion confirmation
+  const handleDeleteConfirm = useCallback(() => {
+    performDeletion(nodesToDelete);
+    // Remove nodes from React Flow
+    setNodes((nds: any) => 
+      nds.filter((node: any) => !nodesToDelete.some(n => n.id === node.id))
+    );
+    setDeleteDialogOpen(false);
+    setNodesToDelete([]);
+  }, [nodesToDelete, performDeletion, setNodes]);
 
   // Find non-overlapping position for new nodes
   const findNonOverlappingPosition = useCallback((desiredPos: { x: number; y: number }, nodeType: string) => {
@@ -915,7 +981,8 @@ function InnerCanvas({
 
 
   // Handle video file upload
-  const handleVideoUpload = async (file: File, position: { x: number; y: number }) => {
+  const handleVideoUpload = async (file: File, position: { x: number; y: number }, retryCount = 0) => {
+    const MAX_RETRIES = 2;
     try {
       // Create a temporary node with loading state
       const tempNodeId = `video_temp_${Date.now()}`;
@@ -930,17 +997,32 @@ function InnerCanvas({
       };
       setNodes((nds: any) => nds.concat(tempNode));
 
+      // Validate file before upload
+      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error(`File is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 100MB.`);
+      }
+
+      // Check video format
+      const supportedFormats = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mov'];
+      if (!supportedFormats.includes(file.type) && !file.name.match(/\.(mp4|mov|avi|webm)$/i)) {
+        throw new Error('Unsupported video format. Please upload MP4, MOV, AVI, or WebM files.');
+      }
+
       // Step 1: Get upload URL from Convex
       const uploadUrl = await generateUploadUrl();
       
-      // Step 2: Upload file to Convex storage
+      // Step 2: Upload file to Convex storage with progress tracking
       const result = await fetch(uploadUrl, {
         method: "POST",
         headers: { "Content-Type": file.type },
         body: file,
       });
       
-      if (!result.ok) throw new Error("Upload failed");
+      if (!result.ok) {
+        const errorText = await result.text().catch(() => 'Unknown error');
+        throw new Error(`Upload failed: ${result.status} ${result.statusText}. ${errorText}`);
+      }
       
       const { storageId } = await result.json();
       
@@ -955,7 +1037,7 @@ function InnerCanvas({
       
       console.log("Video created:", video);
       if (!video || !video._id) {
-        throw new Error("Failed to create video - no ID returned");
+        throw new Error("Failed to create video record in database. Please try again.");
       }
       
       // Step 4: Update node with real data including video URL
@@ -985,7 +1067,9 @@ function InnerCanvas({
         )
       );
       
-      toast.success("Video uploaded successfully!");
+      toast.success("Video uploaded successfully!", {
+        description: `${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
+      });
       
       // Update node to show transcribing state immediately
       setNodes((nds: any) =>
@@ -1003,38 +1087,13 @@ function InnerCanvas({
         )
       );
       
-      // Step 5: Extract video metadata and create info node (optional, non-blocking)
+      // Step 5: Extract video metadata (optional, non-blocking)
       console.log("Starting optional metadata extraction for video:", video._id);
       // Run metadata extraction in parallel, don't block transcription
-      const metadataPromise = (async () => {
-        const infoNodeId = `video_info_${video._id}`;
+      (async () => {
         try {
-          // Create temporary info node
-          const infoNode: Node = {
-            id: infoNodeId,
-            type: "videoInfo",
-            position: { x: position.x - 350, y: position.y }, // Position to the left of video
-            data: {
-              videoId: video._id,
-              title: video.title,
-              isLoading: true,
-            },
-          };
-          setNodes((nds: any) => nds.concat(infoNode));
-          
-          // Connect info node to video node
-          const infoEdge: Edge = {
-            id: `e_info_${video._id}`,
-            source: infoNodeId,
-            target: `video_${video._id}`,
-            type: 'smoothstep',
-            animated: enableEdgeAnimations && !isDragging,
-            style: { stroke: '#888', strokeDasharray: '5 5' },
-          };
-          setEdges((eds: any) => eds.concat(infoEdge));
           
           // Extract metadata with timeout
-          toast.info("Extracting video information...");
           console.log("Calling extractVideoMetadata...");
           
           let metadata: any;
@@ -1067,6 +1126,11 @@ function InnerCanvas({
               codec: 'unknown',
               thumbnails: []
             };
+            
+            // Show info message but don't fail the upload
+            toast.info("Video details couldn't be extracted", {
+              description: "The video was uploaded successfully, but some information may be missing.",
+            });
           }
           
           // Update video in database with metadata
@@ -1082,19 +1146,10 @@ function InnerCanvas({
             audioInfo: metadata.audioInfo,
           });
           
-          // Update both info node and video node with metadata
+          // Update video node with metadata
           setNodes((nds: any) =>
             nds.map((node: any) => {
-              if (node.id === infoNodeId) {
-                return {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    ...metadata,
-                    isLoading: false,
-                  },
-                };
-              } else if (node.id === `video_${video._id}`) {
+              if (node.id === `video_${video._id}`) {
                 return {
                   ...node,
                   data: {
@@ -1114,26 +1169,16 @@ function InnerCanvas({
             })
           );
           
-          toast.success("Video information extracted!");
-        } catch (metadataError) {
+          // Only show success if we got real metadata
+          if (metadata.duration > 0 || metadata.resolution.width > 0) {
+            toast.success("Video information extracted!");
+          }
+        } catch (metadataError: any) {
           console.error("Metadata extraction error:", metadataError);
-          // Update the info node to remove loading state
-          setNodes((nds: any) =>
-            nds.map((node: any) => {
-              if (node.id === infoNodeId) {
-                return {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    isLoading: false,
-                    error: true,
-                    errorMessage: "Failed to extract video metadata"
-                  },
-                };
-              }
-              return node;
-            })
-          );
+          
+          // Handle metadata error gracefully
+          handleVideoError(metadataError, 'Metadata Extraction');
+          
           // Continue with upload even if metadata fails
           toast.warning("Could not extract all video information");
         }
@@ -1231,7 +1276,30 @@ function InnerCanvas({
           } catch (scheduleError: any) {
             console.error("Failed to schedule transcription:", scheduleError);
             console.error("Error details:", scheduleError.message, scheduleError.stack);
-            throw scheduleError;
+            
+            // Don't throw - transcription failure shouldn't fail the whole upload
+            toast.error("Transcription couldn't start", {
+              description: "The video was uploaded but transcription failed. You can try again later.",
+            });
+            
+            // Update node to show transcription failed
+            setNodes((nds: any) =>
+              nds.map((node: any) =>
+                node.id === `video_${video._id}`
+                  ? {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        isTranscribing: false,
+                        isExtracting: false,
+                        hasTranscription: false,
+                        transcriptionError: scheduleError.message,
+                        onRetryTranscription: () => retryTranscription(video._id),
+                      },
+                    }
+                  : node
+              )
+            );
           }
         } else {
           // Schedule background transcription for smaller files  
@@ -1248,7 +1316,30 @@ function InnerCanvas({
           } catch (scheduleError: any) {
             console.error("Failed to schedule transcription:", scheduleError);
             console.error("Error details:", scheduleError.message, scheduleError.stack);
-            throw scheduleError;
+            
+            // Don't throw - transcription failure shouldn't fail the whole upload
+            toast.error("Transcription couldn't start", {
+              description: "The video was uploaded but transcription failed. You can try again later.",
+            });
+            
+            // Update node to show transcription failed
+            setNodes((nds: any) =>
+              nds.map((node: any) =>
+                node.id === `video_${video._id}`
+                  ? {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        isTranscribing: false,
+                        isExtracting: false,
+                        hasTranscription: false,
+                        transcriptionError: scheduleError.message,
+                        onRetryTranscription: () => retryTranscription(video._id),
+                      },
+                    }
+                  : node
+              )
+            );
           }
         }
         
@@ -1256,7 +1347,9 @@ function InnerCanvas({
         // For now, keep showing the transcribing state
       } catch (transcriptionError: any) {
         console.error("Transcription error:", transcriptionError);
-        toast.error(transcriptionError.message || "Failed to transcribe video");
+        
+        // Handle transcription errors gracefully
+        const errorDetails = handleVideoError(transcriptionError, 'Transcription');
         
         // Update node to show transcription failed
         setNodes((nds: any) =>
@@ -1269,6 +1362,8 @@ function InnerCanvas({
                     isTranscribing: false,
                     isExtracting: false,
                     hasTranscription: false,
+                    transcriptionError: errorDetails.message,
+                    onRetryTranscription: () => retryTranscription(video._id),
                   },
                 }
               : node
@@ -1278,10 +1373,118 @@ function InnerCanvas({
     } catch (error: any) {
       console.error("Upload error:", error);
       console.error("Full error details:", error.stack);
-      toast.error(error.message || "Failed to upload video");
+      
+      // Handle the error with our error handler
+      const errorDetails = handleVideoError(error, 'Upload');
       
       // Remove the temporary node on error
       setNodes((nds: any) => nds.filter((node: any) => !node.id.startsWith('video_temp_')));
+      
+      // If recoverable and haven't exceeded retries, show retry option
+      if (errorDetails.recoverable && retryCount < MAX_RETRIES) {
+        const retryAction = createRetryAction(() => {
+          handleVideoUpload(file, position, retryCount + 1);
+        });
+        
+        toast.error(errorDetails.message, {
+          description: errorDetails.details,
+          duration: 8000,
+          action: retryAction,
+        });
+      }
+    }
+  };
+
+  // Retry transcription for a failed video
+  // Create refs for viewport saving
+  const viewportRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  const viewportSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Handle viewport changes - debounced save
+  const onViewportChange = useCallback((viewport: { x: number; y: number; zoom: number }) => {
+    // Store the latest viewport
+    viewportRef.current = viewport;
+    
+    // Clear existing timeout
+    if (viewportSaveTimeoutRef.current) {
+      clearTimeout(viewportSaveTimeoutRef.current);
+    }
+    
+    // Set new timeout to save viewport
+    if (projectId && hasInitializedViewport && hasLoadedFromDB) {
+      viewportSaveTimeoutRef.current = setTimeout(() => {
+        console.log("Saving viewport after change:", viewport);
+        // Only update viewport in the canvas state
+        const currentCanvasState = canvasState || { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } };
+        saveCanvasState({
+          projectId,
+          nodes: currentCanvasState.nodes,
+          edges: currentCanvasState.edges,
+          viewport: {
+            x: viewport.x,
+            y: viewport.y,
+            zoom: viewport.zoom,
+          },
+        }).catch((error) => {
+          console.error("Failed to save viewport:", error);
+        });
+      }, 1000); // Save after 1 second of no viewport changes
+    }
+  }, [projectId, hasInitializedViewport, hasLoadedFromDB, canvasState, saveCanvasState]);
+
+  const retryTranscription = async (videoId: string) => {
+    try {
+      const video = nodes.find((n: any) => n.id === `video_${videoId}`)?.data;
+      if (!video?.storageId) {
+        toast.error("Cannot retry: Video data not found");
+        return;
+      }
+
+      // Update node to show transcribing state
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === `video_${videoId}`
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  isTranscribing: true,
+                  transcriptionError: null,
+                },
+              }
+            : node
+        )
+      );
+
+      // Schedule transcription
+      await scheduleTranscription({
+        videoId: videoId as any,
+        storageId: video.storageId,
+        fileType: "video",
+      });
+
+      toast.success("Transcription retry started", {
+        description: "The transcription will process in the background.",
+      });
+    } catch (error: any) {
+      console.error("Retry transcription error:", error);
+      handleVideoError(error, 'Transcription Retry');
+      
+      // Reset node state
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === `video_${videoId}`
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  isTranscribing: false,
+                  transcriptionError: error.message,
+                },
+              }
+            : node
+        )
+      );
     }
   };
 
@@ -1429,6 +1632,7 @@ function InnerCanvas({
             duration: video.duration,
             fileSize: video.fileSize,
           }),
+          onRetryTranscription: video.transcriptionStatus === "failed" ? () => retryTranscription(video._id) : undefined,
         },
       }));
 
@@ -1450,48 +1654,7 @@ function InnerCanvas({
         },
       }));
 
-      // Create VideoInfoNodes for videos that have metadata
-      const videoInfoNodes: Node[] = [];
-      const infoEdges: Edge[] = [];
-      
-      projectVideos.forEach((video) => {
-        if (video.duration || video.resolution || video.audioInfo) {
-          const infoNode: Node = {
-            id: `video_info_${video._id}`,
-            type: "videoInfo",
-            position: { 
-              x: video.canvasPosition.x - 350, 
-              y: video.canvasPosition.y 
-            },
-            data: {
-              videoId: video._id,
-              title: video.title,
-              duration: video.duration,
-              fileSize: video.fileSize,
-              resolution: video.resolution,
-              frameRate: video.frameRate,
-              bitRate: video.bitRate,
-              format: video.format,
-              codec: video.codec,
-              audioInfo: video.audioInfo,
-              isLoading: false,
-            },
-          };
-          videoInfoNodes.push(infoNode);
-          
-          // Create edge connecting info node to video node
-          infoEdges.push({
-            id: `e_info_${video._id}`,
-            source: `video_info_${video._id}`,
-            target: `video_${video._id}`,
-            type: 'smoothstep',
-            animated: enableEdgeAnimations && !isDragging,
-            style: { stroke: '#888', strokeDasharray: '5 5' },
-          });
-        }
-      });
-      
-      setNodes([...videoNodes, ...agentNodes, ...videoInfoNodes]);
+      setNodes([...videoNodes, ...agentNodes]);
       
       // Load chat history from agents
       const allMessages: typeof chatMessages = [];
@@ -1541,19 +1704,55 @@ function InnerCanvas({
         });
       });
       
-      setEdges([...edges, ...infoEdges]);
+      setEdges(edges);
       setHasLoadedFromDB(true);
     }
   }, [projectVideos, projectAgents, hasLoadedFromDB, setNodes, setEdges, handleGenerate, handleChatButtonClick]);
   
-  // Load canvas viewport state
+  // Load canvas viewport state - only run once when everything is ready
   useEffect(() => {
-    if (canvasState && reactFlowInstance && hasLoadedFromDB) {
-      console.log("Loading canvas viewport state:", canvasState.viewport);
-      reactFlowInstance.setViewport(canvasState.viewport);
+    if (!reactFlowInstance || !hasLoadedFromDB || hasInitializedViewport) return;
+    
+    // If we have a saved canvas state with viewport
+    if (canvasState?.viewport) {
+      const { x, y, zoom } = canvasState.viewport;
+      // Apply saved viewport with minimal validation
+      if (typeof x === 'number' && typeof y === 'number' && typeof zoom === 'number' && zoom > 0) {
+        console.log("Restoring saved viewport:", { x, y, zoom });
+        // Small delay to ensure React Flow is ready
+        setTimeout(() => {
+          reactFlowInstance.setViewport({ x, y, zoom });
+          viewportRef.current = { x, y, zoom };
+          setHasInitializedViewport(true);
+        }, 50);
+      } else {
+        setHasInitializedViewport(true);
+      }
+    } else if (nodes.length > 0) {
+      // Only fit view on first load when there's no saved state
+      console.log("No saved viewport, fitting view to nodes");
+      setTimeout(() => {
+        reactFlowInstance.fitView({ 
+          padding: 0.2, 
+          maxZoom: 1.5,
+          duration: 800 
+        });
+        setHasInitializedViewport(true);
+      }, 100);
+    } else {
+      // No nodes and no saved state, just mark as initialized
+      setHasInitializedViewport(true);
     }
-  }, [canvasState, reactFlowInstance, hasLoadedFromDB]);
+  }, [canvasState?.viewport, reactFlowInstance, hasLoadedFromDB, hasInitializedViewport, nodes.length]);
   
+  // Debug: Log when nodes change to see selection state
+  useEffect(() => {
+    const selectedNodes = nodes.filter((node: any) => node.selected);
+    if (selectedNodes.length > 0) {
+      console.log("📍 Selected nodes:", selectedNodes.map((n: any) => ({ id: n.id, type: n.type, selected: n.selected })));
+    }
+  }, [nodes]);
+
   // Periodically check for transcription updates
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1593,6 +1792,7 @@ function InnerCanvas({
                       hasTranscription: newHasTranscription,
                       isTranscribing: newIsTranscribing,
                       transcriptionError: newTranscriptionError,
+                      onRetryTranscription: newTranscriptionError ? () => retryTranscription(video._id) : undefined,
                     },
                   };
                 }
@@ -1609,10 +1809,19 @@ function InnerCanvas({
 
   // Auto-save canvas state
   useEffect(() => {
-    if (!projectId || !hasLoadedFromDB) return;
+    if (!projectId || !hasLoadedFromDB || !hasInitializedViewport) return;
     
     const saveTimeout = setTimeout(() => {
-      const viewport = reactFlowInstance?.getViewport() || { x: 0, y: 0, zoom: 1 };
+      // Use the viewport from ref or get current viewport
+      const viewport = viewportRef.current || reactFlowInstance?.getViewport();
+      
+      // Basic viewport validation
+      if (!viewport || typeof viewport.zoom !== 'number' || viewport.zoom <= 0) {
+        console.warn("Invalid viewport, skipping save");
+        return;
+      }
+      
+      console.log("Saving canvas state with viewport:", viewport);
       
       saveCanvasState({
         projectId,
@@ -1629,14 +1838,18 @@ function InnerCanvas({
           sourceHandle: edge.sourceHandle,
           targetHandle: edge.targetHandle,
         })),
-        viewport,
+        viewport: {
+          x: viewport.x,
+          y: viewport.y,
+          zoom: viewport.zoom,
+        },
       }).catch((error) => {
         console.error("Failed to save canvas state:", error);
       });
-    }, 5000); // Save after 5 seconds of inactivity
+    }, 2000); // Save after 2 seconds of inactivity
     
     return () => clearTimeout(saveTimeout);
-  }, [nodes, edges, reactFlowInstance, projectId, saveCanvasState, hasLoadedFromDB]);
+  }, [nodes, edges, reactFlowInstance, projectId, saveCanvasState, hasLoadedFromDB, hasInitializedViewport]);
 
   return (
     <ReactFlowProvider>
@@ -1700,12 +1913,8 @@ function InnerCanvas({
             {!isSidebarCollapsed && (
               <div className="mt-8">
                 <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center space-y-2">
-                  <Upload className="h-6 w-6 text-muted-foreground mx-auto" />
                   <p className="text-sm text-muted-foreground">
                     Drag video onto canvas →
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    or press <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted rounded">⌘U</kbd>
                   </p>
                 </div>
               </div>
@@ -1802,6 +2011,10 @@ function InnerCanvas({
                     />
                   </button>
                 </div>
+                
+                <div className="pt-2">
+                  <VideoProcessingHelp />
+                </div>
               </div>
             )}
           </div>
@@ -1841,11 +2054,19 @@ function InnerCanvas({
             }}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodesDelete={onNodesDelete}
             onInit={setReactFlowInstance}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onViewportChange={onViewportChange}
             nodeTypes={nodeTypes}
-            fitView
+            deleteKeyCode={["Backspace", "Delete"]}
+            selectionOnDrag={false}
+            selectNodesOnDrag={false}
+            fitView={false}
+            minZoom={0.1}
+            maxZoom={2}
+            preventScrolling={false}
           >
             <Background />
             <Controls />
@@ -1946,6 +2167,19 @@ function InnerCanvas({
           duration={nodes.find((n: any) => n.type === 'video')?.data.duration}
           channelName={userProfile?.channelName}
           subscriberCount="1.2K"
+        />
+        
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Content?"
+          description={
+            nodesToDelete.some((n: any) => n.type === 'video')
+              ? "This will permanently delete the video and all associated content. This action cannot be undone."
+              : "This will permanently delete the selected content. This action cannot be undone."
+          }
         />
         
       </div>
