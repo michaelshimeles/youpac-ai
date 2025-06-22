@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps } from "./ReactFlowComponents";
 import { 
   FileText, 
   Image, 
@@ -7,7 +7,8 @@ import {
   MessageSquare,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { Card } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -44,12 +45,15 @@ const agentConfig = {
   },
 };
 
-interface ExtendedNodeProps extends NodeProps {
+interface ExtendedNodeProps {
   data: AgentNodeData & {
     onGenerate?: () => void;
     onChat?: () => void;
     onView?: () => void;
+    onRegenerate?: () => void;
   };
+  selected?: boolean;
+  id: string;
 }
 
 export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
@@ -66,7 +70,7 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
   const statusColors = {
     idle: "secondary",
     generating: "default",
-    ready: "success",
+    ready: "default", // Changed from "success" since that variant doesn't exist
     error: "destructive",
   } as const;
 
@@ -130,22 +134,35 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
           <MessageSquare className="h-3 w-3 mr-1" />
           Chat
         </Button>
-        <Button 
-          size="sm" 
-          variant="default" 
-          className="flex-1"
-          onClick={data.onGenerate}
-          disabled={data.status === "generating"}
-        >
-          {data.status === "generating" ? (
-            <>
-              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            "Generate"
-          )}
-        </Button>
+        {data.status === "ready" && data.draft ? (
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="flex-1"
+            onClick={data.onRegenerate}
+            disabled={data.status === "generating"}
+          >
+            <RefreshCw className="h-3 w-3 mr-1" />
+            Regenerate
+          </Button>
+        ) : (
+          <Button 
+            size="sm" 
+            variant="default" 
+            className="flex-1"
+            onClick={data.onGenerate}
+            disabled={data.status === "generating"}
+          >
+            {data.status === "generating" ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              "Generate"
+            )}
+          </Button>
+        )}
       </div>
       
       <Handle

@@ -19,14 +19,15 @@ export async function loader(args: Route.LoaderArgs) {
 
 export default function DashboardLayout() {
   const { user } = useLoaderData();
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    // Get initial state from localStorage
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sidebar-open");
-      return saved !== null ? saved === "true" : false;
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Load saved state after mount to avoid hydration mismatch
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar-open");
+    if (saved !== null) {
+      setSidebarOpen(saved === "true");
     }
-    return false;
-  });
+  }, []);
 
   // Save to localStorage whenever state changes
   useEffect(() => {

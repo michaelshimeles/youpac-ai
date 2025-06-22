@@ -25,8 +25,20 @@ export const refineContent = action({
       v.object({
         title: v.optional(v.string()),
         transcription: v.optional(v.string()),
+        duration: v.optional(v.number()),
+        resolution: v.optional(v.object({
+          width: v.number(),
+          height: v.number(),
+        })),
+        format: v.optional(v.string()),
       })
     ),
+    connectedAgentOutputs: v.optional(v.array(
+      v.object({
+        type: v.string(),
+        content: v.string(),
+      })
+    )),
     profileData: v.optional(
       v.object({
         channelName: v.string(),
@@ -47,7 +59,8 @@ export const refineContent = action({
       
       // Build the conversation context with proper types
       let prompt = systemPrompt + "\n\n";
-      prompt += `Current ${args.agentType}: ${args.currentDraft}\n\n`;
+      prompt += `CURRENT ${args.agentType.toUpperCase()} (that needs to be changed): "${args.currentDraft}"\n\n`;
+      prompt += `Note: The user wants this regenerated/changed. Do NOT return the same content.\n\n`;
       
       // Add chat history
       if (args.chatHistory.length > 0) {
@@ -61,6 +74,29 @@ export const refineContent = action({
       // Add context about the video if available
       if (args.videoData?.transcription) {
         prompt += `Video context: ${args.videoData.transcription.slice(0, 1000)}...\n\n`;
+      }
+      
+      // Add connected agent outputs if available
+      if (args.connectedAgentOutputs && args.connectedAgentOutputs.length > 0) {
+        prompt += "Related content from other agents:\n";
+        args.connectedAgentOutputs.forEach(({ type, content }) => {
+          prompt += `${type}: ${content}\n`;
+        });
+        prompt += "\n";
+      }
+      
+      // Add profile data if available
+      if (args.profileData) {
+        prompt += "Channel Profile:\n";
+        prompt += `Channel: ${args.profileData.channelName} (${args.profileData.niche})\n`;
+        prompt += `Content Type: ${args.profileData.contentType}\n`;
+        if (args.profileData.tone) {
+          prompt += `Tone: ${args.profileData.tone}\n`;
+        }
+        if (args.profileData.targetAudience) {
+          prompt += `Target Audience: ${args.profileData.targetAudience}\n`;
+        }
+        prompt += "\n";
       }
       
       // Add the current user message
@@ -111,15 +147,22 @@ export const refineContent = action({
 
 function getRefineSystemPrompt(agentType: string): string {
   const basePrompt = `You are an AI assistant helping to refine ${agentType} content for YouTube videos. 
-When the user asks for changes, provide:
+When the user asks for changes or regeneration, you MUST create NEW content that is DIFFERENT from the current draft while incorporating their feedback.
+
+IMPORTANT: 
+- If the user asks to regenerate, create something COMPLETELY NEW based on their instructions
+- Do NOT return the same or similar content as the current draft
+- The updated content should reflect the user's specific requests
+
+When responding, provide:
 1. A friendly response acknowledging their request
-2. The updated ${agentType} that incorporates their feedback
+2. The NEW ${agentType} that incorporates their feedback
 
 Format your response as:
 [Your conversational response]
 
 UPDATED ${agentType.toUpperCase()}:
-[The refined content]
+[The completely new or significantly modified content]
 
 Important guidelines:`;
 

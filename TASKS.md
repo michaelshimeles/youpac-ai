@@ -28,15 +28,31 @@
 - [x] Dashboard sidebar closed by default
 - [x] Fixed all ESM module loading issues
 - [x] Removed redundant toast notifications
+- [x] Video preview on hover with play button
+- [x] Video player modal on click
+- [x] Video duration and file size display
+- [x] Thumbnail upload modal (instead of frame extraction)
+
+### Latest Fixes (Session Summary) ✓
+- [x] Fixed chat input flickering issue (removed two-way state binding)
+- [x] Enable content regeneration from chat with context (@mention regenerate)
+- [x] Fixed OpenAI safety errors (corrected model name to dall-e-3)
+- [x] Fixed canvas position saving (re-enabled onNodeDragStop handler)
+- [x] Changed from right-click to Cmd+U keyboard shortcut for upload
+- [x] Fixed video info extraction (added timeout and HTML5 fallback)
+- [x] Updated sidebar text to clarify video drag direction
+- [x] Fixed SSR/hydration errors with React Flow
+- [x] Fixed audio info display (hide zero/invalid values)
+- [x] Fixed thumbnail generation validator (accept video metadata)
 
 ## 🔴 HIGH PRIORITY (Do These First!)
 
 ### Video Features 🎬
-- [ ] Fix video preview on hover
-- [ ] Add video duration display
+- [x] Fix video preview on hover
+- [x] Add video duration display
 - [ ] Support YouTube URL input (not just file upload)
 - [ ] Handle video processing errors gracefully
-- [ ] Add video metadata to agent context
+- [x] Add video metadata to agent context
 
 ### Canvas UX 🎨
 - [ ] Add keyboard shortcuts (Cmd+S save, Delete key, etc)
@@ -61,7 +77,7 @@
 - [ ] Multiple profile support
 
 ### AI Improvements 🤖
-- [ ] Regenerate single content button
+- [x] Regenerate single content button with chat context
 - [ ] Content variations (generate 3 options)
 - [ ] Custom prompts per agent
 - [ ] Generation history with rollback
@@ -87,30 +103,34 @@
 ## 🎯 QUICK WINS (< 1 hour each)
 
 - [ ] Add loading spinner when generating content
-- [ ] Show video file size in node
+- [x] Show video file size in node
 - [ ] Add "Clear All" button for content
-- [ ] Fix chat input focus issues
+- [x] Fix chat input focus issues
 - [ ] Add generation time estimate
 - [ ] Show word count in content modal
 - [ ] Add dark mode toggle
 - [ ] Fix mobile responsive issues
+- [x] Add video info node with metadata display
+- [x] Add keyboard shortcut (Cmd+U) for upload
 
 ## 📈 Progress Tracker
 
 ### What's Complete
 - ✅ Core Infrastructure (100%)
 - ✅ Project System (100%)
-- ✅ Canvas Functionality (95%)
-- ✅ AI Integration (95%)
+- ✅ Canvas Functionality (98%)
+- ✅ AI Integration (98%)
 - ✅ Video Transcription (100%)
 - ✅ Thumbnail Generation (100%)
-- ✅ Chat Interface (90%)
+- ✅ Chat Interface (95%)
 - ✅ Profile System (85%)
+- ✅ Canvas State Persistence (100%)
+- ✅ Video Metadata Extraction (100%)
 
 ### What Needs Work
 - 🟡 Export Features (0%)
-- 🟡 Keyboard Shortcuts (10%)
-- 🟡 Video Enhancements (60%)
+- 🟡 Keyboard Shortcuts (20%)
+- 🟡 Video Enhancements (85%)
 - 🟡 Content Variations (0%)
 - 🔴 Collaboration (0%)
 - 🔴 Analytics (0%)
@@ -121,17 +141,21 @@
 1. **Canvas Issues**
    - [ ] Nodes sometimes overlap on creation
    - [ ] Edge animations cause performance issues
-   - [ ] Canvas state sometimes doesn't save
+   - [x] Canvas state sometimes doesn't save (FIXED)
+   - [x] SSR/hydration errors with React Flow (FIXED)
 
 2. **Video Issues**
    - [ ] Large videos (>100MB) fail silently
    - [ ] Some video formats not supported
    - [ ] Transcription timeout on long videos
+   - [x] Video info extraction failing (FIXED with timeout/fallback)
 
 3. **UI/UX Issues**
    - [ ] Chat dropdown positioning on small screens
    - [ ] Modal close button hard to see
    - [ ] Toast notifications stack up
+   - [x] Chat input flickering (FIXED)
+   - [x] Sidebar hydration mismatch (FIXED)
 
 ## 🚀 Next Sprint Goals
 

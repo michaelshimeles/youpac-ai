@@ -4,7 +4,7 @@ import type {
   Node,
   NodeTypes,
   OnConnect,
-} from "@xyflow/react";
+} from "./ReactFlowComponents";
 import { VideoNode } from "./VideoNode";
 import { AgentNode } from "./AgentNode";
 import { VideoInfoNode } from "./VideoInfoNode";
@@ -21,6 +21,7 @@ import { extractVideoMetadata } from "~/lib/video-metadata";
 import { FloatingChat } from "./FloatingChat";
 import { ReactFlowWrapper } from "./ReactFlowWrapper";
 import { ThumbnailUploadModal } from "./ThumbnailUploadModal";
+import { VideoPlayerModal } from "./VideoPlayerModal";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
@@ -81,6 +82,8 @@ function InnerCanvas({
   const [transcriptionVersion, setTranscriptionVersion] = useState(0);
   const [thumbnailModalOpen, setThumbnailModalOpen] = useState(false);
   const [pendingThumbnailNode, setPendingThumbnailNode] = useState<string | null>(null);
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string; duration?: number; fileSize?: number } | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     // Get initial state from localStorage
     if (typeof window !== "undefined") {
@@ -97,6 +100,7 @@ function InnerCanvas({
     agentId?: string;
   }>>([]);
   const [isChatGenerating, setIsChatGenerating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Use refs to access current values in callbacks
   const nodesRef = useRef(nodes);
@@ -117,7 +121,7 @@ function InnerCanvas({
   }, [isSidebarCollapsed]);
   
   // Convex queries
-  const canvasState = null; // Temporarily disabled to ensure DB loading works
+  const canvasState = useQuery(api.canvas.getState, { projectId });
   const projectVideos = useQuery(api.videos.getByProject, { projectId });
   const projectAgents = useQuery(api.agents.getByProject, { projectId });
   const userProfile = useQuery(api.profiles.get);
@@ -126,9 +130,11 @@ function InnerCanvas({
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createVideo = useMutation(api.videos.create);
   const updateVideoMetadata = useMutation(api.videos.updateMetadata);
+  const updateVideo = useMutation(api.videos.update);
   const createAgent = useMutation(api.agents.create);
   const updateAgentDraft = useMutation(api.agents.updateDraft);
   const updateAgentConnections = useMutation(api.agents.updateConnections);
+  const updateAgentPosition = useMutation(api.agents.updatePosition);
   const saveCanvasState = useMutation(api.canvas.saveState);
   const deleteVideo = useMutation(api.videos.remove);
   const deleteAgent = useMutation(api.agents.remove);
@@ -140,7 +146,7 @@ function InnerCanvas({
   const refineContent = useAction(api.chat.refineContent);
 
   // Handle content generation for an agent node
-  const handleGenerate = useCallback(async (nodeId: string, thumbnailImages?: File[]) => {
+  const handleGenerate = useCallback(async (nodeId: string, thumbnailImages?: File[], additionalContext?: string) => {
     const agentNode = nodesRef.current.find((n: any) => n.id === nodeId);
     if (!agentNode) {
       console.error("Agent node not found:", nodeId);
@@ -275,6 +281,7 @@ function InnerCanvas({
           videoData,
           connectedAgentOutputs,
           profileData,
+          additionalContext,
         });
         
         console.log("[Canvas] Thumbnail generation completed");
@@ -283,6 +290,11 @@ function InnerCanvas({
         
         result = thumbnailResult.concept;
         thumbnailUrl = thumbnailResult.imageUrl;
+        
+        // If no image was generated due to safety issues, inform the user
+        if (!thumbnailUrl) {
+          toast.warning("Thumbnail concept created, but image generation was blocked by safety filters. Try uploading different images or adjusting your requirements.");
+        }
       } else {
         // Use regular content generation for other agent types
         result = await generateContent({
@@ -368,15 +380,42 @@ function InnerCanvas({
     console.log("[Canvas] Handling thumbnail upload for node:", pendingThumbnailNode);
     console.log("[Canvas] Number of images:", images.length);
     
+    // Check if there's a recent regeneration request in chat for this node
+    const recentMessages = chatMessages.filter(msg => 
+      msg.agentId === pendingThumbnailNode && 
+      Date.now() - msg.timestamp < 60000 // Within last minute
+    );
+    
+    const regenerationMessage = recentMessages.find(msg => 
+      msg.role === 'user' && msg.content.toLowerCase().includes('regenerate')
+    );
+    
+    // Extract the user's requirements from the regeneration message
+    let additionalContext = '';
+    if (regenerationMessage) {
+      // Remove the @mention and extract the actual requirements
+      additionalContext = regenerationMessage.content
+        .replace(/@\w+_AGENT/gi, '')
+        .replace(/regenerate\s*/gi, '')
+        .trim();
+      console.log("[Canvas] Found regeneration context:", additionalContext);
+    }
+    
     // Close modal and reset state
     setThumbnailModalOpen(false);
     
-    // Call handleGenerate with the uploaded images
-    await handleGenerate(pendingThumbnailNode, images);
+    // Call handleGenerate with the uploaded images and context
+    await handleGenerate(pendingThumbnailNode, images, additionalContext);
     
     // Reset pending node
     setPendingThumbnailNode(null);
-  }, [pendingThumbnailNode, handleGenerate]);
+  }, [pendingThumbnailNode, handleGenerate, chatMessages]);
+  
+  // Handle video click
+  const handleVideoClick = useCallback((videoData: { url: string; title: string; duration?: number; fileSize?: number }) => {
+    setSelectedVideo(videoData);
+    setVideoModalOpen(true);
+  }, []);
 
   // Handle chat messages with @mentions
   const handleChatMessage = useCallback(async (message: string) => {
@@ -428,6 +467,51 @@ function InnerCanvas({
       return;
     }
     
+    // Check if agent has no content and user wants to generate
+    if (!agentNode.data.draft && (message.toLowerCase().includes('generate') || message.toLowerCase().includes('create'))) {
+      // Trigger generation instead of refinement
+      await handleGenerate(agentNode.id);
+      
+      setChatMessages(prev => [...prev, {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: message,
+        timestamp: Date.now(),
+        agentId: agentNode.id,
+      }]);
+      
+      return;
+    }
+    
+    // Special handling for thumbnail regeneration
+    if (agentNode.data.type === 'thumbnail' && message.toLowerCase().includes('regenerate')) {
+      // Store the regeneration request
+      setChatMessages(prev => [...prev, {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: message,
+        timestamp: Date.now(),
+        agentId: agentNode.id,
+      }]);
+      
+      // Open thumbnail upload modal
+      setPendingThumbnailNode(agentNode.id);
+      setThumbnailModalOpen(true);
+      
+      // Add response
+      setTimeout(() => {
+        setChatMessages(prev => [...prev, {
+          id: `ai-${Date.now()}`,
+          role: "ai",
+          content: `To regenerate the thumbnail, please upload new images in the modal that just opened. I'll use your feedback about making the face more shocked when generating the new thumbnail.`,
+          timestamp: Date.now(),
+          agentId: agentNode.id,
+        }]);
+      }, 500);
+      
+      return;
+    }
+    
     setIsChatGenerating(true);
     
     // Add user message immediately
@@ -456,10 +540,42 @@ function InnerCanvas({
       // Get relevant chat history for this agent
       const agentHistory = chatMessages.filter(msg => msg.agentId === agentNode.id);
       
-      // Call refine content action
+      // Get connected agent outputs for context
+      const connectedAgentOutputs: Array<{type: string, content: string}> = [];
+      const connectedAgentEdges = edgesRef.current.filter((e: any) => e.target === agentNode.id && e.source?.includes('agent'));
+      for (const edge of connectedAgentEdges) {
+        const connectedAgent = nodesRef.current.find((n: any) => n.id === edge.source);
+        if (connectedAgent && connectedAgent.data.draft) {
+          connectedAgentOutputs.push({
+            type: connectedAgent.data.type,
+            content: connectedAgent.data.draft,
+          });
+        }
+      }
+
+      // Check if this is a regeneration request
+      const cleanMessage = message.replace(mentionRegex, "").trim();
+      const lowerMessage = cleanMessage.toLowerCase();
+      
+      // Check for various regeneration keywords
+      const regenerationKeywords = [
+        'regenerate', 'generate again', 'create new', 'make new', 'redo', 
+        'try again', 'give me another', 'different version', 'new version',
+        'change it', 'make it', 'create a'
+      ];
+      
+      const isRegeneration = regenerationKeywords.some(keyword => lowerMessage.includes(keyword)) || 
+                            (agentNode.data.draft && lowerMessage.includes('generate'));
+      
+      // If regenerating, prepend context to the user message
+      const finalMessage = isRegeneration && agentNode.data.draft
+        ? `REGENERATE the ${agentNode.data.type} with a COMPLETELY NEW version based on the user's instructions. Current version: "${agentNode.data.draft}". User requirements: ${cleanMessage}. Create something different that incorporates their feedback.`
+        : cleanMessage;
+
+      // Call refine content action with full context
       const result = await refineContent({
         agentId: agentNode.data.agentId as Id<"agents">,
-        userMessage: message.replace(mentionRegex, "").trim(), // Remove @mention from message
+        userMessage: finalMessage,
         currentDraft: agentNode.data.draft || "",
         agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets",
         chatHistory: agentHistory.map(msg => ({
@@ -494,11 +610,25 @@ function InnerCanvas({
                 data: {
                   ...node.data,
                   draft: result.updatedDraft,
+                  status: "ready",
                 },
               }
             : node
         )
       );
+      
+      // Add a helpful tip if this was their first generation
+      if (!agentNode.data.draft && !isRegeneration) {
+        setTimeout(() => {
+          setChatMessages(prev => [...prev, {
+            id: `tip-${Date.now()}`,
+            role: "ai",
+            content: `💡 Tip: You can regenerate this ${agentNode.data.type} anytime by mentioning @${agentNode.data.type.toUpperCase()}_AGENT and describing what changes you want. For example: "@${agentNode.data.type.toUpperCase()}_AGENT make it more casual" or "@${agentNode.data.type.toUpperCase()}_AGENT try again with a focus on benefits"`,
+            timestamp: Date.now(),
+            agentId: agentNode.id,
+          }]);
+        }, 1000);
+      }
       
     } catch (error) {
       console.error("Chat error:", error);
@@ -526,6 +656,49 @@ function InnerCanvas({
     
     // Add mention to chat input
     setChatInput(mention);
+    // Clear it after a short delay to prevent continuous updates
+    setTimeout(() => setChatInput(''), 100);
+  }, []);
+
+  // Handle regenerate button click - open chat with context
+  const handleRegenerateClick = useCallback((nodeId: string) => {
+    const agentNode = nodesRef.current.find((n: any) => n.id === nodeId);
+    if (!agentNode || agentNode.type !== 'agent') return;
+    
+    const agentType = agentNode.data.type as string;
+    
+    // Special handling for thumbnail regeneration
+    if (agentType === 'thumbnail') {
+      // Open thumbnail upload modal for new images
+      setPendingThumbnailNode(nodeId);
+      setThumbnailModalOpen(true);
+      
+      // Add a context message to the chat
+      setChatMessages(prev => [...prev, {
+        id: `system-${Date.now()}`,
+        role: "ai",
+        content: `Upload new images for thumbnail regeneration. The previous concept was: "${agentNode.data.draft?.slice(0, 200)}..."`,
+        timestamp: Date.now(),
+        agentId: nodeId,
+      }]);
+    } else {
+      // For other agents, open chat with pre-filled message
+      const mention = `@${agentType.toUpperCase()}_AGENT Regenerate with changes: `;
+      
+      // Add mention to chat input and open chat if minimized
+      setChatInput(mention);
+      // Clear it after a short delay to prevent continuous updates
+      setTimeout(() => setChatInput(''), 100);
+      
+      // Add a context message to the chat
+      setChatMessages(prev => [...prev, {
+        id: `system-${Date.now()}`,
+        role: "ai",
+        content: `Ready to regenerate ${agentType} content. Please describe what changes you'd like to make.`,
+        timestamp: Date.now(),
+        agentId: nodeId,
+      }]);
+    }
   }, []);
 
   // Generate content for all agent nodes (connect if needed)
@@ -678,6 +851,20 @@ function InnerCanvas({
     }
   };
 
+  // Handle keyboard shortcut for upload
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Check for Cmd+U (Mac) or Ctrl+U (Windows/Linux)
+      if ((event.metaKey || event.ctrlKey) && event.key === 'u') {
+        event.preventDefault();
+        fileInputRef.current?.click();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
   // Handle video file upload
   const handleVideoUpload = async (file: File, position: { x: number; y: number }) => {
     try {
@@ -737,6 +924,12 @@ function InnerCanvas({
                   videoUrl: video.videoUrl,
                   title: video.title,
                   isTranscribing: true,
+                  onVideoClick: () => handleVideoClick({
+                    url: video.videoUrl!,
+                    title: video.title || "Untitled Video",
+                    duration: undefined, // Will be populated after metadata extraction
+                    fileSize: file.size,
+                  }),
                 },
               }
             : node
@@ -754,6 +947,7 @@ function InnerCanvas({
                 data: {
                   ...node.data,
                   isTranscribing: true,
+                  onVideoClick: node.data.onVideoClick, // Preserve the click handler
                 },
               }
             : node
@@ -764,9 +958,9 @@ function InnerCanvas({
       console.log("Starting optional metadata extraction for video:", video._id);
       // Run metadata extraction in parallel, don't block transcription
       const metadataPromise = (async () => {
+        const infoNodeId = `video_info_${video._id}`;
         try {
           // Create temporary info node
-          const infoNodeId = `video_info_${video._id}`;
           const infoNode: Node = {
             id: infoNodeId,
             type: "videoInfo",
@@ -790,16 +984,41 @@ function InnerCanvas({
           };
           setEdges((eds: any) => eds.concat(infoEdge));
           
-          // Extract metadata
+          // Extract metadata with timeout
           toast.info("Extracting video information...");
           console.log("Calling extractVideoMetadata...");
-          const metadata = await extractVideoMetadata(file, {
-            onProgress: (progress) => {
-              console.log("Metadata extraction progress:", progress);
-            },
-            extractThumbnails: true,
-          });
-          console.log("Metadata extracted:", metadata);
+          
+          let metadata: any;
+          try {
+            // Set a timeout for metadata extraction
+            const metadataPromise = extractVideoMetadata(file, {
+              onProgress: (progress) => {
+                console.log("Metadata extraction progress:", progress);
+              },
+              extractThumbnails: false, // Disable thumbnails for now to speed up
+              useFFmpeg: false, // Disable FFmpeg to avoid loading issues
+            });
+            
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error("Metadata extraction timeout")), 15000); // 15 second timeout
+            });
+            
+            metadata = await Promise.race([metadataPromise, timeoutPromise]);
+            console.log("Metadata extracted:", metadata);
+          } catch (metadataError) {
+            console.error("Metadata extraction failed, using basic info:", metadataError);
+            // Use basic metadata as fallback
+            metadata = {
+              duration: 0,
+              fileSize: file.size,
+              resolution: { width: 0, height: 0 },
+              frameRate: 0,
+              bitRate: 0,
+              format: file.type.split('/')[1] || 'unknown',
+              codec: 'unknown',
+              thumbnails: []
+            };
+          }
           
           // Update video in database with metadata
           await updateVideoMetadata({
@@ -814,25 +1033,58 @@ function InnerCanvas({
             audioInfo: metadata.audioInfo,
           });
           
-          // Update info node with metadata
+          // Update both info node and video node with metadata
           setNodes((nds: any) =>
-            nds.map((node: any) =>
-              node.id === infoNodeId
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      ...metadata,
-                      isLoading: false,
-                    },
-                  }
-                : node
-            )
+            nds.map((node: any) => {
+              if (node.id === infoNodeId) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    ...metadata,
+                    isLoading: false,
+                  },
+                };
+              } else if (node.id === `video_${video._id}`) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    duration: metadata.duration,
+                    fileSize: metadata.fileSize,
+                    onVideoClick: () => handleVideoClick({
+                      url: node.data.videoUrl!,
+                      title: node.data.title || "Untitled Video",
+                      duration: metadata.duration,
+                      fileSize: metadata.fileSize,
+                    }),
+                  },
+                };
+              }
+              return node;
+            })
           );
           
           toast.success("Video information extracted!");
         } catch (metadataError) {
           console.error("Metadata extraction error:", metadataError);
+          // Update the info node to remove loading state
+          setNodes((nds: any) =>
+            nds.map((node: any) => {
+              if (node.id === infoNodeId) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    isLoading: false,
+                    error: true,
+                    errorMessage: "Failed to extract video metadata"
+                  },
+                };
+              }
+              return node;
+            })
+          );
           // Continue with upload even if metadata fails
           toast.warning("Could not extract all video information");
         }
@@ -1059,6 +1311,7 @@ function InnerCanvas({
             onGenerate: () => handleGenerate(nodeId),
             onChat: () => handleChatButtonClick(nodeId),
             onView: () => setSelectedNodeForModal(nodeId),
+            onRegenerate: () => handleRegenerateClick(nodeId),
           },
         };
 
@@ -1097,7 +1350,7 @@ function InnerCanvas({
         toast.error("Failed to create agent");
       });
     },
-    [reactFlowInstance, setNodes, setEdges, handleVideoUpload, handleGenerate, nodes, createAgent, projectId, updateAgentConnections, handleChatButtonClick]
+    [reactFlowInstance, setNodes, setEdges, handleVideoUpload, handleGenerate, nodes, createAgent, projectId, updateAgentConnections, handleChatButtonClick, handleRegenerateClick]
   );
 
   // Load existing videos and agents from the project
@@ -1112,9 +1365,17 @@ function InnerCanvas({
           title: video.title,
           videoUrl: video.videoUrl,
           storageId: video.fileId,
+          duration: video.duration,
+          fileSize: video.fileSize,
           hasTranscription: !!video.transcription || video.transcriptionStatus === "completed",
           isTranscribing: video.transcriptionStatus === "processing",
           transcriptionError: video.transcriptionStatus === "failed" ? video.transcriptionError : null,
+          onVideoClick: () => handleVideoClick({
+            url: video.videoUrl!,
+            title: video.title || "Untitled Video",
+            duration: video.duration,
+            fileSize: video.fileSize,
+          }),
         },
       }));
 
@@ -1132,6 +1393,7 @@ function InnerCanvas({
           onGenerate: () => handleGenerate(`agent_${agent.type}_${agent._id}`),
           onChat: () => handleChatButtonClick(`agent_${agent.type}_${agent._id}`),
           onView: () => setSelectedNodeForModal(`agent_${agent.type}_${agent._id}`),
+          onRegenerate: () => handleRegenerateClick(`agent_${agent.type}_${agent._id}`),
         },
       }));
 
@@ -1230,6 +1492,14 @@ function InnerCanvas({
       setHasLoadedFromDB(true);
     }
   }, [projectVideos, projectAgents, hasLoadedFromDB, setNodes, setEdges, handleGenerate, handleChatButtonClick]);
+  
+  // Load canvas viewport state
+  useEffect(() => {
+    if (canvasState && reactFlowInstance && hasLoadedFromDB) {
+      console.log("Loading canvas viewport state:", canvasState.viewport);
+      reactFlowInstance.setViewport(canvasState.viewport);
+    }
+  }, [canvasState, reactFlowInstance, hasLoadedFromDB]);
   
   // Periodically check for transcription updates
   useEffect(() => {
@@ -1376,12 +1646,13 @@ function InnerCanvas({
             
             {!isSidebarCollapsed && (
               <div className="mt-8">
-                <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-                  Drag & Drop Video
-                </h3>
-                <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center">
+                <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center space-y-2">
+                  <Upload className="h-6 w-6 text-muted-foreground mx-auto" />
                   <p className="text-sm text-muted-foreground">
-                    Drop video file onto canvas
+                    Drag video onto canvas →
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    or press <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted rounded">⌘U</kbd>
                   </p>
                 </div>
               </div>
@@ -1459,6 +1730,30 @@ function InnerCanvas({
               // Apply changes to state
               onNodesChange(changes);
             }}
+            onNodeDragStop={async (_event: any, node: any) => {
+              console.log("Node dragged:", node.id, "to position:", node.position);
+              
+              // Update position in database
+              if (node.type === 'video' && node.data.videoId) {
+                try {
+                  await updateVideo({
+                    id: node.data.videoId as Id<"videos">,
+                    canvasPosition: node.position,
+                  });
+                } catch (error) {
+                  console.error("Failed to update video position:", error);
+                }
+              } else if (node.type === 'agent' && node.data.agentId) {
+                try {
+                  await updateAgentPosition({
+                    id: node.data.agentId as Id<"agents">,
+                    canvasPosition: node.position,
+                  });
+                } catch (error) {
+                  console.error("Failed to update agent position:", error);
+                }
+              }
+            }}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onInit={setReactFlowInstance}
@@ -1498,6 +1793,21 @@ function InnerCanvas({
           isGenerating={false}
         />
         
+        {/* Video Player Modal */}
+        {selectedVideo && (
+          <VideoPlayerModal
+            isOpen={videoModalOpen}
+            onClose={() => {
+              setVideoModalOpen(false);
+              setSelectedVideo(null);
+            }}
+            videoUrl={selectedVideo.url}
+            title={selectedVideo.title}
+            duration={selectedVideo.duration}
+            fileSize={selectedVideo.fileSize}
+          />
+        )}
+        
         {/* Floating Chat - Always Visible */}
         <FloatingChat
           agents={nodes
@@ -1510,9 +1820,35 @@ function InnerCanvas({
           messages={chatMessages}
           onSendMessage={handleChatMessage}
           isGenerating={isChatGenerating}
-          currentInputValue={chatInput}
-          onInputChange={setChatInput}
+          initialInputValue={chatInput}
         />
+        
+        {/* Hidden file input for video upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="video/*"
+          style={{ display: 'none' }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (file && reactFlowInstance) {
+              // Get the center of the current viewport
+              const bounds = reactFlowWrapper.current?.getBoundingClientRect();
+              if (bounds) {
+                const centerX = bounds.width / 2;
+                const centerY = bounds.height / 2;
+                const position = reactFlowInstance.screenToFlowPosition({
+                  x: centerX,
+                  y: centerY,
+                });
+                await handleVideoUpload(file, position);
+              }
+            }
+            // Reset the input
+            e.target.value = '';
+          }}
+        />
+        
       </div>
     </ReactFlowProvider>
   );

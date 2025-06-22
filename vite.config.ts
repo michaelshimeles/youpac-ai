@@ -6,6 +6,14 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
   ssr: {
-    noExternal: ["@xyflow/react"],
+    noExternal: ["@xyflow/react", "@xyflow/system"],
+  },
+  resolve: {
+    alias: {
+      "use-sync-external-store/shim/with-selector": "use-sync-external-store/shim/with-selector.js",
+    },
+  },
+  optimizeDeps: {
+    include: ["@xyflow/react", "@xyflow/system", "use-sync-external-store/shim/with-selector"],
   },
 });

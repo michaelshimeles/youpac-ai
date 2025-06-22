@@ -10,10 +10,17 @@ async function loadFFmpeg() {
   
   const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
   
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-  });
+  console.log('[FFmpeg] Loading FFmpeg...');
+  try {
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    });
+    console.log('[FFmpeg] FFmpeg loaded successfully');
+  } catch (error) {
+    console.error('[FFmpeg] Failed to load FFmpeg:', error);
+    throw error;
+  }
   
   return ffmpeg;
 }
@@ -38,22 +45,83 @@ export interface VideoMetadata {
   thumbnails: string[]; // Data URLs of extracted frames
 }
 
+// Simple metadata extraction using HTML5 video element
+export async function extractBasicVideoMetadata(videoFile: File): Promise<Partial<VideoMetadata>> {
+  return new Promise((resolve) => {
+    console.log('[BasicMetadata] Starting basic metadata extraction for:', videoFile.name);
+    const video = document.createElement('video');
+    const url = URL.createObjectURL(videoFile);
+    
+    video.onloadedmetadata = () => {
+      const metadata: Partial<VideoMetadata> = {
+        duration: video.duration,
+        fileSize: videoFile.size,
+        resolution: {
+          width: video.videoWidth,
+          height: video.videoHeight,
+        },
+      };
+      
+      console.log('[BasicMetadata] Successfully extracted:', metadata);
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      video.remove();
+      
+      resolve(metadata);
+    };
+    
+    video.onerror = (error) => {
+      console.error('[BasicMetadata] Video element error:', error);
+      URL.revokeObjectURL(url);
+      video.remove();
+      resolve({
+        fileSize: videoFile.size,
+      });
+    };
+    
+    video.src = url;
+    video.load();
+  });
+}
+
 export async function extractVideoMetadata(
   videoFile: File,
   options: {
     onProgress?: (progress: number) => void;
     extractThumbnails?: boolean;
+    useFFmpeg?: boolean;
   } = {}
 ): Promise<VideoMetadata> {
-  const { onProgress, extractThumbnails = true } = options;
-  const ffmpeg = await loadFFmpeg();
+  const { onProgress, extractThumbnails = true, useFFmpeg = true } = options;
   
-  // Set up progress handling
-  ffmpeg.on('progress', ({ progress }) => {
-    onProgress?.(progress * 0.5); // First 50% for metadata
-  });
-
   try {
+    // First try to get basic metadata quickly
+    const basicMetadata = await extractBasicVideoMetadata(videoFile);
+    onProgress?.(0.2);
+    
+    // If FFmpeg is disabled or fails, return basic metadata
+    if (!useFFmpeg) {
+      return {
+        duration: basicMetadata.duration || 0,
+        fileSize: basicMetadata.fileSize || videoFile.size,
+        resolution: basicMetadata.resolution || { width: 0, height: 0 },
+        frameRate: 0,
+        bitRate: 0,
+        format: videoFile.type.split('/')[1] || 'unknown',
+        codec: 'unknown',
+        audioInfo: undefined,
+        thumbnails: []
+      };
+    }
+    
+    // Then try FFmpeg for more detailed metadata
+    const ffmpeg = await loadFFmpeg();
+    
+    // Set up progress handling
+    ffmpeg.on('progress', ({ progress }) => {
+      onProgress?.(progress * 0.5 + 0.2); // 20% base + 50% for metadata
+    });
     // Write video file to FFmpeg file system
     await ffmpeg.writeFile('input.mp4', await fetchFile(videoFile));
     
@@ -110,11 +178,11 @@ export async function extractVideoMetadata(
     // Clean up
     await ffmpeg.deleteFile('input.mp4');
     
-    // Ensure all required fields are set
+    // Ensure all required fields are set, merge with basic metadata
     return {
-      duration: metadata.duration || 0,
-      fileSize: metadata.fileSize || videoFile.size,
-      resolution: metadata.resolution || { width: 0, height: 0 },
+      duration: metadata.duration || basicMetadata.duration || 0,
+      fileSize: metadata.fileSize || basicMetadata.fileSize || videoFile.size,
+      resolution: metadata.resolution || basicMetadata.resolution || { width: 0, height: 0 },
       frameRate: metadata.frameRate || 0,
       bitRate: metadata.bitRate || 0,
       format: metadata.format || videoFile.type.split('/')[1] || 'unknown',
@@ -124,11 +192,14 @@ export async function extractVideoMetadata(
     };
   } catch (error) {
     console.error('FFmpeg metadata extraction error:', error);
+    // Try to get basic metadata as fallback
+    const basicMetadata = await extractBasicVideoMetadata(videoFile);
+    
     // Return basic metadata on error
     return {
-      duration: 0,
-      fileSize: videoFile.size,
-      resolution: { width: 0, height: 0 },
+      duration: basicMetadata.duration || 0,
+      fileSize: basicMetadata.fileSize || videoFile.size,
+      resolution: basicMetadata.resolution || { width: 0, height: 0 },
       frameRate: 0,
       bitRate: 0,
       format: videoFile.type.split('/')[1] || 'unknown',

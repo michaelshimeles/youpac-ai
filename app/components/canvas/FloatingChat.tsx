@@ -34,8 +34,7 @@ interface FloatingChatProps {
   messages: Message[];
   onSendMessage: (message: string) => Promise<void>;
   isGenerating?: boolean;
-  currentInputValue?: string;
-  onInputChange?: (value: string) => void;
+  initialInputValue?: string;
 }
 
 const agentLabels = {
@@ -50,10 +49,9 @@ export function FloatingChat({
   messages,
   onSendMessage,
   isGenerating = false,
-  currentInputValue = "",
-  onInputChange
+  initialInputValue = ""
 }: FloatingChatProps) {
-  const [input, setInput] = useState(currentInputValue);
+  const [input, setInput] = useState("");
   const [isMinimized, setIsMinimized] = useState(true);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionSearchTerm, setMentionSearchTerm] = useState("");
@@ -75,17 +73,25 @@ export function FloatingChat({
     option.value.toLowerCase().includes(mentionSearchTerm.toLowerCase())
   );
   
-  // Auto-expand when input changes (from @mention)
+  // Handle initial value from parent (like @mentions)
   useEffect(() => {
-    if (currentInputValue && currentInputValue.includes('@') && isMinimized) {
-      setIsMinimized(false);
+    if (initialInputValue) {
+      setInput(initialInputValue);
+      
+      // Auto-expand if initial value contains @mention
+      if (initialInputValue.includes('@')) {
+        setIsMinimized(false);
+        
+        // Focus the input after expansion
+        setTimeout(() => {
+          inputRef.current?.focus();
+          // Move cursor to end
+          const len = initialInputValue.length;
+          inputRef.current?.setSelectionRange(len, len);
+        }, 150);
+      }
     }
-  }, [currentInputValue, isMinimized]);
-
-  // Sync input with external value
-  useEffect(() => {
-    setInput(currentInputValue);
-  }, [currentInputValue]);
+  }, [initialInputValue]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -97,23 +103,18 @@ export function FloatingChat({
     }
   }, [messages]);
 
-  // Focus input when chat opens or when @mention is added
+  // Focus input when chat opens
   useEffect(() => {
-    if (!isMinimized && currentInputValue) {
+    if (!isMinimized) {
       // Small delay to ensure the input is rendered
       setTimeout(() => {
         inputRef.current?.focus();
-        // Move cursor to end of input
-        if (inputRef.current) {
-          inputRef.current.setSelectionRange(input.length, input.length);
-        }
       }, 100);
     }
-  }, [isMinimized, currentInputValue, input.length]);
+  }, [isMinimized]);
 
   const handleInputChange = (value: string) => {
     setInput(value);
-    onInputChange?.(value);
     
     // Check for @ symbol to show mention dropdown
     const lastAtIndex = value.lastIndexOf('@');
@@ -126,7 +127,6 @@ export function FloatingChat({
       setMentionSearchTerm(textAfterAt);
       setMentionStartIndex(lastAtIndex);
       setSelectedMentionIndex(0);
-      console.log('Showing mention dropdown for:', textAfterAt);
     } else {
       // Hide dropdown
       setShowMentionDropdown(false);

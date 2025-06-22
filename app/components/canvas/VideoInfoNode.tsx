@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps } from "./ReactFlowComponents";
 import { 
   Info, 
   Film, 
@@ -40,6 +40,8 @@ export interface VideoInfoNodeData {
   };
   thumbnails?: string[];
   isLoading?: boolean;
+  error?: boolean;
+  errorMessage?: string;
 }
 
 export const VideoInfoNode = memo(({ data, selected }: NodeProps<VideoInfoNodeData>) => {
@@ -51,7 +53,7 @@ export const VideoInfoNode = memo(({ data, selected }: NodeProps<VideoInfoNodeDa
   });
   const [copied, setCopied] = useState(false);
   
-  const infoData = data;
+  const infoData = data as VideoInfoNodeData;
   
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -91,6 +93,26 @@ Audio Channels: ${infoData.audioInfo?.channels || 'Unknown'}`;
           <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
           <div className="h-4 bg-muted animate-pulse rounded w-1/2" />
         </div>
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="info-input"
+          style={{ background: "#555" }}
+        />
+      </Card>
+    );
+  }
+  
+  if (infoData.error) {
+    return (
+      <Card className={`w-80 p-4 ${selected ? "ring-2 ring-primary" : ""}`}>
+        <div className="flex items-center gap-2 mb-3">
+          <Info className="h-5 w-5 text-destructive" />
+          <h3 className="font-semibold">Video Info Error</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {infoData.errorMessage || "Failed to extract video metadata"}
+        </p>
         <Handle
           type="target"
           position={Position.Left}
@@ -183,7 +205,7 @@ Audio Channels: ${infoData.audioInfo?.channels || 'Unknown'}`;
         </div>
         
         {/* Audio Info Section */}
-        {infoData.audioInfo && (
+        {infoData.audioInfo && infoData.audioInfo.codec && (
           <div className="space-y-2 mt-3">
             <button
               onClick={() => toggleSection('audio')}
@@ -199,15 +221,21 @@ Audio Channels: ${infoData.audioInfo?.channels || 'Unknown'}`;
                   <Volume2 className="h-3 w-3" />
                   <span>Codec: {infoData.audioInfo.codec}</span>
                 </div>
-                <div className="text-muted-foreground">
-                  Sample Rate: {infoData.audioInfo.sampleRate} Hz
-                </div>
-                <div className="text-muted-foreground">
-                  Channels: {infoData.audioInfo.channels === 2 ? 'Stereo' : 'Mono'}
-                </div>
-                <div className="text-muted-foreground">
-                  Bitrate: {formatBitRate(infoData.audioInfo.bitRate)}
-                </div>
+                {infoData.audioInfo.sampleRate > 0 && (
+                  <div className="text-muted-foreground">
+                    Sample Rate: {infoData.audioInfo.sampleRate} Hz
+                  </div>
+                )}
+                {infoData.audioInfo.channels > 0 && (
+                  <div className="text-muted-foreground">
+                    Channels: {infoData.audioInfo.channels === 2 ? 'Stereo' : 'Mono'}
+                  </div>
+                )}
+                {infoData.audioInfo.bitRate > 0 && (
+                  <div className="text-muted-foreground">
+                    Bitrate: {formatBitRate(infoData.audioInfo.bitRate)}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -215,7 +243,7 @@ Audio Channels: ${infoData.audioInfo?.channels || 'Unknown'}`;
         
         {/* Thumbnails Section */}
         {infoData.thumbnails && infoData.thumbnails.length > 0 && (
-          <div className="space-y-2 mt-3">
+          <div className="space-y-2">
             <button
               onClick={() => toggleSection('thumbnails')}
               className="flex items-center gap-1 text-sm font-medium w-full hover:text-primary transition-colors"

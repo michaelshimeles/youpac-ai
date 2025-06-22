@@ -83,6 +83,25 @@ export const refineContent = action({
     agentId: v.id("agents"),
     userMessage: v.string(),
     currentDraft: v.string(),
+    videoData: v.optional(v.object({
+      title: v.optional(v.string()),
+      transcription: v.optional(v.string()),
+    })),
+    connectedAgentOutputs: v.optional(v.array(
+      v.object({
+        type: v.string(),
+        content: v.string(),
+      })
+    )),
+    profileData: v.optional(
+      v.object({
+        channelName: v.string(),
+        contentType: v.string(),
+        niche: v.string(),
+        tone: v.optional(v.string()),
+        targetAudience: v.optional(v.string()),
+      })
+    ),
   },
   handler: async (ctx, args): Promise<string> => {
     const identity = await ctx.auth.getUserIdentity();
@@ -99,13 +118,47 @@ export const refineContent = action({
     });
 
     try {
+      // Build context with all available information
+      let contextMessage = `Current draft: ${args.currentDraft}\n\n`;
+      
+      if (args.videoData) {
+        contextMessage += "Video Context:\n";
+        if (args.videoData.title) {
+          contextMessage += `Title: ${args.videoData.title}\n`;
+        }
+        if (args.videoData.transcription) {
+          contextMessage += `Transcription: ${args.videoData.transcription.slice(0, 1000)}...\n`;
+        }
+        contextMessage += "\n";
+      }
+      
+      if (args.connectedAgentOutputs && args.connectedAgentOutputs.length > 0) {
+        contextMessage += "Connected Agent Outputs:\n";
+        args.connectedAgentOutputs.forEach(({ type, content }) => {
+          contextMessage += `${type}: ${content}\n`;
+        });
+        contextMessage += "\n";
+      }
+      
+      if (args.profileData) {
+        contextMessage += "Channel Profile:\n";
+        contextMessage += `Channel: ${args.profileData.channelName} (${args.profileData.niche})\n`;
+        contextMessage += `Content Type: ${args.profileData.contentType}\n`;
+        if (args.profileData.tone) {
+          contextMessage += `Tone: ${args.profileData.tone}\n`;
+        }
+        if (args.profileData.targetAudience) {
+          contextMessage += `Target Audience: ${args.profileData.targetAudience}\n`;
+        }
+      }
+
       const { text: refinedContent } = await generateText({
         model: openai("gpt-4o-mini"),
         system: getSystemPrompt(agent.type),
         messages: [
           {
             role: "assistant",
-            content: `Current draft: ${args.currentDraft}`,
+            content: contextMessage,
           },
           {
             role: "user",
