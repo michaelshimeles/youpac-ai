@@ -154,6 +154,7 @@ function InnerCanvas({
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
   const generateThumbnail = useAction(api.thumbnail.generateThumbnail);
   const refineContent = useAction(api.chat.refineContent);
+  const refineThumbnail = useAction(api.thumbnailRefine.refineThumbnail);
 
   // Handle content generation for an agent node
   const handleGenerate = useCallback(async (nodeId: string, thumbnailImages?: File[], additionalContext?: string) => {
@@ -579,8 +580,8 @@ function InnerCanvas({
 
   // Handle chat messages with @mentions
   const handleChatMessage = useCallback(async (message: string) => {
-    // Extract @mention from message
-    const mentionRegex = /@(\w+_AGENT)/gi;
+    // Extract @mention from message - handle various formats
+    const mentionRegex = /@(\w+)[\s_]?(?:AGENT|Agent|agent)?/gi;
     const match = message.match(mentionRegex);
     
     if (!match) {
@@ -605,7 +606,11 @@ function InnerCanvas({
     }
     
     // Find the agent node based on the mention
-    const agentType = match[0].replace("@", "").replace("_AGENT", "").toLowerCase();
+    const agentType = match[0]
+      .replace(/@/gi, "")
+      .replace(/[\s_]?(?:AGENT|Agent|agent)/gi, "")
+      .toLowerCase()
+      .trim();
     const agentNode = nodesRef.current.find((n: any) => n.type === "agent" && n.data.type === agentType);
     
     if (!agentNode || !agentNode.data.agentId) {
@@ -717,11 +722,11 @@ function InnerCanvas({
       const cleanMessage = message.replace(mentionRegex, "").trim();
       const lowerMessage = cleanMessage.toLowerCase();
       
-      // Check for various regeneration keywords
+      // Check for various regeneration/modification keywords
       const regenerationKeywords = [
         'regenerate', 'generate again', 'create new', 'make new', 'redo', 
         'try again', 'give me another', 'different version', 'new version',
-        'change it', 'make it', 'create a'
+        'change', 'make', 'create', 'modify', 'update', 'edit'
       ];
       
       const isRegeneration = regenerationKeywords.some(keyword => lowerMessage.includes(keyword)) || 
@@ -732,25 +737,105 @@ function InnerCanvas({
         ? `REGENERATE the ${agentNode.data.type} with a COMPLETELY NEW version based on the user's instructions. Current version: "${agentNode.data.draft}". User requirements: ${cleanMessage}. Create something different that incorporates their feedback.`
         : cleanMessage;
 
-      // Call refine content action with full context
-      const result = await refineContent({
-        agentId: agentNode.data.agentId as Id<"agents">,
-        userMessage: finalMessage,
-        currentDraft: agentNode.data.draft || "",
-        agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets",
-        chatHistory: agentHistory.map(msg => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        videoData,
-        profileData: userProfile ? {
-          channelName: userProfile.channelName,
-          contentType: userProfile.contentType,
-          niche: userProfile.niche,
-          tone: userProfile.tone,
-          targetAudience: userProfile.targetAudience,
-        } : undefined,
-      });
+      // Set node status to generating
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === agentNode.id
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  status: "generating",
+                  generationProgress: {
+                    stage: "Refining thumbnail...",
+                    percent: 50
+                  }
+                },
+              }
+            : node
+        )
+      );
+      
+      // Update status in database if we have an agentId
+      if (agentNode.data.agentId) {
+        await updateAgentDraft({
+          id: agentNode.data.agentId as Id<"agents">,
+          draft: agentNode.data.draft || "",
+          status: "generating",
+        });
+      }
+      
+      // Call appropriate refine action based on agent type
+      let result: any;
+      
+      // For thumbnails with existing images, always use refinement (not just for regeneration)
+      if (agentNode.data.type === "thumbnail" && agentNode.data.thumbnailUrl) {
+        // Use thumbnail-specific refinement that can edit the existing image
+        console.log("[Canvas] Using thumbnail refinement with existing image");
+        console.log("[Canvas] Agent node data:", agentNode.data);
+        console.log("[Canvas] Clean message:", cleanMessage);
+        console.log("[Canvas] Is regeneration:", isRegeneration);
+        
+        // Update progress
+        setNodes((nds: any) =>
+          nds.map((node: any) =>
+            node.id === agentNode.id
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    generationProgress: {
+                      stage: "Analyzing current thumbnail...",
+                      percent: 30
+                    }
+                  },
+                }
+              : node
+          )
+        );
+        
+        result = await refineThumbnail({
+          agentId: agentNode.data.agentId as Id<"agents">,
+          currentThumbnailUrl: agentNode.data.thumbnailUrl,
+          userMessage: cleanMessage, // Use clean message, not the REGENERATE prefix
+          videoId: videoNode?.data.videoId as Id<"videos"> | undefined,
+          profileData: userProfile ? {
+            channelName: userProfile.channelName,
+            contentType: userProfile.contentType,
+            niche: userProfile.niche,
+            tone: userProfile.tone,
+            targetAudience: userProfile.targetAudience,
+          } : undefined,
+        });
+        
+        // Create a response object matching refineContent format
+        result = {
+          response: result.concept,
+          updatedContent: result.concept,
+          imageUrl: result.imageUrl,
+          storageId: result.storageId,
+        };
+      } else {
+        // Use regular text refinement for other agent types
+        result = await refineContent({
+          agentId: agentNode.data.agentId as Id<"agents">,
+          userMessage: finalMessage,
+          currentDraft: agentNode.data.draft || "",
+          agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets",
+          chatHistory: agentHistory.map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          videoData,
+          profileData: userProfile ? {
+            channelName: userProfile.channelName,
+            contentType: userProfile.contentType,
+            niche: userProfile.niche,
+            tone: userProfile.tone,
+            targetAudience: userProfile.targetAudience,
+          } : undefined,
+        });
+      }
       
       // Add AI response
       setChatMessages(prev => [...prev, {
@@ -761,7 +846,7 @@ function InnerCanvas({
         agentId: agentNode.id,
       }]);
       
-      // Update node with new draft
+      // Update node with new draft and thumbnail URL if applicable
       setNodes((nds: any) =>
         nds.map((node: any) =>
           node.id === agentNode.id
@@ -769,13 +854,25 @@ function InnerCanvas({
                 ...node,
                 data: {
                   ...node.data,
-                  draft: result.updatedDraft,
+                  draft: result?.updatedContent || result?.updatedDraft || node.data.draft,
                   status: "ready",
+                  ...(result?.imageUrl && { thumbnailUrl: result.imageUrl }),
                 },
               }
             : node
         )
       );
+      
+      // Save to database if it's a thumbnail with a new image
+      if (agentNode.data.type === "thumbnail" && result?.imageUrl && agentNode.data.agentId) {
+        await updateAgentDraft({
+          id: agentNode.data.agentId as Id<"agents">,
+          draft: result?.updatedContent || result?.updatedDraft || agentNode.data.draft || "",
+          status: "ready",
+          thumbnailUrl: result.imageUrl,
+          thumbnailStorageId: result?.storageId as Id<"_storage"> | undefined,
+        });
+      }
       
       // Add a helpful tip if this was their first generation
       if (!agentNode.data.draft && !isRegeneration) {
@@ -790,8 +887,43 @@ function InnerCanvas({
         }, 1000);
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat error:", error);
+      
+      // Reset node status on error
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === agentNode.id
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  status: "error",
+                  generationProgress: undefined
+                },
+              }
+            : node
+        )
+      );
+      
+      // Update error status in database
+      if (agentNode.data.agentId) {
+        await updateAgentDraft({
+          id: agentNode.data.agentId as Id<"agents">,
+          draft: agentNode.data.draft || "",
+          status: "error",
+        });
+      }
+      
+      // Add error message to chat
+      setChatMessages(prev => [...prev, {
+        id: `ai-error-${Date.now()}`,
+        role: "ai",
+        content: `❌ Sorry, I encountered an error: ${error.message || "Failed to process your request"}. Please try again or generate a new thumbnail if the issue persists.`,
+        timestamp: Date.now(),
+        agentId: agentNode.id,
+      }]);
+      
       toast.error("Failed to process chat message");
       
       setChatMessages(prev => [...prev, {

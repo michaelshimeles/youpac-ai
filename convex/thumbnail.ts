@@ -206,23 +206,29 @@ export const generateThumbnail = action({
       const visualDescription = descriptionResponse.choices[0].message.content || "";
       console.log("[Thumbnail] Visual description obtained");
       
-      // Extract key elements from the concept
-      const textOverlayMatch = thumbnailConcept.match(/text overlay[:\s]+["']?([^"'\n]+)["']?/i) ||
-                             thumbnailConcept.match(/text[:\s]+["']?([^"'\n]{3,30})["']?/i);
-      const textOverlay = textOverlayMatch ? textOverlayMatch[1].trim() : "WATCH THIS";
+      // Extract key elements from the concept - better regex for text overlay
+      const textOverlayMatch = thumbnailConcept.match(/text[:\s]*["']([^"']+)["']/i) ||
+                             thumbnailConcept.match(/suggested text[:\s]*["']([^"']+)["']/i) ||
+                             thumbnailConcept.match(/text overlay[:\s]*["']([^"']+)["']/i) ||
+                             thumbnailConcept.match(/["']([^"']{5,40})["'][^"']*(?:text|overlay)/i);
+      const textOverlay = textOverlayMatch ? textOverlayMatch[1].trim() : "AMAZING TIPS";
       
       console.log("[Thumbnail] Extracted text overlay:", textOverlay);
       
       // Build a comprehensive prompt for gpt-image-1 that includes video context
       let gptImagePrompt = "Create a YouTube thumbnail based on this video content:\n\n";
       
+      // Debug: Log connected agent outputs
+      console.log("[Thumbnail] Connected agent outputs:", args.connectedAgentOutputs);
+      
       // Add AI-generated video title from connected agents
       const titleFromAgent = args.connectedAgentOutputs.find(output => output.type === "title");
-      if (titleFromAgent && titleFromAgent.content) {
+      if (titleFromAgent && titleFromAgent.content && titleFromAgent.content.trim() !== "") {
+        console.log("[Thumbnail] Using AI-generated title:", titleFromAgent.content);
         gptImagePrompt += `VIDEO TITLE: ${titleFromAgent.content}\n\n`;
-      } else if (videoData.title) {
-        // Fallback to filename if no AI title available
-        gptImagePrompt += `VIDEO FILENAME: ${videoData.title}\n\n`;
+      } else {
+        console.log("[Thumbnail] No AI title found in connected agents");
+        // Don't include filename as it's not useful for thumbnail generation
       }
       
       // Add transcription summary if available
@@ -237,18 +243,27 @@ export const generateThumbnail = action({
         visualDescription;
       gptImagePrompt += `VISUAL ELEMENTS: ${shortDescription}\n\n`;
       
-      // Add design requirements
+      // Add design requirements with the extracted text overlay
       gptImagePrompt += "DESIGN REQUIREMENTS:\n";
-      gptImagePrompt += `- Bold text overlay: "${textOverlay}"\n`;
-      gptImagePrompt += "- Eye-catching YouTube thumbnail style\n";
+      gptImagePrompt += `- Main text overlay should say: "${textOverlay}"\n`;
+      gptImagePrompt += "- Make the text LARGE and BOLD\n";
+      gptImagePrompt += "- Use eye-catching YouTube thumbnail style\n";
       gptImagePrompt += "- High contrast and vibrant colors\n";
       gptImagePrompt += "- Professional quality\n";
+      gptImagePrompt += "- 16:9 aspect ratio\n";
       
-      // Add channel style if available
+      // Add channel style if available - ensure it's not cut off
       if (args.profileData) {
-        gptImagePrompt += `\nCHANNEL STYLE: ${args.profileData.channelName} - ${args.profileData.niche}\n`;
+        const channelInfo = `${args.profileData.channelName} - ${args.profileData.niche}`;
+        gptImagePrompt += `\nCHANNEL STYLE: ${channelInfo}\n`;
         if (args.profileData.contentType) {
           gptImagePrompt += `Content type: ${args.profileData.contentType}\n`;
+        }
+        if (args.profileData.tone) {
+          gptImagePrompt += `Tone: ${args.profileData.tone}\n`;
+        }
+        if (args.profileData.targetAudience) {
+          gptImagePrompt += `Target audience: ${args.profileData.targetAudience}\n`;
         }
       }
       
