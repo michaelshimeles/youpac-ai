@@ -28,6 +28,7 @@ export default defineSchema({
     title: v.optional(v.string()),
     videoUrl: v.optional(v.string()),
     fileId: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")), // Convex storage ID
     transcription: v.optional(v.string()),
     canvasPosition: v.object({
       x: v.number(),
@@ -59,6 +60,7 @@ export default defineSchema({
       v.literal("failed")
     )),
     transcriptionError: v.optional(v.string()),
+    transcriptionProgress: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])

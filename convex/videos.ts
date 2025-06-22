@@ -214,3 +214,61 @@ export const remove = mutation({
     await ctx.db.delete(args.id);
   },
 });
+
+// Mutation to update video transcription (moved from transcription.ts)
+export const updateVideoTranscription = mutation({
+  args: {
+    videoId: v.id("videos"),
+    transcription: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.videoId, {
+      transcription: args.transcription,
+      transcriptionStatus: "completed",
+      transcriptionError: undefined,
+    });
+  },
+});
+
+// Mutation to update transcription status
+export const updateTranscriptionStatus = mutation({
+  args: {
+    videoId: v.id("videos"),
+    status: v.union(v.literal("idle"), v.literal("processing"), v.literal("completed"), v.literal("failed")),
+    error: v.optional(v.string()),
+    progress: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const updates: any = {
+      transcriptionStatus: args.status,
+    };
+    
+    if (args.error) {
+      updates.transcriptionError = args.error;
+    }
+    
+    if (args.progress) {
+      updates.transcriptionProgress = args.progress;
+    }
+    
+    await ctx.db.patch(args.videoId, updates);
+  },
+});
+
+// Mutation to update video storage ID
+export const updateVideoStorageId = mutation({
+  args: {
+    id: v.id("videos"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    // Get the URL from Convex storage
+    const videoUrl = await ctx.storage.getUrl(args.storageId);
+    
+    await ctx.db.patch(args.id, {
+      storageId: args.storageId,
+      videoUrl: videoUrl || undefined,
+      fileId: args.storageId, // Also update fileId to match storageId
+    });
+  },
+});

@@ -1,30 +1,30 @@
-import { useCallback, useRef, useState, type DragEvent, useEffect } from "react";
+import { api } from "convex/_generated/api";
+import type { Id } from "convex/_generated/dataModel";
+import { useAction, useMutation, useQuery } from "convex/react";
+import { Bot, Check, ChevronLeft, ChevronRight, Eye, FileText, GripVertical, Hash, Layers, Map, Palette, Settings2, Share2, Sparkles, Upload, Video, Zap } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { toast } from "sonner";
+import { PreviewModal } from "~/components/preview/PreviewModal";
+import { Button } from "~/components/ui/button";
+import { VideoProcessingHelp } from "~/components/VideoProcessingHelp";
+import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
+import { createRetryAction, handleVideoError } from "~/lib/video-error-handler";
+import { extractVideoMetadata } from "~/lib/video-metadata";
+import { AgentNode } from "./AgentNode";
+import { ContentModal } from "./ContentModal";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
+import { FloatingChat } from "./FloatingChat";
+import { PromptModal } from "./PromptModal";
 import type {
   Edge,
   Node,
   NodeTypes,
   OnConnect,
 } from "./ReactFlowComponents";
-import { VideoNode } from "./VideoNode";
-import { AgentNode } from "./AgentNode";
-import { ContentModal } from "./ContentModal";
-import { useMutation, useAction, useQuery } from "convex/react";
-import { toast } from "sonner";
-import { api } from "convex/_generated/api";
-import type { Id } from "convex/_generated/dataModel";
-import { Button } from "~/components/ui/button";
-import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Upload, GripVertical, Eye, X, Map, Video, Bot, Hash, Layers, Settings2, Zap, Palette, Share2, Copy, Check } from "lucide-react";
-import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
-import { extractVideoMetadata } from "~/lib/video-metadata";
-import { FloatingChat } from "./FloatingChat";
 import { ReactFlowWrapper } from "./ReactFlowWrapper";
 import { ThumbnailUploadModal } from "./ThumbnailUploadModal";
+import { VideoNode } from "./VideoNode";
 import { VideoPlayerModal } from "./VideoPlayerModal";
-import { PreviewModal } from "~/components/preview/PreviewModal";
-import { handleVideoError, createRetryAction } from "~/lib/video-error-handler";
-import { VideoProcessingHelp } from "~/components/VideoProcessingHelp";
-import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
-import { PromptModal } from "./PromptModal";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
@@ -139,10 +139,11 @@ function InnerCanvas({
   const userProfile = useQuery(api.profiles.get);
   
   // Convex mutations
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createVideo = useMutation(api.videos.create);
   const updateVideoMetadata = useMutation(api.videos.updateMetadata);
   const updateVideo = useMutation(api.videos.update);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const updateVideoStorageId = useMutation(api.videos.updateVideoStorageId);
   const createAgent = useMutation(api.agents.create);
   const updateAgentDraft = useMutation(api.agents.updateDraft);
   const updateAgentConnections = useMutation(api.agents.updateConnections);
@@ -1369,14 +1370,15 @@ function InnerCanvas({
       setNodes((nds: any) => nds.concat(tempNode));
 
       // Validate file before upload
-      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+      const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB limit for ElevenLabs
+      
       if (file.size > MAX_FILE_SIZE) {
         // Remove the temporary node since upload won't proceed
         setNodes((nds: any) => nds.filter((n: any) => n.id !== tempNodeId));
         
         const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
         toast.error("Video file too large", {
-          description: `Your video is ${fileSizeMB}MB but the maximum allowed size is 100MB. Try compressing it with HandBrake or use a shorter clip.`,
+          description: `Your video is ${fileSizeMB}MB but the maximum allowed size is 1GB. Please use a shorter clip or compress your video.`,
           duration: 8000,
           action: {
             label: "Learn more",
@@ -1385,7 +1387,16 @@ function InnerCanvas({
         });
         
         // Throw error for proper error handling
-        throw new Error(`File is too large (${fileSizeMB}MB). Maximum size is 100MB.`);
+        throw new Error(`File is too large (${fileSizeMB}MB). Maximum size is 1GB.`);
+      }
+      
+      // Show warning for large files
+      if (file.size > 100 * 1024 * 1024) {
+        const largeFileSizeMB = (file.size / 1024 / 1024).toFixed(1);
+        toast.warning("Large file detected", {
+          description: `Your ${largeFileSizeMB}MB video may have issues with transcription due to memory limits. Consider using a smaller file.`,
+          duration: 6000,
+        });
       }
 
       // Check video format
@@ -1402,29 +1413,11 @@ function InnerCanvas({
         throw new Error('Unsupported video format. Please upload MP4, MOV, AVI, or WebM files.');
       }
 
-      // Step 1: Get upload URL from Convex
-      const uploadUrl = await generateUploadUrl();
-      
-      // Step 2: Upload file to Convex storage with progress tracking
-      const result = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      
-      if (!result.ok) {
-        const errorText = await result.text().catch(() => 'Unknown error');
-        throw new Error(`Upload failed: ${result.status} ${result.statusText}. ${errorText}`);
-      }
-      
-      const { storageId } = await result.json();
-      
-      // Step 3: Create video record in database with storage URL
+      // Step 1: Create video record in database first
       console.log("Creating video record in database...");
       const video = await createVideo({
         projectId,
         title: file.name.replace(/\.[^/.]+$/, ""),
-        storageId: storageId,
         canvasPosition: position,
       });
       
@@ -1433,7 +1426,38 @@ function InnerCanvas({
         throw new Error("Failed to create video record in database. Please try again.");
       }
       
-      // Step 4: Update node with real data including video URL
+      // Step 2: Upload to Convex storage
+      console.log("Uploading to Convex storage...");
+      const uploadUrl = await generateUploadUrl();
+      const uploadResult = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      
+      if (!uploadResult.ok) {
+        throw new Error("Upload to Convex failed");
+      }
+      
+      const { storageId } = await uploadResult.json();
+      console.log("File uploaded to Convex storage:", storageId);
+      
+      // Step 3: Update video with storage ID (this also updates the videoUrl)
+      await updateVideoStorageId({
+        id: video._id,
+        storageId,
+      });
+      
+      // Step 4: Create a temporary blob URL to show video immediately
+      // The actual URL will be set when updateVideoStorageId completes and projectVideos refreshes
+      const temporaryUrl = URL.createObjectURL(file);
+      
+      // Clean up the blob URL after a delay (once the real URL should be available)
+      setTimeout(() => {
+        URL.revokeObjectURL(temporaryUrl);
+      }, 30000); // Clean up after 30 seconds
+      
+      // Step 5: Update node with real data including video URL
       setNodes((nds: any) => 
         nds.map((node: any) => 
           node.id === tempNodeId
@@ -1444,16 +1468,17 @@ function InnerCanvas({
                   ...node.data,
                   isUploading: false,
                   videoId: video._id,
-                  storageId,
-                  videoUrl: video.videoUrl,
+                  storageId: storageId,
+                  videoUrl: temporaryUrl,
+                  // Using Convex storage exclusively
                   title: video.title,
                   isTranscribing: true,
                   onVideoClick: () => handleVideoClick({
-                    url: video.videoUrl!,
+                    url: temporaryUrl,
                     title: video.title || "Untitled Video",
                     duration: undefined, // Will be populated after metadata extraction
                     fileSize: file.size,
-                  }),
+                  })
                 },
               }
             : node
@@ -1480,7 +1505,7 @@ function InnerCanvas({
         )
       );
       
-      // Step 5: Extract video metadata (optional, non-blocking)
+      // Step 6: Extract video metadata (optional, non-blocking)
       console.log("Starting optional metadata extraction for video:", video._id);
       // Run metadata extraction in parallel, don't block transcription
       (async () => {
@@ -1579,19 +1604,27 @@ function InnerCanvas({
       
       console.log("Moving to transcription step...");
       
-      // Step 6: Transcribe video or extract audio first if too large
+      // Step 6: Transcribe video
       const fileSizeMB = file.size / (1024 * 1024);
-      const MAX_DIRECT_TRANSCRIBE_SIZE = 25; // 25MB limit for Whisper API
       
-      console.log(`Video file size: ${fileSizeMB.toFixed(2)}MB, Max direct size: ${MAX_DIRECT_TRANSCRIBE_SIZE}MB`);
+      console.log(`Video file size: ${fileSizeMB.toFixed(2)}MB`);
       
       // Small delay to ensure file is available in storage
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       try {
-        if (fileSizeMB > MAX_DIRECT_TRANSCRIBE_SIZE) {
-          // Show audio extraction progress
-          toast.info("Video is large. Extracting audio for transcription...");
+        // The backend will automatically use ElevenLabs if available (supports 1GB)
+        // Skip audio extraction entirely - let ElevenLabs handle large files directly
+        const SKIP_AUDIO_EXTRACTION = true; // Always use direct transcription with ElevenLabs
+        
+        if (fileSizeMB > 1024) {
+          // File is over 1GB - ElevenLabs limit
+          throw new Error(`File is too large for transcription (${fileSizeMB.toFixed(1)}MB). Maximum size is 1GB.`);
+        }
+        
+        if (false && fileSizeMB > 25 && !SKIP_AUDIO_EXTRACTION) {
+          // For large files, we'll extract audio (unless backend has ElevenLabs)
+          toast.info("Processing large video for transcription...");
           
           // Update node to show extraction status
           setNodes((nds: any) =>
@@ -1627,17 +1660,9 @@ function InnerCanvas({
               );
             });
           
-          // Upload audio file
-          const audioUploadUrl = await generateUploadUrl();
-          const audioResult = await fetch(audioUploadUrl, {
-            method: "POST",
-            headers: { "Content-Type": audioFile.type },
-            body: audioFile,
-          });
-          
-          if (!audioResult.ok) throw new Error("Audio upload failed");
-          
-          const { storageId: audioStorageId } = await audioResult.json();
+          // Skip audio upload - Convex handles everything
+          // This code path should not be reached since we skip audio extraction
+          throw new Error("Audio extraction is no longer supported. Please use smaller video files.");
           
           // Update node to show transcription status
           setNodes((nds: any) =>
@@ -1662,6 +1687,8 @@ function InnerCanvas({
               videoId: video._id,
               storageId: audioStorageId,
               fileType: "audio",
+              fileSize: audioFile.size,
+              fileName: "audio.mp3",
             });
             console.log("Schedule transcription result:", result);
             
@@ -1695,17 +1722,22 @@ function InnerCanvas({
             );
           }
         } else {
-          // Schedule background transcription for smaller files  
+          // Schedule background transcription with Convex storage
           try {
             console.log("Scheduling video transcription for video:", video._id);
             const result = await scheduleTranscription({
               videoId: video._id,
               storageId: storageId,
               fileType: "video",
+              fileSize: file.size,
+              fileName: file.name,
             });
             console.log("Schedule transcription result:", result);
             
-            toast.info("Video transcription started in background. It will continue even if you close this tab.");
+            // Show transcription started message
+            toast.info("Video transcription started in background.", {
+              description: "This will continue even if you close this tab.",
+            });
           } catch (scheduleError: any) {
             console.error("Failed to schedule transcription:", scheduleError);
             console.error("Error details:", scheduleError.message, scheduleError.stack);
@@ -1828,8 +1860,18 @@ function InnerCanvas({
   const retryTranscription = async (videoId: string) => {
     try {
       const video = nodes.find((n: any) => n.id === `video_${videoId}`)?.data;
-      if (!video?.storageId) {
+      const videoRecord = projectVideos?.find(v => v._id === videoId);
+      
+      if (!video && !videoRecord) {
         toast.error("Cannot retry: Video data not found");
+        return;
+      }
+      
+      // Check if we have storage ID
+      const storageId = video?.storageId || videoRecord?.storageId;
+      
+      if (!storageId) {
+        toast.error("Cannot retry: Storage ID not found");
         return;
       }
 
@@ -1850,18 +1892,25 @@ function InnerCanvas({
                   isTranscribing: true,
                   hasTranscription: false,
                   transcriptionError: null,
+                  transcriptionProgress: null,
                 },
               }
             : node
         )
       );
 
-      // Schedule transcription
-      await scheduleTranscription({
-        videoId: videoId as any,
-        storageId: video.storageId,
-        fileType: "video",
-      });
+      // Schedule transcription with Convex storage
+      if (storageId) {
+        await scheduleTranscription({
+          videoId: videoId as any,
+          storageId: storageId as any,
+          fileType: "video",
+          fileName: video?.title || "video.mp4",
+        });
+      } else {
+        toast.error("Cannot retry: No storage ID found");
+        return;
+      }
 
       toast.success("Transcription retry started", {
         description: "The transcription will process in the background.",
@@ -2033,6 +2082,7 @@ function InnerCanvas({
           hasTranscription: !!video.transcription || video.transcriptionStatus === "completed",
           isTranscribing: video.transcriptionStatus === "processing",
           transcriptionError: video.transcriptionStatus === "failed" ? video.transcriptionError : null,
+          transcriptionProgress: video.transcriptionProgress || null,
           onVideoClick: () => handleVideoClick({
             url: video.videoUrl!,
             title: video.title || "Untitled Video",
@@ -2203,10 +2253,17 @@ function InnerCanvas({
                     ...node,
                     data: {
                       ...node.data,
+                      videoUrl: video.videoUrl || node.data.videoUrl, // Update URL if available
                       hasTranscription: newHasTranscription,
                       isTranscribing: newIsTranscribing,
                       transcriptionError: newTranscriptionError,
                       onRetryTranscription: newTranscriptionError ? () => retryTranscription(video._id) : undefined,
+                      onVideoClick: video.videoUrl ? () => handleVideoClick({
+                        url: video.videoUrl,
+                        title: video.title || "Untitled Video",
+                        duration: video.duration,
+                        fileSize: video.fileSize,
+                      }) : node.data.onVideoClick,
                     },
                   };
                 }

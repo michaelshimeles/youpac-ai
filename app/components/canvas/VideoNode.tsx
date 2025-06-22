@@ -24,6 +24,7 @@ export interface VideoNodeData {
   isExtracting?: boolean;
   extractionProgress?: number;
   transcriptionError?: string | null;
+  transcriptionProgress?: string | null;
   onVideoClick?: () => void;
   onRetryTranscription?: () => void;
 }
@@ -235,14 +236,9 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
                 <Loader2 className="relative h-4 w-4 animate-spin text-blue-500" />
               </div>
               <div className="flex-1">
-                <p className="text-xs font-medium">Extracting audio...</p>
-                {videoData.extractionProgress && (
-                  <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-blue-500 transition-all duration-300"
-                      style={{ width: `${videoData.extractionProgress}%` }}
-                    />
-                  </div>
+                <p className="text-xs font-medium">Transcribing video...</p>
+                {videoData.transcriptionProgress && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{videoData.transcriptionProgress}</p>
                 )}
               </div>
             </div>
@@ -253,7 +249,12 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur animate-pulse" />
                 <Loader2 className="relative h-4 w-4 animate-spin text-primary" />
               </div>
-              <p className="text-xs font-medium">Transcribing audio...</p>
+              <div className="flex-1">
+                <p className="text-xs font-medium">Transcribing video...</p>
+                {videoData.transcriptionProgress && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{videoData.transcriptionProgress}</p>
+                )}
+              </div>
             </div>
           )}
           {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription && (
@@ -289,13 +290,20 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 cursor-help">
-                    <div className="p-1 rounded-full bg-yellow-500/10">
-                      <AlertCircle className="h-3.5 w-3.5 text-yellow-600" />
+                  <div className="space-y-1.5 cursor-help">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded-full bg-yellow-500/10">
+                        <AlertCircle className="h-3.5 w-3.5 text-yellow-600" />
+                      </div>
+                      <p className="text-xs font-medium text-yellow-600">
+                        {videoData.transcriptionError ? "Transcription failed" : "No transcription"}
+                      </p>
                     </div>
-                    <p className="text-xs font-medium text-yellow-600">
-                      {videoData.transcriptionError ? "Transcription failed" : "No transcription"}
-                    </p>
+                    {videoData.transcriptionError && (
+                      <p className="text-[10px] text-muted-foreground pl-7 break-words">
+                        {videoData.transcriptionError}
+                      </p>
+                    )}
                   </div>
                 </TooltipTrigger>
                 {videoData.transcriptionError && (

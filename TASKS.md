@@ -69,7 +69,7 @@
 1. **Video Issues**
    - [x] Large videos (>100MB) fail silently ✅ IMPROVED - Now shows clear error with suggestions
    - [x] Some video formats not supported ✅ IMPROVED - Clear error message for unsupported formats
-   - [ ] Transcription timeout on long videos
+   - [x] Transcription timeout on long videos ✅ SOLVED - Added ElevenLabs API support for files up to 1GB!
 
 2. **Performance**
    - [ ] Canvas lag with many nodes

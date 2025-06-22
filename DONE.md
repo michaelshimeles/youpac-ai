@@ -138,6 +138,20 @@
 ## AI Improvements (Additional) ✓
 - [x] Generation progress indicators for all agents
 
+## Transcription Improvements ✓
+- [x] ElevenLabs Speech-to-Text integration
+- [x] Cloudflare R2 integration for ALL video files (up to 1GB!)
+- [x] Direct upload to R2 (bypassing Convex storage entirely)
+- [x] Fixed ElevenLabs implementation to use R2 URLs
+- [x] Moved mutations out of Node.js action files (Convex deployment fix)
+- [x] API key moved to environment variables for security
+- [x] Clear user feedback with detailed progress updates
+- [x] Comprehensive error handling with user-friendly messages
+- [x] Removed OpenAI Whisper completely per user request
+- [x] Added transcription progress tracking in UI
+- [x] Fixed large file handling with R2 for files up to 1GB
+- [x] R2 files preserved (not deleted after transcription)
+
 ## Progress Summary
 - ✅ Core Infrastructure (100%)
 - ✅ Project System (100%)
@@ -151,3 +165,4 @@
 - ✅ Video Metadata Extraction (100%)
 - ✅ UI/UX Design (98%)
 - ✅ Share System (100%)
+- ✅ Convex Deployment (100%)
