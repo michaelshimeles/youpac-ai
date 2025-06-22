@@ -51,7 +51,7 @@ http.route({
     ) {
       return new Response(null, {
         headers: new Headers({
-          "Access-Control-Allow-Origin": process.env.FRONTEND_URL || "http://localhost:5173",
+          "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "POST",
           "Access-Control-Allow-Headers": "Content-Type, Authorization",
           "Access-Control-Allow-Credentials": "true",
@@ -78,7 +78,7 @@ http.route({
     ) {
       return new Response(null, {
         headers: new Headers({
-          "Access-Control-Allow-Origin": process.env.FRONTEND_URL || "http://localhost:5173",
+          "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "POST",
           "Access-Control-Allow-Headers": "Content-Type, Authorization",
           "Access-Control-Allow-Credentials": "true",
@@ -91,6 +91,109 @@ http.route({
   }),
 });
 
+
+// Transcription proxy endpoint
+http.route({
+  path: "/api/transcribe",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: "ElevenLabs API key not configured" }), {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    }
+    
+    try {
+      // Get the form data from the request
+      const formData = await request.formData();
+      
+      // Log file details
+      const file = formData.get("file") as File;
+      if (file) {
+        console.log("📎 Transcription request:", {
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+          fileSizeMB: (file.size / 1024 / 1024).toFixed(2),
+        });
+      }
+      
+      // Forward the request to ElevenLabs
+      const response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+        method: "POST",
+        headers: {
+          "Xi-Api-Key": apiKey,
+        },
+        body: formData,
+      });
+      
+      // Get the response data
+      const responseData = await response.text();
+      
+      // Log response for debugging
+      if (!response.ok) {
+        console.error("❌ ElevenLabs error:", {
+          status: response.status,
+          statusText: response.statusText,
+          response: responseData,
+        });
+      } else {
+        console.log("✅ ElevenLabs transcription successful");
+        // Parse and check if it's the "no speech" response
+        try {
+          const result = JSON.parse(responseData);
+          if (result.text === "" || result.text === "We couldn't transcribe the audio. The video might be silent or in an unsupported language.") {
+            console.warn("⚠️ No speech detected in the file");
+          }
+        } catch (e) {
+          // Not JSON, that's okay
+        }
+      }
+      
+      // Return the response with CORS headers
+      return new Response(responseData, {
+        status: response.status,
+        headers: {
+          "Content-Type": response.headers.get("Content-Type") || "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      });
+    } catch (error: any) {
+      console.error("Transcription proxy error:", error);
+      return new Response(JSON.stringify({ error: "Failed to process transcription request" }), {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    }
+  }),
+});
+
+// OPTIONS handler for transcription endpoint
+http.route({
+  path: "/api/transcribe",
+  method: "OPTIONS",
+  handler: httpAction(async (_, request) => {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": process.env.FRONTEND_URL || "http://localhost:5173",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }),
+});
 
 // Log that routes are configured
 console.log("HTTP routes configured");

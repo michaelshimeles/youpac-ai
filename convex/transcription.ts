@@ -16,7 +16,8 @@ export const transcribeVideoElevenLabs = action({
     console.log("🎙️ ElevenLabs transcription started", {
       videoId: args.videoId,
       storageId: args.storageId,
-      fileType: args.fileType
+      fileType: args.fileType,
+      fileName: args.fileName
     });
 
     // Skip auth check for internal actions (background jobs)
@@ -51,154 +52,101 @@ export const transcribeVideoElevenLabs = action({
         throw new Error("Could not retrieve file URL from storage. The file may have been deleted.");
       }
 
-      // For large files, we need to download from URL
-      console.log("🌐 Starting ElevenLabs transcription");
+      // Use ElevenLabs cloud_storage_url feature instead of downloading
+      console.log("🌐 Starting ElevenLabs transcription with cloud URL");
       console.log("📍 File URL:", fileUrl);
       
-      // Note: We can't check file size without downloading, but ElevenLabs will reject if > 1GB
+      // Quick validation that the URL is accessible
+      try {
+        const fetch = (await import('node-fetch')).default;
+        const headResponse = await fetch(fileUrl, { method: 'HEAD' });
+        if (!headResponse.ok) {
+          console.error("❌ File URL not accessible:", headResponse.status);
+          throw new Error(`File URL is not accessible (${headResponse.status}). The file may have been deleted.`);
+        }
+        const contentLength = headResponse.headers.get('content-length');
+        if (contentLength) {
+          const sizeMB = parseInt(contentLength) / (1024 * 1024);
+          console.log(`✅ File URL is accessible. Size: ${sizeMB.toFixed(2)}MB`);
+        }
+      } catch (error: any) {
+        console.error("❌ Failed to validate file URL:", error);
+        throw new Error("Could not validate file accessibility. " + error.message);
+      }
       
       // Update progress
       await ctx.runMutation(api.videos.updateTranscriptionStatus, {
         videoId: args.videoId,
         status: "processing",
-        progress: "Downloading file for transcription...",
+        progress: "Sending file URL to ElevenLabs...",
       });
 
-      // Download the file from URL
-      console.log("📥 Downloading file from URL...");
-      
-      // For very large files, this might fail due to memory constraints
-      let buffer: Buffer;
-      try {
-        const fetch = (await import('node-fetch')).default;
-        const downloadResponse = await fetch(fileUrl);
-        
-        if (!downloadResponse.ok) {
-          throw new Error(`Failed to download file: ${downloadResponse.status} ${downloadResponse.statusText}`);
-        }
-        
-        // Check Content-Length header if available
-        const contentLength = downloadResponse.headers.get('content-length');
-        if (contentLength) {
-          const sizeMB = parseInt(contentLength) / (1024 * 1024);
-          console.log(`📏 File size from header: ${sizeMB.toFixed(2)}MB`);
-          
-          if (sizeMB > 1024) {
-            throw new Error(`File is too large for processing (${sizeMB.toFixed(1)}MB). Maximum file size is 1GB.`);
-          }
-        }
-        
-        const arrayBuffer = await downloadResponse.arrayBuffer();
-        buffer = Buffer.from(arrayBuffer);
-      } catch (error: any) {
-        if (error.message.includes('too large')) {
-          throw error;
-        }
-        throw new Error(`Failed to download file for transcription. The file may be too large. ${error.message}`);
-      }
-      
-      const fileSizeMB = (buffer.length / 1024 / 1024).toFixed(2);
-      console.log("📤 File downloaded successfully");
-      console.log("📏 File size:", fileSizeMB, "MB");
-      
-      // Check file size limit after download
-      // Note: Convex actions have memory limits, so very large files may fail
-      if (buffer.length > 1024 * 1024 * 1024) {
-        throw new Error(`File is too large (${fileSizeMB}MB). ElevenLabs supports files up to 1GB.`);
-      }
-
-      // Call ElevenLabs Speech-to-Text API with raw form data
-      console.log("🚀 Calling ElevenLabs API...");
+      // Call ElevenLabs Speech-to-Text API with cloud URL
+      console.log("🚀 Calling ElevenLabs API with cloud URL...");
       console.log("🔐 Using API key:", apiKey.substring(0, 10) + "...");
 
       // Update progress
       await ctx.runMutation(api.videos.updateTranscriptionStatus, {
         videoId: args.videoId,
         status: "processing",
-        progress: "Uploading to ElevenLabs Speech-to-Text API...",
+        progress: "Processing with ElevenLabs Speech-to-Text API...",
       });
 
-      // Create form data manually for Node.js
-      const FormData = (await import('form-data')).default;
-      const formData = new FormData();
+      // Create JSON body with cloud_storage_url
+      const requestBody = {
+        cloud_storage_url: fileUrl,
+        model_id: 'scribe_v1',
+      };
       
-      // Determine content type and filename based on original file or file type
-      let filename = 'video.mp4';
-      let contentType = 'video/mp4';
-      
-      if (args.fileName) {
-        filename = args.fileName;
-        // Detect content type from filename extension
-        const ext = filename.toLowerCase().split('.').pop();
-        switch (ext) {
-          case 'mp4':
-            contentType = 'video/mp4';
-            break;
-          case 'webm':
-            contentType = 'video/webm';
-            break;
-          case 'mov':
-            contentType = 'video/quicktime';
-            break;
-          case 'avi':
-            contentType = 'video/x-msvideo';
-            break;
-          case 'mp3':
-            contentType = 'audio/mpeg';
-            break;
-          case 'wav':
-            contentType = 'audio/wav';
-            break;
-          case 'ogg':
-            contentType = 'audio/ogg';
-            break;
-          default:
-            // Fallback to generic types
-            contentType = args.fileType === 'audio' ? 'audio/mpeg' : 'video/mp4';
-        }
-      } else {
-        // Fallback if no filename provided
-        filename = args.fileType === 'audio' ? 'audio.mp3' : 'video.mp4';
-        contentType = args.fileType === 'audio' ? 'audio/mpeg' : 'video/mp4';
-      }
-      
-      console.log(`📎 Uploading as: ${filename} (${contentType})`);
-      
-      formData.append('file', buffer, {
-        filename: filename,
-        contentType: contentType,
+      console.log(`📎 Request details:`, {
+        cloud_storage_url: fileUrl,
+        model_id: 'scribe_v1',
+        fileName: args.fileName,
+        fileType: args.fileType,
+        requestBody: requestBody,
       });
-      formData.append('model_id', 'scribe_v1');
 
-      // node-fetch already imported above
-      
-      // Make direct API call since SDK might not handle Node.js File properly
+      // Make direct API call using cloud_storage_url
+      const fetch = (await import('node-fetch')).default;
       const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
         method: 'POST',
         headers: {
           'Xi-Api-Key': apiKey,
-          ...formData.getHeaders(),
+          'Content-Type': 'application/json',
         },
-        body: formData as any,
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = `ElevenLabs API error (${response.status})`;
         
+        console.error("❌ ElevenLabs API error response:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText,
+          headers: response.headers,
+        });
+        
         try {
           const errorJson = JSON.parse(errorText);
           if (errorJson.detail) {
             errorMessage = errorJson.detail;
+          } else if (typeof errorJson === 'object' && errorJson.message) {
+            errorMessage = errorJson.message;
           }
-        } catch {
+          console.error("❌ Parsed error details:", errorJson);
+        } catch (parseError) {
+          console.error("❌ Failed to parse error response:", parseError);
           errorMessage = errorText || errorMessage;
         }
         
         // Provide user-friendly error messages
         if (response.status === 400) {
-          if (errorMessage.includes("parsing the body")) {
+          if (errorMessage.includes("parsing the body") || errorMessage.includes("Invalid file format")) {
             errorMessage = "File format not supported. Please ensure your file is a valid video or audio file.";
+          } else if (errorMessage.includes("cloud_storage_url")) {
+            errorMessage = "Could not access the file URL. The file may not be publicly accessible.";
           } else if (errorMessage.includes("model_id")) {
             errorMessage = "Transcription model configuration error. Please try again.";
           }

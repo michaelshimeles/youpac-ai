@@ -1722,30 +1722,91 @@ function InnerCanvas({
             );
           }
         } else {
-          // Schedule background transcription with Convex storage
+          // Client-side transcription with ElevenLabs
           try {
-            console.log("Scheduling video transcription for video:", video._id);
-            const result = await scheduleTranscription({
-              videoId: video._id,
-              storageId: storageId,
-              fileType: "video",
-              fileSize: file.size,
-              fileName: file.name,
-            });
-            console.log("Schedule transcription result:", result);
+            console.log("Starting client-side transcription for video:", video._id);
             
             // Show transcription started message
-            toast.info("Video transcription started in background.", {
-              description: "This will continue even if you close this tab.",
+            toast.info("Video transcription started", {
+              description: `Processing ${file.name}...`,
             });
-          } catch (scheduleError: any) {
-            console.error("Failed to schedule transcription:", scheduleError);
-            console.error("Error details:", scheduleError.message, scheduleError.stack);
             
-            // Don't throw - transcription failure shouldn't fail the whole upload
-            toast.error("Transcription couldn't start", {
-              description: "The video was uploaded but transcription failed. You can try again later.",
+            // Create FormData for ElevenLabs
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("model_id", "scribe_v1");
+            
+            // Get the Convex site URL - it should be in format https://xxxxx.convex.site
+            const convexUrl = import.meta.env.VITE_CONVEX_URL;
+            let siteUrl = '';
+            if (convexUrl) {
+              // Extract the deployment name from the URL
+              const match = convexUrl.match(/https:\/\/([^.]+)\.convex\.cloud/);
+              if (match) {
+                siteUrl = `https://${match[1]}.convex.site`;
+              }
+            }
+            const transcribeUrl = `${siteUrl}/api/transcribe`;
+            
+            console.log("Calling transcription API:", transcribeUrl);
+            
+            if (!siteUrl) {
+              throw new Error("Could not determine Convex site URL. Please check your environment configuration.");
+            }
+            
+            // Call our proxy endpoint
+            const transcriptionResponse = await fetch(transcribeUrl, {
+              method: "POST",
+              body: formData,
             });
+            
+            if (!transcriptionResponse.ok) {
+              const errorText = await transcriptionResponse.text();
+              console.error("Transcription API error:", errorText);
+              throw new Error(`Transcription failed: ${transcriptionResponse.status}`);
+            }
+            
+            const transcriptionResult = await transcriptionResponse.json();
+            console.log("Transcription result:", transcriptionResult);
+            
+            // Check if ElevenLabs couldn't detect speech
+            if (transcriptionResult.text === "We couldn't transcribe the audio. The video might be silent or in an unsupported language.") {
+              throw new Error("No speech detected. The video might be silent, have no audio track, or use an unsupported language.");
+            }
+            
+            // Update the video with transcription
+            if (transcriptionResult.text && transcriptionResult.text.trim().length > 0) {
+              await updateVideo({
+                id: video._id,
+                transcription: transcriptionResult.text,
+              });
+              
+              // Update node to show transcription complete
+              setNodes((nds: any) =>
+                nds.map((node: any) =>
+                  node.id === `video_${video._id}`
+                    ? {
+                        ...node,
+                        data: {
+                          ...node.data,
+                          isTranscribing: false,
+                          hasTranscription: true,
+                          transcriptionError: null,
+                        },
+                      }
+                    : node
+                )
+              );
+              
+              toast.success("Video transcription completed!");
+            } else {
+              throw new Error("No transcription text received. The video might not contain any speech.");
+            }
+          } catch (transcriptionError: any) {
+            console.error("Failed to transcribe:", transcriptionError);
+            console.error("Error details:", transcriptionError.message, transcriptionError.stack);
+            
+            // Video status will be updated by the node state
             
             // Update node to show transcription failed
             setNodes((nds: any) =>
@@ -1758,13 +1819,25 @@ function InnerCanvas({
                         isTranscribing: false,
                         isExtracting: false,
                         hasTranscription: false,
-                        transcriptionError: scheduleError.message,
+                        transcriptionError: transcriptionError.message,
                         onRetryTranscription: () => retryTranscription(video._id),
                       },
                     }
                   : node
               )
             );
+            
+            // Don't throw - transcription failure shouldn't fail the whole upload
+            if (transcriptionError.message.includes("No speech detected")) {
+              toast.warning("No speech detected", {
+                description: "The video was uploaded but appears to be silent or in an unsupported language. Try a different video with clear speech.",
+                duration: 8000,
+              });
+            } else {
+              toast.error("Transcription failed", {
+                description: "The video was uploaded successfully. You can retry transcription later.",
+              });
+            }
           }
         }
         
@@ -1899,22 +1972,111 @@ function InnerCanvas({
         )
       );
 
-      // Schedule transcription with Convex storage
-      if (storageId) {
-        await scheduleTranscription({
-          videoId: videoId as any,
-          storageId: storageId as any,
-          fileType: "video",
-          fileName: video?.title || "video.mp4",
-        });
+      // Get the video file from storage for client-side transcription
+      if (storageId && videoRecord?.videoUrl) {
+        toast.info("Downloading video for transcription...");
+        
+        try {
+          // Download the video file
+          const response = await fetch(videoRecord.videoUrl);
+          if (!response.ok) {
+            throw new Error("Failed to download video");
+          }
+          
+          const blob = await response.blob();
+          const file = new File([blob], video?.title || "video.mp4", { type: blob.type });
+          
+          // Create FormData for ElevenLabs
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("model_id", "scribe_v1");
+          
+          // Get the Convex site URL - it should be in format https://xxxxx.convex.site
+          const convexUrl = import.meta.env.VITE_CONVEX_URL;
+          let siteUrl = '';
+          if (convexUrl) {
+            // Extract the deployment name from the URL
+            const match = convexUrl.match(/https:\/\/([^.]+)\.convex\.cloud/);
+            if (match) {
+              siteUrl = `https://${match[1]}.convex.site`;
+            }
+          }
+          const transcribeUrl = `${siteUrl}/api/transcribe`;
+          
+          if (!siteUrl) {
+            throw new Error("Could not determine Convex site URL. Please check your environment configuration.");
+          }
+          
+          // Call our proxy endpoint
+          const transcriptionResponse = await fetch(transcribeUrl, {
+            method: "POST",
+            body: formData,
+          });
+          
+          if (!transcriptionResponse.ok) {
+            const errorText = await transcriptionResponse.text();
+            throw new Error(`Transcription failed: ${errorText}`);
+          }
+          
+          const transcriptionResult = await transcriptionResponse.json();
+          
+          // Check if ElevenLabs couldn't detect speech
+          if (transcriptionResult.text === "We couldn't transcribe the audio. The video might be silent or in an unsupported language.") {
+            throw new Error("No speech detected. The video might be silent, have no audio track, or use an unsupported language.");
+          }
+          
+          // Update the video with transcription
+          if (transcriptionResult.text && transcriptionResult.text.trim().length > 0) {
+            await updateVideo({
+              id: videoId as any,
+              transcription: transcriptionResult.text,
+            });
+            
+            // Update node to show transcription complete
+            setNodes((nds: any) =>
+              nds.map((node: any) =>
+                node.id === `video_${videoId}`
+                  ? {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        isTranscribing: false,
+                        hasTranscription: true,
+                        transcriptionError: null,
+                      },
+                    }
+                  : node
+              )
+            );
+            
+            toast.success("Transcription completed!");
+          } else {
+            throw new Error("No transcription text received. The video might not contain any speech.");
+          }
+        } catch (error: any) {
+          console.error("Transcription error:", error);
+          // Update node to show error
+          setNodes((nds: any) =>
+            nds.map((node: any) =>
+              node.id === `video_${videoId}`
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      isTranscribing: false,
+                      hasTranscription: false,
+                      transcriptionError: error.message,
+                    },
+                  }
+                : node
+            )
+          );
+          throw error;
+        }
       } else {
-        toast.error("Cannot retry: No storage ID found");
+        toast.error("Cannot retry: No video URL found");
         return;
       }
-
-      toast.success("Transcription retry started", {
-        description: "The transcription will process in the background.",
-      });
     } catch (error: any) {
       console.error("Retry transcription error:", error);
       handleVideoError(error, 'Transcription Retry');
@@ -2259,7 +2421,7 @@ function InnerCanvas({
                       transcriptionError: newTranscriptionError,
                       onRetryTranscription: newTranscriptionError ? () => retryTranscription(video._id) : undefined,
                       onVideoClick: video.videoUrl ? () => handleVideoClick({
-                        url: video.videoUrl,
+                        url: video.videoUrl!,
                         title: video.title || "Untitled Video",
                         duration: video.duration,
                         fileSize: video.fileSize,
@@ -2677,6 +2839,30 @@ function InnerCanvas({
               handleContentUpdate(selectedNodeForModal, newContent);
             }
           }}
+          videoData={(() => {
+            // Find connected video node
+            const agentNode = nodes.find((n: any) => n.id === selectedNodeForModal);
+            if (!agentNode || agentNode.type !== 'agent') return undefined;
+            
+            const videoEdge = edges.find((e: any) => e.target === selectedNodeForModal && e.source?.includes('video'));
+            if (!videoEdge) return undefined;
+            
+            const videoNode = nodes.find((n: any) => n.id === videoEdge.source);
+            if (!videoNode) return undefined;
+            
+            const video = projectVideos?.find((v: any) => v._id === videoNode.data.videoId);
+            
+            return {
+              title: videoNode.data.title || video?.title,
+              thumbnailUrl: video?.thumbnailUrl || videoNode.data.thumbnail,
+              duration: videoNode.data.duration || video?.duration,
+            };
+          })()}
+          channelData={userProfile ? {
+            channelName: userProfile.channelName,
+            channelAvatar: undefined, // Could add avatar URL to profile
+            subscriberCount: "1.2K", // Could add to profile
+          } : undefined}
         />
         
         {/* Thumbnail Upload Modal */}

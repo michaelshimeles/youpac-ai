@@ -47,6 +47,7 @@ export const transcribeInBackground = internalAction({
     console.log("🎬 Background transcription started for video:", args.videoId);
     console.log("📋 Storage ID:", args.storageId);
     console.log("📋 File type:", args.fileType);
+    console.log("📋 File name:", args.fileName);
     
     try {
       console.log("🚀 Calling ElevenLabs transcription action...");
