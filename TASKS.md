@@ -45,6 +45,13 @@
 - [x] Fixed audio info display (hide zero/invalid values)
 - [x] Fixed thumbnail generation validator (accept video metadata)
 
+### New Features Added ✓
+- [x] YouTube Preview Component - Realistic video player interface
+- [x] Twitter Thread Preview Component - Authentic Twitter thread UI
+- [x] Content Preview Sheet - Slides in from right with tabs
+- [x] Export content as Markdown files
+- [x] Copy content to clipboard from preview
+
 ## 🔴 HIGH PRIORITY (Do These First!)
 
 ### Video Features 🎬
@@ -55,13 +62,13 @@
 - [x] Add video metadata to agent context
 
 ### Canvas UX 🎨
-- [ ] Add keyboard shortcuts (Cmd+S save, Delete key, etc)
-- [ ] Implement undo/redo (Cmd+Z/Cmd+Shift+Z)
 - [ ] Add node duplication (Cmd+D)
 - [ ] Fix node selection highlights
 - [ ] Add mini-map toggle button
 
 ### Export & Sharing 📤
+- [x] Export individual content as Markdown files
+- [x] Copy individual content to clipboard
 - [ ] Export all content as ZIP (markdown files)
 - [ ] Copy all content to clipboard button
 - [ ] Share canvas link (read-only)
@@ -112,6 +119,8 @@
 - [ ] Fix mobile responsive issues
 - [x] Add video info node with metadata display
 - [x] Add keyboard shortcut (Cmd+U) for upload
+- [x] Content preview with realistic UI mockups
+- [x] Quick export buttons in preview
 
 ## 📈 Progress Tracker
 
@@ -128,8 +137,7 @@
 - ✅ Video Metadata Extraction (100%)
 
 ### What Needs Work
-- 🟡 Export Features (0%)
-- 🟡 Keyboard Shortcuts (20%)
+- 🟡 Export Features (30%) - Individual export done, bulk export pending
 - 🟡 Video Enhancements (85%)
 - 🟡 Content Variations (0%)
 - 🔴 Collaboration (0%)
@@ -161,7 +169,6 @@
 
 **Week 1: Polish & Export**
 - Export functionality (ZIP, PDF)
-- Keyboard shortcuts
 - Fix all known bugs
 
 **Week 2: Enhanced AI**

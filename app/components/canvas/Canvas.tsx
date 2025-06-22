@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { Button } from "~/components/ui/button";
-import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Twitter, Upload, GripVertical } from "lucide-react";
+import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Upload, GripVertical, Eye, X } from "lucide-react";
 import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
 import { extractFramesFromVideo } from "~/lib/video-frames";
 import { extractVideoMetadata } from "~/lib/video-metadata";
@@ -22,6 +22,7 @@ import { FloatingChat } from "./FloatingChat";
 import { ReactFlowWrapper } from "./ReactFlowWrapper";
 import { ThumbnailUploadModal } from "./ThumbnailUploadModal";
 import { VideoPlayerModal } from "./VideoPlayerModal";
+import { PreviewModal } from "~/components/preview/PreviewModal";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
@@ -84,6 +85,7 @@ function InnerCanvas({
   const [pendingThumbnailNode, setPendingThumbnailNode] = useState<string | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string; duration?: number; fileSize?: number } | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     // Get initial state from localStorage
     if (typeof window !== "undefined") {
@@ -136,8 +138,6 @@ function InnerCanvas({
   const updateAgentConnections = useMutation(api.agents.updateConnections);
   const updateAgentPosition = useMutation(api.agents.updatePosition);
   const saveCanvasState = useMutation(api.canvas.saveState);
-  const deleteVideo = useMutation(api.videos.remove);
-  const deleteAgent = useMutation(api.agents.remove);
   const scheduleTranscription = useMutation(api.videoJobs.scheduleTranscription);
   
   // Convex actions for AI
@@ -851,19 +851,6 @@ function InnerCanvas({
     }
   };
 
-  // Handle keyboard shortcut for upload
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      // Check for Cmd+U (Mac) or Ctrl+U (Windows/Linux)
-      if ((event.metaKey || event.ctrlKey) && event.key === 'u') {
-        event.preventDefault();
-        fileInputRef.current?.click();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyPress);
-    return () => document.removeEventListener('keydown', handleKeyPress);
-  }, []);
 
   // Handle video file upload
   const handleVideoUpload = async (file: File, position: { x: number; y: number }) => {
@@ -1639,7 +1626,7 @@ function InnerCanvas({
               <DraggableNode 
                 type="tweets" 
                 label={isSidebarCollapsed ? "" : "Tweets Agent"} 
-                icon={<Twitter className="h-4 w-4" />}
+                icon={<X className="h-4 w-4" />}
                 collapsed={isSidebarCollapsed}
               />
             </div>
@@ -1673,7 +1660,7 @@ function InnerCanvas({
             ) : null}
           </div>
 
-          <div className={`${isSidebarCollapsed ? "p-2" : "p-4"}`}>
+          <div className={`${isSidebarCollapsed ? "p-2" : "p-4"} space-y-2`}>
             <Button 
               onClick={handleGenerateAll} 
               disabled={isGeneratingAll}
@@ -1688,6 +1675,18 @@ function InnerCanvas({
                 : "Generate All Content"
               )}
             </Button>
+            
+            <Button 
+              onClick={() => setPreviewModalOpen(true)}
+              className="w-full"
+              variant="secondary"
+              size={isSidebarCollapsed ? "icon" : "default"}
+              title={isSidebarCollapsed ? "Preview Content" : undefined}
+            >
+              <Eye className={isSidebarCollapsed ? "h-4 w-4" : "mr-2 h-4 w-4"} />
+              {!isSidebarCollapsed && "Preview Content"}
+            </Button>
+            
             {!isSidebarCollapsed && (
               <p className="mt-2 text-xs text-muted-foreground text-center">
                 Connect all agents to video & generate content
@@ -1701,35 +1700,7 @@ function InnerCanvas({
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={(changes: any) => {
-              // Handle node deletions
-              changes.forEach((change: any) => {
-                if (change.type === 'remove') {
-                  const nodeToDelete = nodes.find((n: any) => n.id === change.id);
-                  if (nodeToDelete) {
-                    // Delete from database
-                    if (nodeToDelete.type === 'video' && nodeToDelete.data.videoId) {
-                      deleteVideo({ id: nodeToDelete.data.videoId as Id<"videos"> })
-                        .then(() => toast.success("Video deleted"))
-                        .catch((error) => {
-                          console.error("Failed to delete video:", error);
-                          toast.error("Failed to delete video");
-                        });
-                    } else if (nodeToDelete.type === 'agent' && nodeToDelete.data.agentId) {
-                      deleteAgent({ id: nodeToDelete.data.agentId as Id<"agents"> })
-                        .then(() => toast.success(`${nodeToDelete.data.type} agent deleted`))
-                        .catch((error) => {
-                          console.error("Failed to delete agent:", error);
-                          toast.error("Failed to delete agent");
-                        });
-                    }
-                  }
-                }
-              });
-              
-              // Apply changes to state
-              onNodesChange(changes);
-            }}
+            onNodesChange={onNodesChange}
             onNodeDragStop={async (_event: any, node: any) => {
               console.log("Node dragged:", node.id, "to position:", node.position);
               
@@ -1847,6 +1818,20 @@ function InnerCanvas({
             // Reset the input
             e.target.value = '';
           }}
+        />
+        
+        {/* Preview Modal */}
+        <PreviewModal
+          isOpen={previewModalOpen}
+          onClose={() => setPreviewModalOpen(false)}
+          title={nodes.find((n: any) => n.type === 'agent' && n.data.type === 'title')?.data.draft || ''}
+          description={nodes.find((n: any) => n.type === 'agent' && n.data.type === 'description')?.data.draft || ''}
+          tweets={nodes.find((n: any) => n.type === 'agent' && n.data.type === 'tweets')?.data.draft || ''}
+          thumbnailUrl={nodes.find((n: any) => n.type === 'agent' && n.data.type === 'thumbnail')?.data.thumbnailUrl}
+          videoUrl={nodes.find((n: any) => n.type === 'video')?.data.videoUrl}
+          duration={nodes.find((n: any) => n.type === 'video')?.data.duration}
+          channelName={userProfile?.channelName}
+          subscriberCount="1.2K"
         />
         
       </div>
