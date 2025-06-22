@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { Button } from "~/components/ui/button";
-import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Upload, GripVertical, Eye, X } from "lucide-react";
+import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Upload, GripVertical, Eye, X, Map } from "lucide-react";
 import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
 import { extractFramesFromVideo } from "~/lib/video-frames";
 import { extractVideoMetadata } from "~/lib/video-metadata";
@@ -86,6 +86,9 @@ function InnerCanvas({
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string; duration?: number; fileSize?: number } | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [enableEdgeAnimations, setEnableEdgeAnimations] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showMiniMap, setShowMiniMap] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     // Get initial state from localStorage
     if (typeof window !== "undefined") {
@@ -731,7 +734,7 @@ function InnerCanvas({
           id: `e${videoNode.id}-${agentNode.id}`,
           source: videoNode.id,
           target: agentNode.id,
-          animated: true,
+          animated: enableEdgeAnimations && !isDragging,
         };
         setEdges((eds: any) => [...eds, newEdge]);
         
@@ -819,6 +822,65 @@ function InnerCanvas({
     },
     [nodes, setEdges, setNodes, updateAgentConnections]
   );
+
+  // Find non-overlapping position for new nodes
+  const findNonOverlappingPosition = useCallback((desiredPos: { x: number; y: number }, nodeType: string) => {
+    const nodeWidth = nodeType === 'video' ? 200 : 150;
+    const nodeHeight = nodeType === 'video' ? 120 : 50;
+    const spacing = 20;
+    
+    // Check if position overlaps with any existing node
+    const checkOverlap = (pos: { x: number; y: number }) => {
+      return nodes.some((node: any) => {
+        const existingWidth = node.type === 'video' ? 200 : 150;
+        const existingHeight = node.type === 'video' ? 120 : 50;
+        
+        return (
+          pos.x < node.position.x + existingWidth + spacing &&
+          pos.x + nodeWidth + spacing > node.position.x &&
+          pos.y < node.position.y + existingHeight + spacing &&
+          pos.y + nodeHeight + spacing > node.position.y
+        );
+      });
+    };
+    
+    // If no overlap, return desired position
+    if (!checkOverlap(desiredPos)) {
+      return desiredPos;
+    }
+    
+    // Otherwise, find nearest free position using spiral search
+    const step = 30;
+    let distance = 1;
+    
+    while (distance < 10) {
+      // Try positions in a spiral pattern
+      const positions = [
+        { x: desiredPos.x + step * distance, y: desiredPos.y },
+        { x: desiredPos.x - step * distance, y: desiredPos.y },
+        { x: desiredPos.x, y: desiredPos.y + step * distance },
+        { x: desiredPos.x, y: desiredPos.y - step * distance },
+        { x: desiredPos.x + step * distance, y: desiredPos.y + step * distance },
+        { x: desiredPos.x - step * distance, y: desiredPos.y - step * distance },
+        { x: desiredPos.x + step * distance, y: desiredPos.y - step * distance },
+        { x: desiredPos.x - step * distance, y: desiredPos.y + step * distance },
+      ];
+      
+      for (const pos of positions) {
+        if (!checkOverlap(pos)) {
+          return pos;
+        }
+      }
+      
+      distance++;
+    }
+    
+    // If no free position found, offset significantly
+    return {
+      x: desiredPos.x + 200,
+      y: desiredPos.y + 100
+    };
+  }, [nodes]);
 
   // Handle content update from modal
   const handleContentUpdate = async (nodeId: string, newContent: string) => {
@@ -966,7 +1028,7 @@ function InnerCanvas({
             source: infoNodeId,
             target: `video_${video._id}`,
             type: 'smoothstep',
-            animated: true,
+            animated: enableEdgeAnimations && !isDragging,
             style: { stroke: '#888', strokeDasharray: '5 5' },
           };
           setEdges((eds: any) => eds.concat(infoEdge));
@@ -1240,10 +1302,12 @@ function InnerCanvas({
         if (file.type.startsWith("video/")) {
           if (!reactFlowInstance) return;
           
-          const position = reactFlowInstance.screenToFlowPosition({
+          const desiredPosition = reactFlowInstance.screenToFlowPosition({
             x: event.clientX,
             y: event.clientY,
           });
+          
+          const position = findNonOverlappingPosition(desiredPosition, 'video');
 
           // Show file size info
           const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
@@ -1266,10 +1330,12 @@ function InnerCanvas({
         return;
       }
 
-      const position = reactFlowInstance.screenToFlowPosition({
+      const desiredPosition = reactFlowInstance.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
+      
+      const position = findNonOverlappingPosition(desiredPosition, type);
 
       // Find the first video node to associate with this agent
       const videoNode = nodes.find((n: any) => n.type === 'video' && n.data.videoId);
@@ -1310,7 +1376,7 @@ function InnerCanvas({
           id: edgeId,
           source: videoNode.id,
           target: nodeId,
-          animated: true,
+          animated: enableEdgeAnimations && !isDragging,
         };
         setEdges((eds: any) => [...eds, newEdge]);
         
@@ -1419,7 +1485,7 @@ function InnerCanvas({
             source: `video_info_${video._id}`,
             target: `video_${video._id}`,
             type: 'smoothstep',
-            animated: true,
+            animated: enableEdgeAnimations && !isDragging,
             style: { stroke: '#888', strokeDasharray: '5 5' },
           });
         }
@@ -1469,7 +1535,7 @@ function InnerCanvas({
               id: `e${sourceNodeId}-agent_${agent.type}_${agent._id}`,
               source: sourceNodeId,
               target: `agent_${agent.type}_${agent._id}`,
-              animated: true,
+              animated: enableEdgeAnimations && !isDragging,
             });
           }
         });
@@ -1687,10 +1753,56 @@ function InnerCanvas({
               {!isSidebarCollapsed && "Preview Content"}
             </Button>
             
+            {isSidebarCollapsed && (
+              <Button 
+                onClick={() => setShowMiniMap(!showMiniMap)}
+                className="w-full"
+                variant={showMiniMap ? "secondary" : "ghost"}
+                size="icon"
+                title="Toggle Mini-map"
+              >
+                <Map className="h-4 w-4" />
+              </Button>
+            )}
+            
             {!isSidebarCollapsed && (
-              <p className="mt-2 text-xs text-muted-foreground text-center">
-                Connect all agents to video & generate content
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground text-center">
+                  Connect all agents to video & generate content
+                </p>
+                
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Edge animations</span>
+                  <button
+                    onClick={() => setEnableEdgeAnimations(!enableEdgeAnimations)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      enableEdgeAnimations ? 'bg-primary' : 'bg-muted'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                        enableEdgeAnimations ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Mini-map</span>
+                  <button
+                    onClick={() => setShowMiniMap(!showMiniMap)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      showMiniMap ? 'bg-primary' : 'bg-muted'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                        showMiniMap ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </aside>
@@ -1701,8 +1813,10 @@ function InnerCanvas({
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
+            onNodeDragStart={() => setIsDragging(true)}
             onNodeDragStop={async (_event: any, node: any) => {
               console.log("Node dragged:", node.id, "to position:", node.position);
+              setIsDragging(false);
               
               // Update position in database
               if (node.type === 'video' && node.data.videoId) {
@@ -1735,7 +1849,7 @@ function InnerCanvas({
           >
             <Background />
             <Controls />
-            <MiniMap />
+            {showMiniMap && <MiniMap />}
           </ReactFlow>
         </div>
         
