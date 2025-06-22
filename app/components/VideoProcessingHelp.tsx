@@ -97,22 +97,6 @@ export function VideoProcessingHelp() {
               </div>
             </div>
           </Card>
-
-          {/* Tips */}
-          <Card className="p-4 bg-primary/5">
-            <div className="flex gap-3">
-              <Image className="h-5 w-5 text-primary mt-0.5" />
-              <div className="space-y-2">
-                <h3 className="font-semibold">Pro Tips</h3>
-                <ul className="text-sm space-y-1">
-                  <li>✓ Upload videos during off-peak hours for faster processing</li>
-                  <li>✓ Use clear audio for better transcription accuracy</li>
-                  <li>✓ Keep videos under 10 minutes for optimal performance</li>
-                  <li>✓ Upload custom thumbnails for guaranteed results</li>
-                </ul>
-              </div>
-            </div>
-          </Card>
         </div>
       </DialogContent>
     </Dialog>

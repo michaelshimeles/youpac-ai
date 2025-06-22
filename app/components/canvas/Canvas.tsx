@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { Button } from "~/components/ui/button";
-import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Upload, GripVertical, Eye, X, Map } from "lucide-react";
+import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Upload, GripVertical, Eye, X, Map, Video, Bot, Hash, Layers, Settings2, Zap, Palette } from "lucide-react";
 import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
 import { extractVideoMetadata } from "~/lib/video-metadata";
 import { FloatingChat } from "./FloatingChat";
@@ -72,6 +72,7 @@ function InnerCanvas({
   addEdge: any;
 }) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
@@ -107,7 +108,6 @@ function InnerCanvas({
     agentId?: string;
   }>>([]);
   const [isChatGenerating, setIsChatGenerating] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Use refs to access current values in callbacks
   const nodesRef = useRef(nodes);
@@ -1855,96 +1855,125 @@ function InnerCanvas({
     <ReactFlowProvider>
       <div className="flex h-[calc(100vh-var(--header-height))]">
         {/* Sidebar with draggable agent nodes */}
-        <aside className={`${isSidebarCollapsed ? "w-16" : "w-64"} border-r bg-background transition-all duration-300 flex flex-col`}>
-          <div className={`flex-1 ${isSidebarCollapsed ? "p-2" : "p-4"}`}>
-            {!isSidebarCollapsed && (
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Agents</h2>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="h-8 w-8"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            {isSidebarCollapsed && (
-              <div className="text-center mb-4">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="h-8 w-8"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+        <aside className={`${isSidebarCollapsed ? "w-20" : "w-72"} bg-gradient-to-b from-background via-background to-background/95 border-r border-border/50 transition-all duration-300 flex flex-col backdrop-blur-sm`}>
+          <div className={`flex-1 ${isSidebarCollapsed ? "p-3" : "p-6"} overflow-y-auto`}>
+            {/* Header */}
+            <div className={`flex items-center ${isSidebarCollapsed ? "justify-center mb-6" : "justify-between mb-8"}`}>
+              {!isSidebarCollapsed && (
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Bot className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">AI Agents</h2>
+                    <p className="text-xs text-muted-foreground">Drag to canvas</p>
+                  </div>
+                </div>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className={`h-9 w-9 hover:bg-primary/10 ${isSidebarCollapsed ? "" : "ml-auto"}`}
+              >
+                {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              </Button>
+            </div>
             
-            <div className="space-y-2">
+            {/* Agents Section */}
+            <div className="space-y-3">
+              {!isSidebarCollapsed && (
+                <div className="flex items-center gap-2 mb-4">
+                  <Layers className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Content Agents</span>
+                </div>
+              )}
+              
               <DraggableNode 
                 type="title" 
-                label={isSidebarCollapsed ? "" : "Title Agent"} 
-                icon={<FileText className="h-4 w-4" />}
+                label={isSidebarCollapsed ? "" : "Title Generator"} 
+                description={isSidebarCollapsed ? "" : "Create engaging video titles"}
+                icon={<Hash className="h-5 w-5" />}
                 collapsed={isSidebarCollapsed}
+                color="blue"
               />
               <DraggableNode 
                 type="description" 
-                label={isSidebarCollapsed ? "" : "Description Agent"} 
-                icon={<FileText className="h-4 w-4" />}
+                label={isSidebarCollapsed ? "" : "Description Writer"} 
+                description={isSidebarCollapsed ? "" : "Write SEO-optimized descriptions"}
+                icon={<FileText className="h-5 w-5" />}
                 collapsed={isSidebarCollapsed}
+                color="green"
               />
               <DraggableNode 
                 type="thumbnail" 
-                label={isSidebarCollapsed ? "" : "Thumbnail Agent"} 
-                icon={<Image className="h-4 w-4" />}
+                label={isSidebarCollapsed ? "" : "Thumbnail Designer"} 
+                description={isSidebarCollapsed ? "" : "Design eye-catching thumbnails"}
+                icon={<Palette className="h-5 w-5" />}
                 collapsed={isSidebarCollapsed}
+                color="purple"
               />
               <DraggableNode 
                 type="tweets" 
-                label={isSidebarCollapsed ? "" : "Tweets Agent"} 
-                icon={<X className="h-4 w-4" />}
+                label={isSidebarCollapsed ? "" : "Social Media"} 
+                description={isSidebarCollapsed ? "" : "Create viral tweets & posts"}
+                icon={<Zap className="h-5 w-5" />}
                 collapsed={isSidebarCollapsed}
+                color="yellow"
               />
             </div>
             
             {!isSidebarCollapsed && (
-              <div className="mt-8">
-                <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Drag video onto canvas →
-                  </p>
+              <div className="mt-8 space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-xl blur-xl" />
+                  <div className="relative rounded-xl bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/20 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Video className="h-5 w-5 text-primary" />
+                      <span className="text-sm font-medium">Quick Start</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Drag a video file directly onto the canvas to begin
+                    </p>
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Video
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
             
-            {isSidebarCollapsed ? (
-              <div className="mt-8">
+            {isSidebarCollapsed && (
+              <div className="mt-8 space-y-2">
                 <Button
-                  onClick={() => setIsSidebarCollapsed(false)}
+                  onClick={() => fileInputRef.current?.click()}
                   size="icon"
-                  variant="ghost"
-                  className="w-full"
+                  variant="secondary"
+                  className="w-full hover:bg-primary/10"
                   title="Upload Video"
                 >
-                  <Upload className="h-4 w-4" />
+                  <Upload className="h-5 w-5" />
                 </Button>
               </div>
-            ) : null}
+            )}
           </div>
 
-          <div className={`${isSidebarCollapsed ? "p-2" : "p-4"} space-y-2`}>
+          {/* Bottom Actions */}
+          <div className={`${isSidebarCollapsed ? "p-3" : "p-6"} border-t border-border/50 space-y-3 bg-gradient-to-t from-background/80 to-background backdrop-blur-sm`}>
             <Button 
               onClick={handleGenerateAll} 
               disabled={isGeneratingAll}
-              className="w-full"
-              variant="default"
+              className={`w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20 ${isSidebarCollapsed ? "" : "h-11"}`}
               size={isSidebarCollapsed ? "icon" : "default"}
               title={isSidebarCollapsed ? "Generate All Content" : undefined}
             >
-              <Sparkles className={isSidebarCollapsed ? "h-4 w-4" : "mr-2 h-4 w-4"} />
+              <Sparkles className={`${isSidebarCollapsed ? "h-5 w-5" : "mr-2 h-5 w-5"} ${isGeneratingAll ? "animate-pulse" : ""}`} />
               {!isSidebarCollapsed && (isGeneratingAll 
                 ? `Generating ${generationProgress.current}/${generationProgress.total}...`
                 : "Generate All Content"
@@ -1953,68 +1982,67 @@ function InnerCanvas({
             
             <Button 
               onClick={() => setPreviewModalOpen(true)}
-              className="w-full"
+              className={`w-full ${isSidebarCollapsed ? "" : "h-11"}`}
               variant="secondary"
               size={isSidebarCollapsed ? "icon" : "default"}
               title={isSidebarCollapsed ? "Preview Content" : undefined}
             >
-              <Eye className={isSidebarCollapsed ? "h-4 w-4" : "mr-2 h-4 w-4"} />
+              <Eye className={isSidebarCollapsed ? "h-5 w-5" : "mr-2 h-5 w-5"} />
               {!isSidebarCollapsed && "Preview Content"}
             </Button>
             
-            {isSidebarCollapsed && (
-              <Button 
-                onClick={() => setShowMiniMap(!showMiniMap)}
-                className="w-full"
-                variant={showMiniMap ? "secondary" : "ghost"}
-                size="icon"
-                title="Toggle Mini-map"
-              >
-                <Map className="h-4 w-4" />
-              </Button>
+            {!isSidebarCollapsed && (
+              <div className="space-y-4 pt-2">
+                <div className="space-y-3 rounded-lg bg-muted/50 p-3">
+                  <div className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Canvas Settings</span>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Mini-map</span>
+                      <button
+                        onClick={() => setShowMiniMap(!showMiniMap)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all ${
+                          showMiniMap ? 'bg-primary' : 'bg-muted'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                            showMiniMap ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <VideoProcessingHelp />
+              </div>
             )}
             
-            {!isSidebarCollapsed && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground text-center">
-                  Connect all agents to video & generate content
-                </p>
-                
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Edge animations</span>
-                  <button
-                    onClick={() => setEnableEdgeAnimations(!enableEdgeAnimations)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                      enableEdgeAnimations ? 'bg-primary' : 'bg-muted'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                        enableEdgeAnimations ? 'translate-x-5' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Mini-map</span>
-                  <button
-                    onClick={() => setShowMiniMap(!showMiniMap)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                      showMiniMap ? 'bg-primary' : 'bg-muted'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                        showMiniMap ? 'translate-x-5' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                
-                <div className="pt-2">
-                  <VideoProcessingHelp />
-                </div>
+            {isSidebarCollapsed && (
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={() => setShowMiniMap(!showMiniMap)}
+                  variant={showMiniMap ? "secondary" : "ghost"}
+                  size="icon"
+                  title="Toggle Mini-map"
+                  className="w-full"
+                >
+                  <Map className="h-5 w-5" />
+                </Button>
+                <Button 
+                  onClick={() => setEnableEdgeAnimations(!enableEdgeAnimations)}
+                  variant={enableEdgeAnimations ? "secondary" : "ghost"}
+                  size="icon"
+                  title="Toggle Animations"
+                  className="w-full"
+                >
+                  <Settings2 className="h-5 w-5" />
+                </Button>
               </div>
             )}
           </div>
@@ -2190,44 +2218,66 @@ function InnerCanvas({
 function DraggableNode({ 
   type, 
   label, 
+  description,
   icon, 
-  collapsed 
+  collapsed,
+  color = "blue"
 }: { 
   type: string; 
   label: string; 
+  description?: string;
   icon?: React.ReactNode;
   collapsed?: boolean;
+  color?: "blue" | "green" | "purple" | "yellow";
 }) {
   const onDragStart = (event: React.DragEvent) => {
     event.dataTransfer.setData("application/reactflow", type);
     event.dataTransfer.effectAllowed = "move";
   };
 
+  const colorClasses = {
+    blue: "from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 border-blue-500/30 text-blue-500",
+    green: "from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 border-green-500/30 text-green-500",
+    purple: "from-purple-500/20 to-purple-600/20 hover:from-purple-500/30 hover:to-purple-600/30 border-purple-500/30 text-purple-500",
+    yellow: "from-yellow-500/20 to-yellow-600/20 hover:from-yellow-500/30 hover:to-yellow-600/30 border-yellow-500/30 text-yellow-500",
+  };
+
   if (collapsed) {
     return (
       <div
-        className="cursor-move rounded-lg border bg-card p-2 transition-colors hover:bg-accent hover:text-white flex items-center justify-center group"
+        className={`cursor-move rounded-xl bg-gradient-to-br ${colorClasses[color]} border backdrop-blur-sm p-3 transition-all hover:scale-105 hover:shadow-lg flex items-center justify-center group`}
         onDragStart={onDragStart}
         draggable
-        title={`${type.charAt(0).toUpperCase() + type.slice(1)} Agent`}
+        title={label}
         style={{ opacity: 1 }}
       >
-        {icon}
+        <div className="text-foreground">
+          {icon}
+        </div>
       </div>
     );
   }
 
   return (
     <div
-      className="cursor-move rounded-lg border bg-card p-3 transition-colors hover:bg-accent hover:text-white group"
+      className={`cursor-move rounded-xl bg-gradient-to-br ${colorClasses[color]} border backdrop-blur-sm p-4 transition-all hover:scale-[1.02] hover:shadow-lg group`}
       onDragStart={onDragStart}
       draggable
       style={{ opacity: 1 }}
     >
-      <div className="flex items-center gap-2">
-        <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-white" />
-        {icon}
-        <span className="text-sm font-medium">{label}</span>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <div className="text-foreground">
+            {icon}
+          </div>
+          <div className="flex-1">
+            <h3 className="font-medium text-foreground">{label}</h3>
+            {description && (
+              <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+            )}
+          </div>
+          <GripVertical className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground" />
+        </div>
       </div>
     </div>
   );
