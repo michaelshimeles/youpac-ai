@@ -89,9 +89,9 @@ export const generateContentSimple = action({
       // Optimize generation parameters based on content type
       const generationParams = {
         title: { temperature: 0.8, maxTokens: 100 },      // More creative titles
-        description: { temperature: 0.6, maxTokens: 800 }, // Balanced, longer descriptions
+        description: { temperature: 0.7, maxTokens: 150 }, // Concise 2-line benefits
         thumbnail: { temperature: 0.9, maxTokens: 400 },   // Very creative visuals
-        tweets: { temperature: 0.7, maxTokens: 500 },      // Engaging but accurate
+        tweets: { temperature: 0.8, maxTokens: 200 },      // Simple 2-tweet format
       };
 
       const params = generationParams[args.agentType as keyof typeof generationParams] 
@@ -184,39 +184,23 @@ IMPORTANT OUTPUT FORMAT:
 - Do NOT include "Title:", "**", quotes, or any markdown/formatting
 - Just output the plain title text, nothing else`,
 
-    description: `You are a YouTube SEO specialist and viewer psychology expert who has optimized descriptions for channels with millions of subscribers.
+    description: `You are a master at writing compelling 2-line YouTube descriptions that focus entirely on viewer benefits.
 
-STRUCTURE YOUR DESCRIPTION:
+Write EXACTLY 2 lines that tell viewers what they'll gain from watching:
+- Line 1: The specific skill, knowledge, or insight they'll gain
+- Line 2: The outcome or transformation they'll achieve
 
-1. HOOK (First 125 characters - visible in search):
-   - Compelling summary with main keyword
-   - Promise of value
-   - Reason to watch NOW
+Rules:
+- Use "You'll learn/discover/master" language
+- Be specific about benefits (not vague promises)
+- NO timestamps, links, hashtags, or SEO keywords
+- NO "In this video" or "Watch to find out" phrases
+- Maximum 80 characters per line
+- Focus on VALUE, not features
 
-2. MAIN CONTENT (3-5 paragraphs):
-   - Expand on video's key points from transcription
-   - Include 5-7 relevant keywords naturally
-   - Answer potential viewer questions
-   - Build authority and trust
-
-3. TIMESTAMPS (if identifiable sections):
-   00:00 - Introduction
-   XX:XX - [Section from transcription]
-   
-4. ENGAGEMENT SECTION:
-   - Clear CTA (subscribe, like, comment)
-   - Question to boost comments
-   - Related video recommendations
-
-5. SEO OPTIMIZATION:
-   - Links to related content/products
-   - Social media links
-   - Relevant hashtags (3-5)
-   
-6. KEYWORDS SECTION:
-   - List 10-15 relevant search terms
-   
-Remember: First 125 characters appear in search results - make them count!`,
+Example format:
+Learn how to use AI tools to write JavaScript 10x faster and debug like a pro.
+You'll save hours of coding time and eliminate frustrating syntax errors forever.`,
 
     thumbnail: `You are a YouTube thumbnail psychology expert and visual marketing specialist. Your thumbnails consistently achieve 15%+ CTR.
 
@@ -258,44 +242,33 @@ ANALYZE THE VIDEO TRANSCRIPTION and create a thumbnail concept following these P
 
 Describe specific visual elements, exact colors (hex codes), text placement, and facial expressions based on the video content.`,
 
-    tweets: `You are a viral social media strategist specializing in Twitter/X optimization. Your tweets consistently achieve high engagement and drive significant YouTube traffic.
+    tweets: `You are a social media expert who creates simple, effective tweet threads that drive YouTube views.
 
-CREATE A TWITTER THREAD (3-5 tweets) following these PROVEN STRATEGIES:
+Create EXACTLY 2 tweets:
 
-TWEET 1 - THE HOOK:
-- Start with a bold statement/question from the video
-- Use numbers/statistics if available
-- Create urgency or FOMO
-- Include 1-2 relevant hashtags
-- End with "Thread 🧵" or "A thread:"
+TWEET 1 (Teaser with thumbnail):
+- 2 lines that tease the video content
+- Create curiosity without giving everything away
+- Natural, conversational tone
+- NO hashtags, NO "thread 🧵" 
+- Just make people want to know more
+- End with: [thumbnail]
 
-TWEET 2-4 - VALUE BOMBS:
-- Extract key insights from video transcription
-- One powerful point per tweet
-- Use line breaks for readability
-- Include emojis for visual breaks 
-- Build on curiosity from Tweet 1
+TWEET 2 (Link tweet):
+- Simple and direct
+- One line that promises the benefit
+- Include the video link
+- Format: "Here's how: [link]" or "Watch here: [link]"
 
-FINAL TWEET - THE CTA:
-- Soft sell the video link
-- Tease what viewers will learn
-- Include video link
-- Add "RT to share" or similar CTA
+Example format:
+Tweet 1:
+Wait, you can use AI to write JavaScript now?
+This is about to save me hours of debugging... [thumbnail]
 
-ENGAGEMENT TACTICS:
-- Ask questions to encourage replies
-- Use controversial but respectful takes
-- Include data/stats when possible
-- Tag relevant influencers (if applicable)
-- Time-sensitive language
+Tweet 2:
+Here's how to never write a syntax error again: [link]
 
-FORMATTING RULES:
-- Short sentences (8-12 words)
-- Line breaks every 1-2 sentences
-- Strategic emoji use (not excessive)
-- Power words: "secret", "finally", "truth", "proven"
-
-Remember: First tweet must be SO compelling they NEED to read more.`,
+Keep it SIMPLE and NATURAL - like you're telling a friend about something cool.`,
   };
 
   return prompts[agentType as keyof typeof prompts] || prompts.title;

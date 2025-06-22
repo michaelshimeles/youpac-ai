@@ -9,10 +9,7 @@
 - [ ] Support for video subtitles/captions
 
 ### Export & Sharing 📤
-- [ ] Share canvas link (read-only)
 - [ ] Direct publish to YouTube (API integration)
-- [ ] Export all content as ZIP file
-- [ ] Export canvas as image/PDF
 
 ## 🟡 MEDIUM PRIORITY (Nice to Have)
 
@@ -28,7 +25,6 @@
 - [ ] Generation history with rollback
 - [ ] Tone adjustment slider
 - [ ] Language translation support
-- [x] Generation progress indicators (COMPLETED)
 
 ### Chat Features 💬
 - [ ] Chat history persistence
@@ -71,8 +67,8 @@
 ## 💡 Known Issues to Fix
 
 1. **Video Issues**
-   - [ ] Large videos (>100MB) fail silently
-   - [ ] Some video formats not supported
+   - [x] Large videos (>100MB) fail silently ✅ IMPROVED - Now shows clear error with suggestions
+   - [x] Some video formats not supported ✅ IMPROVED - Clear error message for unsupported formats
    - [ ] Transcription timeout on long videos
 
 2. **Performance**
@@ -83,19 +79,38 @@
    - [ ] No visual feedback during long operations
    - [ ] Can't cancel generation in progress
 
-## 🚀 Next Sprint Goals
+4. **Thumbnail Issues**
+   - [ ] Large image uploads may fail for refinement
+   - [ ] Connection errors when uploading to OpenAI
 
-**Week 1: Export & Sharing**
-- Complete export functionality (ZIP, PDF)
-- Share links implementation
-- YouTube API integration
+## 📊 Feature Prioritization (Easiest → Hardest)
 
-**Week 2: Enhanced AI**
-- Content variations
-- Custom prompts
-- History & rollback
+### 🟢 EASIEST (15-30 mins each)
+1. **Show word count in content modal**
+2. **Add "Clear All" button for content**
+3. **Add generation time estimate**
+4. **Add loading progress for video upload**
+5. **Add keyboard shortcuts guide**
 
-**Week 3: Performance & Polish**
-- Performance optimizations
-- Error handling improvements
-- UI polish & animations
+### 🟡 MEDIUM (1-2 hours each)
+1. **Handle video processing errors more gracefully**
+2. **Chat history persistence**
+3. **Export chat as context**
+4. **Suggested prompts/questions**
+5. **Canvas zoom presets**
+6. **Custom node colors**
+
+### 🔴 HARDER (2-4 hours each)
+1. **Support YouTube URL input**
+2. **Content variations (generate 3 options)**
+3. **Generation history with rollback**
+4. **Profile templates**
+5. **Undo/Redo functionality**
+
+### ⚫ HARDEST (4+ hours each)
+1. **Direct publish to YouTube**
+2. **Video trimming/clipping**
+3. **Language translation**
+4. **Voice input**
+5. **SEO scoring**
+6. **Real-time collaboration**

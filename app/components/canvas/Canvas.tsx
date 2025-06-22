@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { Button } from "~/components/ui/button";
-import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Upload, GripVertical, Eye, X, Map, Video, Bot, Hash, Layers, Settings2, Zap, Palette } from "lucide-react";
+import { Sparkles, ChevronLeft, ChevronRight, FileText, Image, Upload, GripVertical, Eye, X, Map, Video, Bot, Hash, Layers, Settings2, Zap, Palette, Share2, Copy, Check } from "lucide-react";
 import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
 import { extractVideoMetadata } from "~/lib/video-metadata";
 import { FloatingChat } from "./FloatingChat";
@@ -111,6 +111,8 @@ function InnerCanvas({
     agentId?: string;
   }>>([]);
   const [isChatGenerating, setIsChatGenerating] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
   
   // Use refs to access current values in callbacks
   const nodesRef = useRef(nodes);
@@ -149,6 +151,8 @@ function InnerCanvas({
   const scheduleTranscription = useMutation(api.videoJobs.scheduleTranscription);
   const deleteVideo = useMutation(api.videos.remove);
   const deleteAgent = useMutation(api.agents.remove);
+  const createShareLink = useMutation(api.shares.createShareLink);
+  const getShareLink = useQuery(api.shares.getShareLink, { projectId });
   
   // Convex actions for AI
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
@@ -1160,6 +1164,67 @@ function InnerCanvas({
     [deleteVideo, deleteAgent, setNodes]
   );
   
+  // Handle share functionality
+  const handleShare = useCallback(async () => {
+    try {
+      // Get current canvas state
+      const canvasNodes = nodes.map((node: any) => {
+        const cleanedData: any = {};
+        
+        // Only copy serializable properties
+        for (const [key, value] of Object.entries(node.data)) {
+          if (typeof value !== 'function' && key !== 'onGenerate' && key !== 'onRegenerate' && 
+              key !== 'onChat' && key !== 'onView' && key !== 'onViewPrompt' && 
+              key !== 'onRetryTranscription' && key !== 'onVideoClick') {
+            cleanedData[key] = value;
+          }
+        }
+        
+        return {
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: cleanedData
+        };
+      });
+
+      const canvasEdges = edges.map((edge: any) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+      }));
+
+      // Create share link
+      const shareId = await createShareLink({
+        projectId,
+        canvasState: {
+          nodes: canvasNodes,
+          edges: canvasEdges,
+          viewport: {
+            x: 0,
+            y: 0,
+            zoom: 1,
+          }
+        }
+      });
+
+      // Build share URL
+      const shareUrl = `${window.location.origin}/share/${shareId}`;
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedShareLink(true);
+      toast.success("Share link copied to clipboard!");
+      
+      // Reset copied state after 3 seconds
+      setTimeout(() => setCopiedShareLink(false), 3000);
+    } catch (error) {
+      console.error("Failed to create share link:", error);
+      toast.error("Failed to create share link");
+    }
+  }, [createShareLink, projectId, nodes, edges]);
+  
   // Handle node deletion
   const onNodesDelete = useCallback(
     (nodes: Node[]) => {
@@ -1306,12 +1371,34 @@ function InnerCanvas({
       // Validate file before upload
       const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
       if (file.size > MAX_FILE_SIZE) {
-        throw new Error(`File is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 100MB.`);
+        // Remove the temporary node since upload won't proceed
+        setNodes((nds: any) => nds.filter((n: any) => n.id !== tempNodeId));
+        
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
+        toast.error("Video file too large", {
+          description: `Your video is ${fileSizeMB}MB but the maximum allowed size is 100MB. Try compressing it with HandBrake or use a shorter clip.`,
+          duration: 8000,
+          action: {
+            label: "Learn more",
+            onClick: () => window.open("https://handbrake.fr/", "_blank")
+          }
+        });
+        
+        // Throw error for proper error handling
+        throw new Error(`File is too large (${fileSizeMB}MB). Maximum size is 100MB.`);
       }
 
       // Check video format
       const supportedFormats = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mov'];
       if (!supportedFormats.includes(file.type) && !file.name.match(/\.(mp4|mov|avi|webm)$/i)) {
+        // Remove the temporary node since upload won't proceed
+        setNodes((nds: any) => nds.filter((n: any) => n.id !== tempNodeId));
+        
+        toast.error("Unsupported video format", {
+          description: "Please upload MP4, MOV, AVI, or WebM files. Other formats are not supported.",
+          duration: 6000,
+        });
+        
         throw new Error('Unsupported video format. Please upload MP4, MOV, AVI, or WebM files.');
       }
 
@@ -2351,6 +2438,33 @@ function InnerCanvas({
                         />
                       </button>
                     </div>
+                    
+                    {/* Share button */}
+                    <div className="pt-3 border-t border-border/50">
+                      <Button
+                        onClick={handleShare}
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start gap-2"
+                      >
+                        {copiedShareLink ? (
+                          <>
+                            <Check className="h-4 w-4 text-green-500" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="h-4 w-4" />
+                            <span>Share Canvas</span>
+                          </>
+                        )}
+                      </Button>
+                      {getShareLink && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Share link already exists
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
@@ -2377,6 +2491,19 @@ function InnerCanvas({
                   className="w-full"
                 >
                   <Settings2 className="h-5 w-5" />
+                </Button>
+                <Button 
+                  onClick={handleShare}
+                  variant="ghost"
+                  size="icon"
+                  title="Share Canvas"
+                  className="w-full relative"
+                >
+                  {copiedShareLink ? (
+                    <Check className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <Share2 className="h-5 w-5" />
+                  )}
                 </Button>
               </div>
             )}

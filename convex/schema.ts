@@ -116,6 +116,27 @@ export default defineSchema({
   })
     .index("by_user", ["userId"]),
 
+  shares: defineTable({
+    shareId: v.string(),
+    projectId: v.id("projects"),
+    userId: v.string(),
+    canvasState: v.object({
+      nodes: v.array(v.any()),
+      edges: v.array(v.any()),
+      viewport: v.optional(v.object({
+        x: v.number(),
+        y: v.number(),
+        zoom: v.number(),
+      })),
+    }),
+    viewCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_shareId", ["shareId"])
+    .index("by_project", ["projectId"])
+    .index("by_user", ["userId"]),
+
   projectCanvases: defineTable({
     userId: v.string(),
     projectId: v.id("projects"),

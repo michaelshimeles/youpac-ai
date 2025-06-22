@@ -17,6 +17,7 @@ import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as profiles from "../profiles.js";
 import type * as projects from "../projects.js";
+import type * as shares from "../shares.js";
 import type * as thumbnail from "../thumbnail.js";
 import type * as thumbnailGPTImage from "../thumbnailGPTImage.js";
 import type * as thumbnailRefine from "../thumbnailRefine.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   profiles: typeof profiles;
   projects: typeof projects;
+  shares: typeof shares;
   thumbnail: typeof thumbnail;
   thumbnailGPTImage: typeof thumbnailGPTImage;
   thumbnailRefine: typeof thumbnailRefine;
