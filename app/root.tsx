@@ -45,13 +45,13 @@ export const links: Route.LinksFunction = () => [
   // Preload critical assets
   {
     rel: "preload",
-    href: "/rsk.png",
+    href: "/ypai.png",
     as: "image",
     type: "image/png",
   },
   {
     rel: "preload",
-    href: "/favicon.png", 
+    href: "/ypai.png", 
     as: "image",
     type: "image/png",
   },
@@ -60,7 +60,7 @@ export const links: Route.LinksFunction = () => [
   {
     rel: "icon",
     type: "image/png",
-    href: "/favicon.png",
+    href: "/ypai.png",
   },
 ];
 
