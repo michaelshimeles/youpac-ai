@@ -1,7 +1,7 @@
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { Bot, Check, ChevronLeft, ChevronRight, Eye, FileText, GripVertical, Hash, Layers, Map, Palette, Settings2, Share2, Sparkles, Upload, Video, Zap } from "lucide-react";
+import { Bot, Check, ChevronLeft, ChevronRight, Eye, FileText, GripVertical, Hash, Layers, Linkedin, Map, Palette, Settings2, Share2, Sparkles, Upload, Video, Zap } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 import { PreviewModal } from "~/components/preview/PreviewModal";
