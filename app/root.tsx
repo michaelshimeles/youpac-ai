@@ -55,6 +55,12 @@ export const links: Route.LinksFunction = () => [
     as: "image",
     type: "image/png",
   },
+  {
+    rel: "preload",
+    href: "https://dwdwn8b5ye.ufs.sh/f/MD2AM9SEY8Gu3B3mczu7JPAkBlwgiWGr6XbOSue4ZFzhR9QK",
+    as: "video",
+    type: "video/mp4",
+  },
   
   // Icon
   {
