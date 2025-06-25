@@ -67,14 +67,6 @@ const agentConfig = {
     gradient: "from-yellow-500/20 to-orange-500/20",
     iconColor: "text-yellow-500",
   },
-  linkedin: {
-    icon: Linkedin,
-    label: "LinkedIn Generator",
-    description: "Professional posts for LinkedIn",
-    color: "blue",
-    gradient: "from-blue-600/20 to-blue-500/20",
-    iconColor: "text-blue-600",
-  },
 };
 
 interface ExtendedNodeProps {
