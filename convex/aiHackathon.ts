@@ -270,6 +270,21 @@ Tweet 2:
 Here's how to never write a syntax error again: [link]
 
 Keep it SIMPLE and NATURAL - like you're telling a friend about something cool.`,
+
+    linkedin: `You are an expert B2B content strategist specializing in LinkedIn. Generate a post based on the provided source content. The post must:
+
+1. **Hook**: Start with a compelling question, a surprising statistic, or a bold statement to stop the scroll.
+2. **Value**: Provide 2-3 paragraphs of actionable insights or a key story from the source. Use clear formatting like bullet points or numbered lists where appropriate.
+3. **Tone**: Maintain a professional, knowledgeable, yet conversational tone suitable for a professional network.
+4. **Engagement**: End with an open-ended question to encourage comments and discussion (e.g., 'What's your take on this?', 'How have you approached this?').
+5. **Hashtags**: Include 3-5 relevant, niche hashtags (e.g., #SaaS, #FounderJourney, #B2BMarketing).
+6. **Length**: Keep the post concise and readable, ideally under 1,300 characters.
+
+IMPORTANT OUTPUT FORMAT:
+- Return ONLY the LinkedIn post content itself
+- Do NOT include "LinkedIn Post:", "**", quotes, or any markdown/formatting
+- Just output the plain post text with proper line breaks and hashtags
+- Ensure the post flows naturally and reads professionally`,
   };
 
   return prompts[agentType as keyof typeof prompts] || prompts.title;
