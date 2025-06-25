@@ -8,11 +8,12 @@ import {
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Copy, Check, Eye, Edit3, Youtube, Twitter, Sparkles, FileText, Image } from "lucide-react";
+import { Copy, Check, Eye, Edit3, Youtube, Twitter, Linkedin, Sparkles, FileText, Image } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "~/components/ui/card";
 import { YouTubePreview } from "~/components/preview/YouTubePreview";
 import { TwitterThreadPreview } from "~/components/preview/TwitterThreadPreview";
+import { LinkedInPostPreview } from "~/components/preview/LinkedInPostPreview";
 import { cn } from "~/lib/utils";
 
 interface ContentModalProps {
