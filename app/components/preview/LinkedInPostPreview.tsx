@@ -34,14 +34,17 @@ export function LinkedInPostPreview({
   connections = 500,
   postTime = "1h"
 }: LinkedInPostPreviewProps) {
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(Math.floor(Math.random() * 50) + 15);
-  const [commentCount] = useState(Math.floor(Math.random() * 20) + 5);
-  const [shareCount] = useState(Math.floor(Math.random() * 10) + 2);
+  const [copied, setCopied] = useState(false);
+  // Static engagement numbers for V1 (no dynamic counters)
+  const likeCount = 23;
+  const commentCount = 8;
+  const shareCount = 3;
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    toast.success("LinkedIn post copied to clipboard!");
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const formatNumber = (num: number) => {
