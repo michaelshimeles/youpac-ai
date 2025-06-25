@@ -442,6 +442,13 @@ function buildPrompt(
       prompt += `- Extract the most shareable insights\n`;
       prompt += `- Find controversial or surprising statements\n`;
       prompt += `- Identify actionable tips mentioned\n\n`;
+    } else if (agentType === 'linkedin') {
+      prompt += `🎯 LINKEDIN GENERATION FOCUS:\n`;
+      prompt += `- Extract key professional insights and takeaways\n`;
+      prompt += `- Identify thought leadership opportunities\n`;
+      prompt += `- Find data points, statistics, or business results\n`;
+      prompt += `- Look for actionable advice for professionals\n`;
+      prompt += `- Consider networking and engagement opportunities\n\n`;
     }
   } else {
     prompt += `⚠️ LIMITED CONTEXT MODE - No transcription available\n\n`;
