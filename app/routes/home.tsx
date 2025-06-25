@@ -1,6 +1,8 @@
 import { getAuth } from "@clerk/react-router/ssr.server";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "convex/_generated/api";
 import Footer from "~/components/homepage/footer";
-import HeroSection from "~/components/homepage/hero";
+import HeroSection from "~/components/homepage/hero-section";
 import type { Route } from "./+types/home";
 
 export function meta({ }: Route.MetaArgs) {
@@ -49,18 +51,29 @@ export function meta({ }: Route.MetaArgs) {
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
-
-
+  
+  // Fetch initial stats from Convex
+  const convexUrl = process.env.VITE_CONVEX_URL || "https://charming-bird-938.convex.cloud";
+  const convex = new ConvexHttpClient(convexUrl);
+  
+  let initialStats = null;
+  try {
+    initialStats = await convex.query(api.stats.getHeroStats);
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    // Continue without stats if there's an error
+  }
 
   return {
     isSignedIn: !!userId,
+    initialStats,
   };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <>
-      <HeroSection loaderData={loaderData} />
+      <HeroSection loaderData={loaderData}/>
       <Footer />
     </>
   );

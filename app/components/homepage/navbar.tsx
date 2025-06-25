@@ -63,14 +63,23 @@ export const Navbar = ({
         >
           <div className="relative flex flex-wrap items-center justify-between gap-6 py-3 lg:gap-0 lg:py-4">
             <div className="flex w-full justify-between lg:w-auto">
-              <Link
-                to="/"
-                aria-label="home"
-                className="flex items-center space-x-2 font-semibold text-xl"
-                prefetch="viewport"
-              >
-                YouPac AI
-              </Link>
+              <div className="flex items-center gap-4">
+                <Link
+                  to="/"
+                  aria-label="home"
+                  className="flex items-center space-x-2 font-semibold text-xl"
+                  prefetch="viewport"
+                >
+                  YouPac AI
+                </Link>
+                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-muted/50 rounded-full">
+                  <span className="relative flex h-2 w-2 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                  </span>
+                  <p className="text-xs text-muted-foreground">Live Stats</p>
+                </div>
+              </div>
 
               <button
                 onClick={() => setMenuState(!menuState)}
