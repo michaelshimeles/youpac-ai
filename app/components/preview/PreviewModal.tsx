@@ -233,6 +233,63 @@ export function PreviewModal({
                 </div>
               </div>
             </TabsContent>
+            
+            <TabsContent value="linkedin" className="p-6 pt-4 m-0">
+              <div className="space-y-6">
+                {/* Action buttons */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">AI-generated professional post</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleCopyLinkedIn}
+                      className={cn(
+                        "gap-2 transition-all",
+                        copiedLinkedIn && "bg-green-500/10 text-green-600 border-green-500/20"
+                      )}
+                    >
+                      {copiedLinkedIn ? (
+                        <>
+                          <Check className="h-4 w-4" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4" />
+                          Copy Post
+                        </>
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleExportLinkedIn}
+                      className="gap-2 hover:bg-primary/10 hover:text-primary hover:border-primary/20"
+                    >
+                      <Download className="h-4 w-4" />
+                      Export
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Preview container with background */}
+                <div className="relative rounded-xl bg-gradient-to-br from-background to-muted/30 p-6 shadow-inner">
+                  <div className="absolute inset-0 bg-grid-white/5 rounded-xl pointer-events-none" />
+                  <div className="relative">
+                    <LinkedInPostPreview
+                      content={linkedin}
+                      authorName={displayName || channelName}
+                      profileImage={profileImage || channelAvatar}
+                      thumbnailUrl={thumbnailUrl}
+                    />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
           </div>
         
         </Tabs>
