@@ -46,6 +46,7 @@ export function PreviewModal({
 }: PreviewModalProps) {
   const [copiedYouTube, setCopiedYouTube] = useState(false);
   const [copiedTwitter, setCopiedTwitter] = useState(false);
+  const [copiedLinkedIn, setCopiedLinkedIn] = useState(false);
   const [activeTab, setActiveTab] = useState("youtube");
 
   const handleCopyYouTube = () => {
