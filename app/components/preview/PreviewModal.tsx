@@ -120,7 +120,7 @@ export function PreviewModal({
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 relative">
           <div className="px-6 pt-4 pb-2 bg-background/50 backdrop-blur-sm">
-            <TabsList className="grid w-full max-w-lg grid-cols-3 h-12 p-1 bg-muted/50">
+            <TabsList className="grid w-full max-w-md grid-cols-2 h-12 p-1 bg-muted/50">
               <TabsTrigger 
                 value="youtube" 
                 className={cn(
@@ -140,16 +140,6 @@ export function PreviewModal({
               >
                 <Twitter className="h-4 w-4" />
                 Twitter/X
-              </TabsTrigger>
-              <TabsTrigger 
-                value="linkedin" 
-                className={cn(
-                  "gap-2 data-[state=active]:shadow-sm transition-all",
-                  "data-[state=active]:bg-background data-[state=active]:text-foreground"
-                )}
-              >
-                <Linkedin className="h-4 w-4" />
-                LinkedIn
               </TabsTrigger>
             </TabsList>
           </div>
