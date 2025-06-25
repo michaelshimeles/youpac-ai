@@ -75,7 +75,8 @@ export default defineSchema({
       v.literal("title"),
       v.literal("description"),
       v.literal("thumbnail"),
-      v.literal("tweets")
+      v.literal("tweets"),
+      v.literal("linkedin")
     ),
     draft: v.string(),
     thumbnailUrl: v.optional(v.string()),
