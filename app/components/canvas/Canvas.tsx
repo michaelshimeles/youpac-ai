@@ -2610,6 +2610,14 @@ function InnerCanvas({
                 collapsed={isSidebarCollapsed}
                 color="yellow"
               />
+              <DraggableNode 
+                type="linkedin" 
+                label={isSidebarCollapsed ? "" : "LinkedIn Generator"} 
+                description={isSidebarCollapsed ? "" : "Professional posts for LinkedIn"}
+                icon={<Linkedin className="h-5 w-5" />}
+                collapsed={isSidebarCollapsed}
+                color="blue"
+              />
             </div>
             
             {!isSidebarCollapsed && (
