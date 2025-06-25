@@ -180,6 +180,15 @@ export function ContentModal({ isOpen, onClose, nodeData, onUpdate, videoData, c
                       media={nodeData.thumbnailUrl ? [nodeData.thumbnailUrl] : []}
                     />
                   )}
+                  
+                  {nodeData.type === "linkedin" && (
+                    <LinkedInPostPreview
+                      content={content}
+                      authorName={channelData?.channelName || "Your Name"}
+                      profileImage={channelData?.channelAvatar}
+                      thumbnailUrl={nodeData.thumbnailUrl}
+                    />
+                  )}
                 </TabsContent>
               </div>
             </Tabs>
