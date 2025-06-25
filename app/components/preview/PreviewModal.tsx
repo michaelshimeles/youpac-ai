@@ -15,6 +15,7 @@ interface PreviewModalProps {
   title?: string;
   description?: string;
   tweets?: string;
+  linkedin?: string;
   thumbnailUrl?: string;
   videoUrl?: string;
   duration?: number;
