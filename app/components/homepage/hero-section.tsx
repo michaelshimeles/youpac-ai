@@ -3,8 +3,8 @@ import { api } from 'convex/_generated/api'
 import { useQuery } from 'convex/react'
 import { Link } from 'react-router'
 import { Button } from '~/components/ui/button'
-import { Navbar } from './navbar'
 import VideoPlayer from '../VideoPlayer'
+import { Navbar } from './navbar'
 
 interface LoaderData {
     isSignedIn: boolean;
@@ -25,13 +25,11 @@ export default function HeroSection({ loaderData }: { loaderData: LoaderData }) 
     const stats = liveStats || loaderData.initialStats;
     return (
         <section >
-            <Navbar loaderData={loaderData} />  
-            <div className="pt-[4rem]">
+            <Navbar loaderData={loaderData} />
+            <div className="pt-[4rem] px-[2rem]">
                 <div className="text-center">
                     <h1 className="mx-auto mt-16 max-w-xl text-5xl text-balance font-medium">Introducing YouPac AI</h1>
-
                     <p className="text-muted-foreground mx-auto mb-6 mt-4 text-balance text-xl">Generate compelling titles, descriptions, stunning thumbnails, and viral social media posts.</p>
-
                     <div className="flex flex-col items-center gap-2 *:w-full sm:flex-row sm:justify-center sm:*:w-auto">
                         <Button
                             asChild
@@ -73,10 +71,9 @@ export default function HeroSection({ loaderData }: { loaderData: LoaderData }) 
                         </div>
                     </div>
                 )}
-
-            </div>
-            <div className="flex justify-center">
-                <VideoPlayer src="https://dwdwn8b5ye.ufs.sh/f/MD2AM9SEY8Gu3B3mczu7JPAkBlwgiWGr6XbOSue4ZFzhR9QK" />
+                <div className="flex justify-center">
+                    <VideoPlayer src="https://dwdwn8b5ye.ufs.sh/f/MD2AM9SEY8Gu3B3mczu7JPAkBlwgiWGr6XbOSue4ZFzhR9QK" />
+                </div>
             </div>
         </section>
     )
