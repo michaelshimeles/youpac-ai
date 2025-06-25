@@ -10,8 +10,11 @@ import {
   MoreHorizontal,
   Building2,
   Users,
-  TrendingUp
+  TrendingUp,
+  Copy,
+  Check
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface LinkedInPostPreviewProps {
   content: string;
