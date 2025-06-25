@@ -88,6 +88,25 @@ export function PreviewModal({
     toast.success("Twitter thread exported!");
   };
 
+  const handleCopyLinkedIn = () => {
+    navigator.clipboard.writeText(linkedin);
+    setCopiedLinkedIn(true);
+    toast.success("LinkedIn post copied to clipboard!");
+    setTimeout(() => setCopiedLinkedIn(false), 2000);
+  };
+  
+  const handleExportLinkedIn = () => {
+    const content = `# LinkedIn Post\n\n${linkedin}`;
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'linkedin-post.md';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("LinkedIn post exported!");
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="right" className="w-full sm:w-[900px] lg:w-[900px] xl:w-[800px] sm:max-w-[90vw] overflow-hidden p-0">
