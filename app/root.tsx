@@ -16,7 +16,18 @@ import "./app.css";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "sonner";
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
+// Validate and create Convex client with proper error handling
+const convexUrl = import.meta.env.VITE_CONVEX_URL;
+if (!convexUrl) {
+  throw new Error("VITE_CONVEX_URL environment variable is not set. Please check your .env.local file.");
+}
+
+let convex: ConvexReactClient;
+try {
+  convex = new ConvexReactClient(convexUrl);
+} catch (error) {
+  throw new Error(`Invalid VITE_CONVEX_URL: ${convexUrl}. Please ensure it's a valid absolute URL (e.g., https://your-deployment.convex.cloud)`);
+}
 
 export async function loader(args: Route.LoaderArgs) {
   return rootAuthLoader(args);
