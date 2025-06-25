@@ -33,6 +33,7 @@ export function PreviewModal({
   title = "",
   description = "",
   tweets = "",
+  linkedin = "",
   thumbnailUrl,
   videoUrl,
   duration,
