@@ -168,16 +168,37 @@ export function LinkedInPostPreview({
 
         {/* Action Buttons */}
         <div className="px-4 py-3 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <Button
+              onClick={handleCopy}
+              variant="outline"
+              size="sm"
+              className={`gap-2 transition-all ${
+                copied ? 'bg-green-500/10 text-green-600 border-green-500/20' : ''
+              }`}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copy to Clipboard
+                </>
+              )}
+            </Button>
+          </div>
+          
           <div className="flex items-center justify-around">
             <Button
               variant="ghost"
               size="sm"
-              className={`flex-1 gap-2 hover:bg-gray-100 ${
-                isLiked ? 'text-[#0077B5]' : 'text-gray-600'
-              }`}
-              onClick={handleLike}
+              className="flex-1 gap-2 text-gray-600 hover:bg-gray-100"
+              disabled
             >
-              <ThumbsUp className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
+              <ThumbsUp className="h-4 w-4" />
               <span className="font-medium">Like</span>
             </Button>
             
@@ -185,6 +206,7 @@ export function LinkedInPostPreview({
               variant="ghost"
               size="sm"
               className="flex-1 gap-2 text-gray-600 hover:bg-gray-100"
+              disabled
             >
               <MessageCircle className="h-4 w-4" />
               <span className="font-medium">Comment</span>
@@ -194,6 +216,7 @@ export function LinkedInPostPreview({
               variant="ghost"
               size="sm"
               className="flex-1 gap-2 text-gray-600 hover:bg-gray-100"
+              disabled
             >
               <Repeat2 className="h-4 w-4" />
               <span className="font-medium">Repost</span>
@@ -203,6 +226,7 @@ export function LinkedInPostPreview({
               variant="ghost"
               size="sm"
               className="flex-1 gap-2 text-gray-600 hover:bg-gray-100"
+              disabled
             >
               <Send className="h-4 w-4" />
               <span className="font-medium">Send</span>
