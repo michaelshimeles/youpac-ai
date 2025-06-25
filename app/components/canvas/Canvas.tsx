@@ -27,9 +27,7 @@ import { ReactFlowWrapper } from "./ReactFlowWrapper";
 import { ThumbnailUploadModal } from "./ThumbnailUploadModal";
 import { VideoNode } from "./VideoNode";
 import { VideoPlayerModal } from "./VideoPlayerModal";
-
 import { LinkedInNode } from "./LinkedInNode";
-import { VideoNode } from "./VideoNode";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
