@@ -22,7 +22,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 
 export interface AgentNodeData {
-  type: "title" | "description" | "thumbnail" | "tweets" | "linkedin";
+  type: "title" | "description" | "thumbnail" | "tweets";
   draft: string;
   thumbnailUrl?: string;
   status: "idle" | "generating" | "ready" | "error";
