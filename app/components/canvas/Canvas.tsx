@@ -1527,7 +1527,7 @@ function InnerCanvas({
       if (file.size > 100 * 1024 * 1024) {
         const largeFileSizeMB = (file.size / 1024 / 1024).toFixed(1);
         toast.warning("Large file detected", {
-          description: `Your ${largeFileSizeMB}MB video may have issues with transcription due to memory limits. Consider using a smaller file.`,
+          description: `Your ${largeFileSizeMB}MB video is being transcribed. If transcription fails, use manual transcription.`,
           duration: 6000,
         });
       }
