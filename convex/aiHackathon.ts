@@ -285,7 +285,10 @@ IMPORTANT OUTPUT FORMAT:
 - Return ONLY the LinkedIn post content itself
 - Do NOT include "LinkedIn Post:", "**", quotes, or any markdown/formatting
 - Just output the plain post text with proper line breaks and hashtags
-- Ensure the post flows naturally and reads professionally`,
+- Ensure the post flows naturally and reads professionally
+
+// V2: Integrate niche-specific hashtags from profiles.ts (e.g., niche field) for personalized LinkedIn posts.
+// V2: Enable chat refinement via @linkedin_agent mentions for iterative improvement.`,
   };
 
   return prompts[agentType as keyof typeof prompts] || prompts.title;
