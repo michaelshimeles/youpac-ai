@@ -10,6 +10,11 @@ export const generateContent = action({
     videoData: v.object({
       title: v.optional(v.string()),
       transcription: v.optional(v.string()),
+      manualTranscriptions: v.optional(v.array(v.object({
+        fileName: v.string(),
+        text: v.string(),
+        format: v.string(),
+      }))),
     }),
     connectedAgentOutputs: v.array(
       v.object({
@@ -86,6 +91,11 @@ export const refineContent = action({
     videoData: v.optional(v.object({
       title: v.optional(v.string()),
       transcription: v.optional(v.string()),
+      manualTranscriptions: v.optional(v.array(v.object({
+        fileName: v.string(),
+        text: v.string(),
+        format: v.string(),
+      }))),
     })),
     connectedAgentOutputs: v.optional(v.array(
       v.object({
@@ -204,7 +214,15 @@ function getSystemPrompt(agentType: string): string {
 
 function buildPrompt(
   agentType: string,
-  videoData: { title?: string; transcription?: string },
+  videoData: { 
+    title?: string; 
+    transcription?: string;
+    manualTranscriptions?: Array<{
+      fileName: string;
+      text: string;
+      format: string;
+    }>;
+  },
   connectedOutputs: Array<{ type: string; content: string }>,
   profileData?: {
     channelName: string;
@@ -220,8 +238,22 @@ function buildPrompt(
   if (videoData.title) {
     prompt += `Video Title: ${videoData.title}\n`;
   }
+  
+  // Add automatic transcription if available
   if (videoData.transcription) {
     prompt += `Video Transcription: ${videoData.transcription.slice(0, 1000)}...\n\n`;
+  }
+  
+  // Add manual transcriptions if available
+  if (videoData.manualTranscriptions && videoData.manualTranscriptions.length > 0) {
+    prompt += "Manual Transcriptions:\n";
+    videoData.manualTranscriptions.forEach((transcript, index) => {
+      prompt += `\n--- Transcription ${index + 1} (${transcript.fileName}) ---\n`;
+      prompt += `Format: ${transcript.format.toUpperCase()}\n`;
+      // Include more of manual transcriptions since they're specifically provided
+      prompt += `Content: ${transcript.text.slice(0, 2000)}...\n`;
+    });
+    prompt += "\n";
   }
 
   // Add connected agent outputs

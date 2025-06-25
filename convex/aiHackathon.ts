@@ -17,6 +17,11 @@ export const generateContentSimple = action({
     videoData: v.object({
       title: v.optional(v.string()),
       transcription: v.optional(v.string()),
+      manualTranscriptions: v.optional(v.array(v.object({
+        fileName: v.string(),
+        text: v.string(),
+        format: v.string(),
+      }))),
       duration: v.optional(v.number()),
       resolution: v.optional(v.object({
         width: v.number(),
@@ -49,7 +54,7 @@ export const generateContentSimple = action({
       let videoData = args.videoData;
       if (args.videoId) {
         const freshVideoData = await ctx.runQuery(api.videos.getWithTranscription, {
-          id: args.videoId,
+          videoId: args.videoId,
         });
         if (freshVideoData && freshVideoData.transcription) {
           videoData = {
@@ -279,6 +284,11 @@ function buildPrompt(
   videoData: { 
     title?: string; 
     transcription?: string;
+    manualTranscriptions?: Array<{
+      fileName: string;
+      text: string;
+      format: string;
+    }>;
     duration?: number;
     resolution?: { width: number; height: number };
     format?: string;
@@ -314,6 +324,19 @@ function buildPrompt(
     prompt += "\n";
   }
 
+  // Add manual transcriptions first if available
+  if (videoData.manualTranscriptions && videoData.manualTranscriptions.length > 0) {
+    prompt += `📄 MANUAL TRANSCRIPTIONS PROVIDED:\n`;
+    videoData.manualTranscriptions.forEach((transcript, index) => {
+      prompt += `\n--- ${transcript.fileName} (${transcript.format.toUpperCase()}) ---\n`;
+      const preview = transcript.text.length > 2000 
+        ? transcript.text.slice(0, 2000) + "\n\n[Transcription continues...]"
+        : transcript.text;
+      prompt += `${preview}\n`;
+    });
+    prompt += `\n`;
+  }
+  
   // Emphasize transcription-based generation
   if (videoData.transcription) {
     // Analyze transcription for key insights

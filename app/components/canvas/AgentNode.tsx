@@ -14,7 +14,8 @@ import {
   Palette,
   Zap,
   Bot,
-  Brain
+  Brain,
+  Files
 } from "lucide-react";
 import { Card } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -31,6 +32,8 @@ export interface AgentNodeData {
     percent: number;
   };
   lastPrompt?: string;
+  hasManualTranscriptions?: boolean;
+  manualTranscriptionCount?: number;
 }
 
 const agentConfig = {
@@ -164,6 +167,23 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
             )}
           </div>
         </div>
+        
+        {/* Manual transcription indicator */}
+        {data.hasManualTranscriptions && (
+          <div className={`mb-3 flex items-center gap-2 text-xs bg-purple-500/10 text-purple-600 dark:text-purple-400 px-2 py-1 rounded-md transition-all ${
+            data.status === 'generating' ? 'animate-pulse ring-2 ring-purple-500/50 ring-offset-2 ring-offset-background' : ''
+          }`}>
+            <Files className={`h-3.5 w-3.5 ${data.status === 'generating' ? 'animate-bounce' : ''}`} />
+            <span>{data.status === 'generating' ? 'Processing' : 'Using'} {data.manualTranscriptionCount} manual transcription{data.manualTranscriptionCount! > 1 ? 's' : ''}</span>
+            {data.status === 'generating' && (
+              <div className="flex gap-0.5">
+                <div className="w-1 h-1 bg-purple-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1 h-1 bg-purple-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1 h-1 bg-purple-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            )}
+          </div>
+        )}
       
       {/* Show progress when generating */}
       {data.status === "generating" && data.generationProgress && (

@@ -58,7 +58,7 @@ export const generateThumbnailWithGPTImage = action({
       let videoData = args.videoData;
       if (args.videoId) {
         const freshVideoData = await ctx.runQuery(api.videos.getWithTranscription, {
-          id: args.videoId,
+          videoId: args.videoId,
         });
         if (freshVideoData && freshVideoData.transcription) {
           videoData = {

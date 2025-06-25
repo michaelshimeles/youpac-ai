@@ -44,7 +44,7 @@ export const refineThumbnail = action({
       let videoData: any = {};
       if (args.videoId) {
         const freshVideoData = await ctx.runQuery(api.videos.getWithTranscription, {
-          id: args.videoId,
+          videoId: args.videoId,
         });
         if (freshVideoData) {
           videoData = freshVideoData;

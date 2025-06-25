@@ -38,7 +38,7 @@ export const transcribeVideoElevenLabs = action({
     try {
       // Update status to show we're starting
       await ctx.runMutation(api.videos.updateTranscriptionStatus, {
-        videoId: args.videoId,
+        id: args.videoId,
         status: "processing",
         progress: "Starting transcription...",
       });
@@ -76,7 +76,7 @@ export const transcribeVideoElevenLabs = action({
       
       // Update progress
       await ctx.runMutation(api.videos.updateTranscriptionStatus, {
-        videoId: args.videoId,
+        id: args.videoId,
         status: "processing",
         progress: "Sending file URL to ElevenLabs...",
       });
@@ -87,7 +87,7 @@ export const transcribeVideoElevenLabs = action({
 
       // Update progress
       await ctx.runMutation(api.videos.updateTranscriptionStatus, {
-        videoId: args.videoId,
+        id: args.videoId,
         status: "processing",
         progress: "Processing with ElevenLabs Speech-to-Text API...",
       });
@@ -186,7 +186,7 @@ export const transcribeVideoElevenLabs = action({
 
       // Update progress
       await ctx.runMutation(api.videos.updateTranscriptionStatus, {
-        videoId: args.videoId,
+        id: args.videoId,
         status: "processing",
         progress: "Processing transcription results...",
       });
@@ -219,7 +219,7 @@ export const transcribeVideoElevenLabs = action({
       
       // Update status to failed with user-friendly error message
       await ctx.runMutation(api.videos.updateTranscriptionStatus, {
-        videoId: args.videoId,
+        id: args.videoId,
         status: "failed",
         error: error.message || "Transcription failed. Please try again.",
       });

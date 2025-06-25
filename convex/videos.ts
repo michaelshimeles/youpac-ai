@@ -114,47 +114,14 @@ export const updateMetadata = mutation({
 
     const { id, ...metadata } = args;
     await ctx.db.patch(args.id, metadata);
-    
-    return await ctx.db.get(args.id);
   },
 });
 
-export const getByUser = query({
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const userId = identity.subject;
-
-    return await ctx.db
-      .query("videos")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .collect();
+// Query to get a single video
+export const get = query({
+  args: {
+    id: v.id("videos"),
   },
-});
-
-export const getByProject = query({
-  args: { projectId: v.id("projects") },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const userId = identity.subject;
-
-    // Verify project ownership
-    const project = await ctx.db.get(args.projectId);
-    if (!project || project.userId !== userId) {
-      return [];
-    }
-
-    return await ctx.db
-      .query("videos")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
-  },
-});
-
-export const getById = query({
-  args: { id: v.id("videos") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
@@ -169,28 +136,31 @@ export const getById = query({
   },
 });
 
-// New query to get video with transcription for AI generation
-export const getWithTranscription = query({
-  args: { id: v.id("videos") },
+// Query to get videos for a project
+export const listByProject = query({
+  args: {
+    projectId: v.id("projects"),
+  },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+    if (!identity) throw new Error("Unauthorized");
     const userId = identity.subject;
 
-    const video = await ctx.db.get(args.id);
-    if (!video || video.userId !== userId) {
-      return null;
-    }
+    const videos = await ctx.db
+      .query("videos")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .collect();
 
-    return {
-      title: video.title,
-      transcription: video.transcription,
-    };
+    return videos;
   },
 });
 
-export const remove = mutation({
-  args: { id: v.id("videos") },
+export const updateStorageId = mutation({
+  args: {
+    id: v.id("videos"),
+    storageId: v.id("_storage"),
+  },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
@@ -201,74 +171,117 @@ export const remove = mutation({
       throw new Error("Video not found or unauthorized");
     }
 
-    // Delete associated agents
+    // Get the URL from Convex storage
+    const url = await ctx.storage.getUrl(args.storageId);
+    if (!url) {
+      throw new Error("Failed to get storage URL");
+    }
+
+    await ctx.db.patch(args.id, {
+      storageId: args.storageId,
+      fileId: args.storageId,
+      videoUrl: url,
+    });
+  },
+});
+
+export const remove = mutation({
+  args: {
+    id: v.id("videos"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const userId = identity.subject;
+
+    const video = await ctx.db.get(args.id);
+    if (!video || video.userId !== userId) {
+      throw new Error("Video not found or unauthorized");
+    }
+
+    // Delete all agents associated with this video
     const agents = await ctx.db
       .query("agents")
       .withIndex("by_video", (q) => q.eq("videoId", args.id))
       .collect();
-    
+
     for (const agent of agents) {
       await ctx.db.delete(agent._id);
     }
 
+    // Delete the video
     await ctx.db.delete(args.id);
   },
 });
 
-// Mutation to update video transcription (moved from transcription.ts)
+// Query to get video with transcription
+export const getWithTranscription = query({
+  args: {
+    videoId: v.id("videos"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const userId = identity.subject;
+
+    const video = await ctx.db.get(args.videoId);
+    if (!video || video.userId !== userId) {
+      throw new Error("Video not found or unauthorized");
+    }
+
+    return video;
+  },
+});
+
+// Mutation to update video transcription
 export const updateVideoTranscription = mutation({
   args: {
     videoId: v.id("videos"),
     transcription: v.string(),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const userId = identity.subject;
+
+    const video = await ctx.db.get(args.videoId);
+    if (!video || video.userId !== userId) {
+      throw new Error("Video not found or unauthorized");
+    }
+
     await ctx.db.patch(args.videoId, {
       transcription: args.transcription,
       transcriptionStatus: "completed",
-      transcriptionError: undefined,
     });
   },
 });
 
-// Mutation to update transcription status
 export const updateTranscriptionStatus = mutation({
   args: {
-    videoId: v.id("videos"),
-    status: v.union(v.literal("idle"), v.literal("processing"), v.literal("completed"), v.literal("failed")),
+    id: v.id("videos"),
+    status: v.union(
+      v.literal("idle"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
     error: v.optional(v.string()),
     progress: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const updates: any = {
-      transcriptionStatus: args.status,
-    };
-    
-    if (args.error) {
-      updates.transcriptionError = args.error;
-    }
-    
-    if (args.progress) {
-      updates.transcriptionProgress = args.progress;
-    }
-    
-    await ctx.db.patch(args.videoId, updates);
-  },
-});
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const userId = identity.subject;
 
-// Mutation to update video storage ID
-export const updateVideoStorageId = mutation({
-  args: {
-    id: v.id("videos"),
-    storageId: v.id("_storage"),
-  },
-  handler: async (ctx, args) => {
-    // Get the URL from Convex storage
-    const videoUrl = await ctx.storage.getUrl(args.storageId);
-    
+    const video = await ctx.db.get(args.id);
+    if (!video || video.userId !== userId) {
+      throw new Error("Video not found or unauthorized");
+    }
+
     await ctx.db.patch(args.id, {
-      storageId: args.storageId,
-      videoUrl: videoUrl || undefined,
-      fileId: args.storageId, // Also update fileId to match storageId
+      transcriptionStatus: args.status,
+      ...(args.error !== undefined && { transcriptionError: args.error }),
+      ...(args.progress !== undefined && { transcriptionProgress: args.progress }),
     });
   },
 });

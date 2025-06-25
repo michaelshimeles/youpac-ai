@@ -7,11 +7,11 @@ import { toast } from "sonner";
 import { PreviewModal } from "~/components/preview/PreviewModal";
 import { Button } from "~/components/ui/button";
 import { VideoProcessingHelp } from "~/components/VideoProcessingHelp";
-import { extractAudioFromVideo } from "~/lib/ffmpeg-audio";
 import { createRetryAction, handleVideoError } from "~/lib/video-error-handler";
 import { extractVideoMetadata } from "~/lib/video-metadata";
 
-import { compressAudioFile, isFileTooLarge, getFileSizeMB } from "~/lib/audio-compression";
+import { compressAudioFile, getFileSizeMB, isFileTooLarge } from "~/lib/audio-compression";
+import type { ParsedTranscription } from "~/utils/transcription-upload";
 import { AgentNode } from "./AgentNode";
 import { ContentModal } from "./ContentModal";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
@@ -25,12 +25,16 @@ import type {
 } from "./ReactFlowComponents";
 import { ReactFlowWrapper } from "./ReactFlowWrapper";
 import { ThumbnailUploadModal } from "./ThumbnailUploadModal";
+import { TranscriptionUpload } from "./TranscriptionUpload";
+import { TranscriptionViewModal } from "./TranscriptionViewModal";
 import { VideoNode } from "./VideoNode";
 import { VideoPlayerModal } from "./VideoPlayerModal";
+import { TranscriptionNode } from "./TranscriptionNode";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
   agent: AgentNode,
+  transcription: TranscriptionNode,
 };
 
 function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
@@ -88,8 +92,13 @@ function InnerCanvas({
   const [thumbnailModalOpen, setThumbnailModalOpen] = useState(false);
   const [pendingThumbnailNode, setPendingThumbnailNode] = useState<string | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [transcriptionModalOpen, setTranscriptionModalOpen] = useState(false);
+  const [selectedTranscription, setSelectedTranscription] = useState<{ text: string; title: string } | null>(null);
+  const [transcriptionLoading, setTranscriptionLoading] = useState(false);
+  const [transcriptionVideoId, setTranscriptionVideoId] = useState<Id<"videos"> | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string; duration?: number; fileSize?: number } | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [transcriptionUploadVideoId, setTranscriptionUploadVideoId] = useState<Id<"videos"> | null>(null);
   const [enableEdgeAnimations, setEnableEdgeAnimations] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [showMiniMap, setShowMiniMap] = useState(true);
@@ -113,7 +122,6 @@ function InnerCanvas({
     agentId?: string;
   }>>([]);
   const [isChatGenerating, setIsChatGenerating] = useState(false);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
   
   // Use refs to access current values in callbacks
@@ -136,8 +144,9 @@ function InnerCanvas({
   
   // Convex queries
   const canvasState = useQuery(api.canvas.getState, { projectId });
-  const projectVideos = useQuery(api.videos.getByProject, { projectId });
+  const projectVideos = useQuery(api.videos.listByProject, { projectId });
   const projectAgents = useQuery(api.agents.getByProject, { projectId });
+  const projectTranscriptions = useQuery(api.transcriptions.listByProject, { projectId });
   const userProfile = useQuery(api.profiles.get);
   
   // Convex mutations
@@ -145,7 +154,7 @@ function InnerCanvas({
   const updateVideoMetadata = useMutation(api.videos.updateMetadata);
   const updateVideo = useMutation(api.videos.update);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const updateVideoStorageId = useMutation(api.videos.updateVideoStorageId);
+  const updateVideoStorageId = useMutation(api.videos.updateStorageId);
   const createAgent = useMutation(api.agents.create);
   const updateAgentDraft = useMutation(api.agents.updateDraft);
   const updateAgentConnections = useMutation(api.agents.updateConnections);
@@ -156,6 +165,15 @@ function InnerCanvas({
   const deleteAgent = useMutation(api.agents.remove);
   const createShareLink = useMutation(api.shares.createShareLink);
   const getShareLink = useQuery(api.shares.getShareLink, { projectId });
+  const uploadManualTranscription = useMutation(api.transcriptionUpload.uploadManualTranscription);
+  const updateTranscriptionStatus = useMutation(api.videos.updateTranscriptionStatus);
+  const generateTranscriptionUploadUrl = useMutation(api.transcriptionUpload.generateUploadUrl);
+  const videoForTranscription = useQuery(api.videos.get, transcriptionVideoId ? { id: transcriptionVideoId } : "skip");
+  const createTranscription = useMutation(api.transcriptions.create);
+  const updateTranscriptionPosition = useMutation(api.transcriptions.updatePosition);
+  const deleteTranscription = useMutation(api.transcriptions.remove);
+
+
   
   // Convex actions for AI
   const generateContent = useAction(api.aiHackathon.generateContentSimple);
@@ -180,23 +198,41 @@ function InnerCanvas({
     }
     
     try {
+      // First, collect connected transcription nodes for animation
+      const connectedEdgesForAnimation = edges.filter((edge: any) => edge.target === nodeId);
+      const connectedNodesForAnimation = connectedEdgesForAnimation.map((edge: any) => 
+        nodes.find((n: any) => n.id === edge.source)
+      ).filter(Boolean);
+      const transcriptionNodesToAnimate = connectedNodesForAnimation.filter((n: any) => n.type === 'transcription');
+      
       // Update status to generating in UI with initial progress
       setNodes((nds: any) =>
-        nds.map((node: any) =>
-          node.id === nodeId
-            ? { 
-                ...node, 
-                data: { 
-                  ...node.data, 
-                  status: "generating",
-                  generationProgress: {
-                    stage: "Preparing...",
-                    percent: 0
-                  }
-                } 
+        nds.map((node: any) => {
+          if (node.id === nodeId) {
+            return { 
+              ...node, 
+              data: { 
+                ...node.data, 
+                status: "generating",
+                generationProgress: {
+                  stage: "Preparing...",
+                  percent: 0
+                }
+              } 
+            };
+          }
+          // Mark connected transcription nodes as being used
+          if (node.type === 'transcription' && transcriptionNodesToAnimate.some((tn: any) => tn.id === node.id)) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                isBeingUsed: true
               }
-            : node
-        )
+            };
+          }
+          return node;
+        })
       );
       
       // Also update status in database if we have an agentId
@@ -211,6 +247,12 @@ function InnerCanvas({
       // Find connected video node
       const connectedVideoEdge = edgesRef.current.find((e: any) => e.target === nodeId && e.source?.includes('video'));
       const videoNode = connectedVideoEdge ? nodesRef.current.find((n: any) => n.id === connectedVideoEdge.source) : null;
+      
+      // Find connected transcription nodes
+      const connectedTranscriptionNodes = edgesRef.current
+        .filter((e: any) => e.target === nodeId && e.source?.includes('transcription'))
+        .map((e: any) => nodesRef.current.find((n: any) => n.id === e.source))
+        .filter(Boolean);
       
       // Find other connected agent nodes
       const connectedAgentNodes = edgesRef.current
@@ -240,25 +282,61 @@ function InnerCanvas({
       let videoData: { 
         title?: string; 
         transcription?: string;
+        manualTranscriptions?: Array<{
+          fileName: string;
+          text: string;
+          format: string;
+        }>;
         duration?: number;
         resolution?: { width: number; height: number };
         format?: string;
       } = {};
+      
+      // Collect all manual transcriptions from connected transcription nodes
+      const manualTranscriptions = connectedTranscriptionNodes.map((node: any) => ({
+        fileName: node.data.fileName || "Untitled",
+        text: node.data.transcription || "",
+        format: node.data.format || "txt",
+      }));
+      
+      // Log manual transcriptions being used
+      if (manualTranscriptions.length > 0) {
+        console.log(`[Canvas] 📄 Manual transcriptions being sent to ${agentNode.data.type} agent:`, {
+          count: manualTranscriptions.length,
+          files: manualTranscriptions.map((t: any) => ({
+            fileName: t.fileName,
+            format: t.format,
+            textLength: t.text.length,
+            preview: t.text.substring(0, 100) + '...'
+          }))
+        });
+      }
+      
       if (videoNode && videoNode.data.videoId) {
         // Fetch the video with transcription and metadata from database
         const video = projectVideos?.find((v: any) => v._id === videoNode.data.videoId);
         videoData = {
           title: videoNode.data.title as string,
           transcription: video?.transcription,
+          manualTranscriptions: manualTranscriptions.length > 0 ? manualTranscriptions : undefined,
           duration: video?.duration,
           resolution: video?.resolution,
           format: video?.format,
         };
         
-        // If no transcription, warn the user
-        if (!video?.transcription) {
+        // If no transcription (automatic or manual), warn the user
+        if (!video?.transcription && manualTranscriptions.length === 0) {
           toast.warning("Generating without transcription - results may be less accurate");
+        } else if (manualTranscriptions.length > 0 && !video?.transcription) {
+          toast.info(`Using ${manualTranscriptions.length} manual transcription(s) for generation`);
         }
+      } else if (manualTranscriptions.length > 0) {
+        // No video node but we have manual transcriptions
+        videoData = {
+          title: "Untitled Content",
+          manualTranscriptions,
+        };
+        toast.info(`Using ${manualTranscriptions.length} manual transcription(s) for generation`);
       }
       
       const connectedAgentOutputs = connectedAgentNodes.map((n: any) => ({
@@ -290,9 +368,14 @@ function InnerCanvas({
                 data: { 
                   ...node.data, 
                   generationProgress: {
-                    stage: "Analyzing content...",
+                    stage: manualTranscriptions.length > 0 
+                      ? `Analyzing ${manualTranscriptions.length} manual transcription(s)...`
+                      : "Analyzing content...",
                     percent: 40
-                  }
+                  },
+                  // Store manual transcription info for visual indicator
+                  hasManualTranscriptions: manualTranscriptions.length > 0,
+                  manualTranscriptionCount: manualTranscriptions.length,
                 } 
               }
             : node
@@ -472,20 +555,31 @@ function InnerCanvas({
       }
       
       setNodes((nds: any) =>
-        nds.map((node: any) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  draft: result,
-                  thumbnailUrl: thumbnailUrl,
-                  status: "ready",
-                  generationProgress: undefined, // Clear progress when done
-                },
+        nds.map((node: any) => {
+          if (node.id === nodeId) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                draft: result,
+                thumbnailUrl: thumbnailUrl,
+                status: "ready",
+                generationProgress: undefined, // Clear progress when done
+              },
+            };
+          }
+          // Clear isBeingUsed flag on transcription nodes
+          if (node.type === 'transcription' && node.data.isBeingUsed) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                isBeingUsed: false
               }
-            : node
-        )
+            };
+          }
+          return node;
+        })
       );
       
       // Save to database if the node has an agentId
@@ -514,20 +608,31 @@ function InnerCanvas({
       });
       toast.error(error.message || "Failed to generate content");
       
-      // Update status to error
+      // Update status to error and clear isBeingUsed flags
       setNodes((nds: any) =>
-        nds.map((node: any) =>
-          node.id === nodeId
-            ? { 
-                ...node, 
-                data: { 
-                  ...node.data, 
-                  status: "error",
-                  generationProgress: undefined // Clear progress on error
-                } 
+        nds.map((node: any) => {
+          if (node.id === nodeId) {
+            return { 
+              ...node, 
+              data: { 
+                ...node.data, 
+                status: "error",
+                generationProgress: undefined // Clear progress on error
+              } 
+            };
+          }
+          // Clear isBeingUsed flag on transcription nodes
+          if (node.type === 'transcription' && node.data.isBeingUsed) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                isBeingUsed: false
               }
-            : node
-        )
+            };
+          }
+          return node;
+        })
       );
       
       // Update error status in database
@@ -1099,41 +1204,62 @@ function InnerCanvas({
       const sourceNode = nodes.find((n: any) => n.id === params.source);
       const targetNode = nodes.find((n: any) => n.id === params.target);
       
-      // Allow connections from video to agent or agent to agent
+      // Allow connections from video to agent, transcription to agent, or agent to agent
       if (!sourceNode || !targetNode) return;
       
       if (
         (sourceNode.type === 'video' && targetNode.type === 'agent') ||
+        (sourceNode.type === 'transcription' && targetNode.type === 'agent') ||
         (sourceNode.type === 'agent' && targetNode.type === 'agent')
       ) {
-        setEdges((eds: any) => addEdge(params, eds));
+        const newEdge = {
+          ...params,
+          animated: enableEdgeAnimations && !isDragging,
+          style: sourceNode.type === 'transcription' ? { stroke: '#a855f7', strokeWidth: 2 } : undefined,
+        };
+        setEdges((eds: any) => addEdge(newEdge, eds));
         
-        // Update agent connections in database
-        if (targetNode.data.agentId && sourceNode.data.videoId) {
-          const currentConnections = targetNode.data.connections || [];
-          const newConnections = [...currentConnections, sourceNode.data.videoId];
+        // Update agent connections in database for both video and transcription connections
+        if (targetNode.data.agentId) {
+          let connectionId: string | null = null;
           
-          updateAgentConnections({
-            id: targetNode.data.agentId as Id<"agents">,
-            connections: newConnections,
-          }).catch((error: any) => {
-            console.error("Failed to update agent connections:", error);
-          });
+          if (sourceNode.data.videoId) {
+            connectionId = sourceNode.data.videoId;
+          } else if (sourceNode.data.transcriptionId) {
+            connectionId = sourceNode.data.transcriptionId;
+          }
           
-          // Update node data
-          setNodes((nds: any) =>
-            nds.map((node: any) =>
-              node.id === targetNode.id
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      connections: newConnections,
-                    },
-                  }
-                : node
-            )
-          );
+          if (connectionId) {
+            const currentConnections = targetNode.data.connections || [];
+            const newConnections = [...currentConnections, connectionId];
+            
+            updateAgentConnections({
+              id: targetNode.data.agentId as Id<"agents">,
+              connections: newConnections,
+            }).catch((error: any) => {
+              console.error("Failed to update agent connections:", error);
+            });
+            
+            // Update node data
+            setNodes((nds: any) =>
+              nds.map((node: any) =>
+                node.id === targetNode.id
+                  ? {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        connections: newConnections,
+                      },
+                    }
+                  : node
+              )
+            );
+          }
+        }
+        
+        // Show success message for transcription connections
+        if (sourceNode.type === 'transcription' && targetNode.type === 'agent') {
+          toast.success(`Connected ${sourceNode.data.fileName || 'transcription'} to ${targetNode.data.type} agent`);
         }
       }
     },
@@ -1154,6 +1280,10 @@ function InnerCanvas({
             // Delete agent from database
             await deleteAgent({ id: node.data.agentId as Id<"agents"> });
             toast.success("Agent deleted");
+          } else if (node.type === 'transcription' && node.data.transcriptionId) {
+            // Delete transcription from database
+            await deleteTranscription({ id: node.data.transcriptionId as Id<"transcriptions"> });
+            toast.success("Transcription deleted");
           }
         } catch (error) {
           console.error("Failed to delete node:", error);
@@ -1164,7 +1294,7 @@ function InnerCanvas({
         }
       }
     },
-    [deleteVideo, deleteAgent, setNodes]
+    [deleteVideo, deleteAgent, deleteTranscription, setNodes]
   );
   
   // Handle share functionality
@@ -1237,8 +1367,9 @@ function InnerCanvas({
       // Check if any nodes have important data
       const hasVideo = nodes.some((n: any) => n.type === 'video');
       const hasAgent = nodes.some((n: any) => n.type === 'agent' && n.data.draft);
+      const hasTranscription = nodes.some((n: any) => n.type === 'transcription');
       
-      if (hasVideo || hasAgent) {
+      if (hasVideo || hasAgent || hasTranscription) {
         // Store nodes for deletion and show dialog
         setNodesToDelete(nodes);
         setDeleteDialogOpen(true);
@@ -1617,116 +1748,27 @@ function InnerCanvas({
       try {
         // The backend will automatically use ElevenLabs if available (supports 1GB)
         // Skip audio extraction entirely - let ElevenLabs handle large files directly
-        const SKIP_AUDIO_EXTRACTION = true; // Always use direct transcription with ElevenLabs
+        // Always use direct transcription with ElevenLabs
         
         if (fileSizeMB > 1024) {
           // File is over 1GB - ElevenLabs limit
           throw new Error(`File is too large for transcription (${fileSizeMB.toFixed(1)}MB). Maximum size is 1GB.`);
         }
         
-        if (false && fileSizeMB > 25 && !SKIP_AUDIO_EXTRACTION) {
+        if (false) {
+          // Dead code - audio extraction has been removed
           // For large files, we'll extract audio (unless backend has ElevenLabs)
-          toast.info("Processing large video for transcription...");
-          
-          // Update node to show extraction status
-          setNodes((nds: any) =>
-            nds.map((node: any) =>
-              node.id === `video_${video._id}`
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      isTranscribing: false,
-                      isExtracting: true,
-                      extractionProgress: 0,
-                    },
-                  }
-                : node
-            )
-          );
-          
-          // Extract audio from video
-          const audioFile = await extractAudioFromVideo(file, (progress) => {
-              setNodes((nds: any) =>
-                nds.map((node: any) =>
-                  node.id === `video_${video._id}`
-                    ? {
-                        ...node,
-                        data: {
-                          ...node.data,
-                          extractionProgress: Math.round(progress * 100),
-                        },
-                      }
-                    : node
-                )
-              );
-            });
-          
-          // Skip audio upload - Convex handles everything
-          // This code path should not be reached since we skip audio extraction
-          throw new Error("Audio extraction is no longer supported. Please use smaller video files.");
-          
-          // Update node to show transcription status
-          setNodes((nds: any) =>
-            nds.map((node: any) =>
-              node.id === `video_${video._id}`
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      isExtracting: false,
-                      isTranscribing: true,
-                    },
-                  }
-                : node
-            )
-          );
-          
-          // Schedule background transcription
-          try {
-            console.log("Scheduling audio transcription for video:", video._id);
-            const result = await scheduleTranscription({
-              videoId: video._id,
-              storageId: audioStorageId,
-              fileType: "audio",
-              fileSize: audioFile.size,
-              fileName: "audio.mp3",
-            });
-            console.log("Schedule transcription result:", result);
-            
-            toast.info("Audio transcription started in background. It will continue even if you close this tab.");
-          } catch (scheduleError: any) {
-            console.error("Failed to schedule transcription:", scheduleError);
-            console.error("Error details:", scheduleError.message, scheduleError.stack);
-            
-            // Don't throw - transcription failure shouldn't fail the whole upload
-            toast.error("Transcription couldn't start", {
-              description: "The video was uploaded but transcription failed. You can try again later.",
-            });
-            
-            // Update node to show transcription failed
-            setNodes((nds: any) =>
-              nds.map((node: any) =>
-                node.id === `video_${video._id}`
-                  ? {
-                      ...node,
-                      data: {
-                        ...node.data,
-                        isTranscribing: false,
-                        isExtracting: false,
-                        hasTranscription: false,
-                        transcriptionError: scheduleError.message,
-                        onRetryTranscription: () => retryTranscription(video._id),
-                      },
-                    }
-                  : node
-              )
-            );
-          }
         } else {
           // Client-side transcription with ElevenLabs
           try {
             console.log("Starting client-side transcription for video:", video._id);
+            
+            // Update transcription status to processing in database
+            await updateTranscriptionStatus({
+              id: video._id,
+              status: "processing",
+              progress: "Starting transcription...",
+            });
             
             // Show transcription started message
             toast.info("Video transcription started", {
@@ -1787,7 +1829,26 @@ function InnerCanvas({
             if (!transcriptionResponse.ok) {
               const errorText = await transcriptionResponse.text();
               console.error("Transcription API error:", errorText);
-              throw new Error(`Transcription failed: ${transcriptionResponse.status}`);
+              
+              // Handle specific error cases
+              if (transcriptionResponse.status === 429) {
+                // Rate limit error - parse the response for details
+                try {
+                  const errorData = JSON.parse(errorText);
+                  if (errorData.detail?.message) {
+                    throw new Error(`Transcription service is busy: ${errorData.detail.message}. Please try again in a few minutes or upload a manual transcription.`);
+                  }
+                } catch (e) {
+                  // Fallback if JSON parsing fails
+                }
+                throw new Error("Transcription service is experiencing high demand. Please try again in a few minutes or upload a manual transcription.");
+              } else if (transcriptionResponse.status === 503) {
+                throw new Error("Transcription service is temporarily unavailable. Please try again later or upload a manual transcription.");
+              } else if (transcriptionResponse.status === 500) {
+                throw new Error("Transcription service error. Please try again or upload a manual transcription.");
+              } else {
+                throw new Error(`Transcription failed (${transcriptionResponse.status}). Please try again or upload a manual transcription.`);
+              }
             }
             
             const transcriptionResult = await transcriptionResponse.json();
@@ -1805,6 +1866,12 @@ function InnerCanvas({
                 transcription: transcriptionResult.text,
               });
               
+              // Update transcription status to completed
+              await updateTranscriptionStatus({
+                id: video._id,
+                status: "completed",
+              });
+              
               // Update node to show transcription complete
               setNodes((nds: any) =>
                 nds.map((node: any) =>
@@ -1816,6 +1883,10 @@ function InnerCanvas({
                           isTranscribing: false,
                           hasTranscription: true,
                           transcriptionError: null,
+                          transcription: transcriptionResult.text,
+                          onViewTranscription: () => {
+                            handleViewTranscription(video._id, video.title || "Untitled Video", transcriptionResult.text);
+                          },
                         },
                       }
                     : node
@@ -1830,7 +1901,12 @@ function InnerCanvas({
             console.error("Failed to transcribe:", transcriptionError);
             console.error("Error details:", transcriptionError.message, transcriptionError.stack);
             
-            // Video status will be updated by the node state
+            // Update transcription status to failed in database
+            await updateTranscriptionStatus({
+              id: video._id,
+              status: "failed",
+              error: transcriptionError.message,
+            });
             
             // Update node to show transcription failed
             setNodes((nds: any) =>
@@ -1845,6 +1921,7 @@ function InnerCanvas({
                         hasTranscription: false,
                         transcriptionError: transcriptionError.message,
                         onRetryTranscription: () => retryTranscription(video._id),
+                        onUploadTranscription: () => handleManualTranscriptionUpload(video._id),
                       },
                     }
                   : node
@@ -1857,9 +1934,31 @@ function InnerCanvas({
                 description: "The video was uploaded but appears to be silent or in an unsupported language. Try a different video with clear speech.",
                 duration: 8000,
               });
+            } else if (transcriptionError.message.includes("experiencing high demand") || transcriptionError.message.includes("service is busy")) {
+              toast.warning("Transcription service busy", {
+                description: "The transcription service is experiencing heavy traffic. Your video was uploaded successfully - please try transcribing again in a few minutes or upload a manual transcription.",
+                duration: 10000,
+                action: {
+                  label: "Upload Transcription",
+                  onClick: () => handleManualTranscriptionUpload(video._id),
+                },
+              });
+            } else if (transcriptionError.message.includes("temporarily unavailable")) {
+              toast.warning("Service temporarily unavailable", {
+                description: "The transcription service is temporarily down. Your video was uploaded successfully - please try again later or upload a manual transcription.",
+                duration: 10000,
+                action: {
+                  label: "Upload Transcription",
+                  onClick: () => handleManualTranscriptionUpload(video._id),
+                },
+              });
             } else {
               toast.error("Transcription failed", {
-                description: "The video was uploaded successfully. You can retry transcription later.",
+                description: "The video was uploaded successfully. You can retry transcription later or upload a manual transcription.",
+                action: {
+                  label: "Upload Transcription",
+                  onClick: () => handleManualTranscriptionUpload(video._id),
+                },
               });
             }
           }
@@ -1872,6 +1971,13 @@ function InnerCanvas({
         
         // Handle transcription errors gracefully
         const errorDetails = handleVideoError(transcriptionError, 'Transcription');
+        
+        // Update transcription status to failed in database
+        await updateTranscriptionStatus({
+          id: video._id,
+          status: "failed",
+          error: errorDetails.message,
+        });
         
         // Update node to show transcription failed
         setNodes((nds: any) =>
@@ -1886,6 +1992,7 @@ function InnerCanvas({
                     hasTranscription: false,
                     transcriptionError: errorDetails.message,
                     onRetryTranscription: () => retryTranscription(video._id),
+                    onUploadTranscription: () => handleManualTranscriptionUpload(video._id),
                   },
                 }
               : node
@@ -1978,6 +2085,13 @@ function InnerCanvas({
         clearTranscription: true,
       });
 
+      // Update transcription status to processing in database
+      await updateTranscriptionStatus({
+        id: videoId as Id<"videos">,
+        status: "processing",
+        progress: "Retrying transcription...",
+      });
+
       // Update node to show transcribing state
       setNodes((nds: any) =>
         nds.map((node: any) =>
@@ -2061,7 +2175,27 @@ function InnerCanvas({
           
           if (!transcriptionResponse.ok) {
             const errorText = await transcriptionResponse.text();
-            throw new Error(`Transcription failed: ${errorText}`);
+            console.error("Retry transcription API error:", errorText);
+            
+            // Handle specific error cases (same as initial transcription)
+            if (transcriptionResponse.status === 429) {
+              // Rate limit error - parse the response for details
+              try {
+                const errorData = JSON.parse(errorText);
+                if (errorData.detail?.message) {
+                  throw new Error(`Transcription service is busy: ${errorData.detail.message}. Please try again in a few minutes or upload a manual transcription.`);
+                }
+              } catch (e) {
+                // Fallback if JSON parsing fails
+              }
+              throw new Error("Transcription service is experiencing high demand. Please try again in a few minutes or upload a manual transcription.");
+            } else if (transcriptionResponse.status === 503) {
+              throw new Error("Transcription service is temporarily unavailable. Please try again later or upload a manual transcription.");
+            } else if (transcriptionResponse.status === 500) {
+              throw new Error("Transcription service error. Please try again or upload a manual transcription.");
+            } else {
+              throw new Error(`Transcription failed (${transcriptionResponse.status}). Please try again or upload a manual transcription.`);
+            }
           }
           
           const transcriptionResult = await transcriptionResponse.json();
@@ -2078,6 +2212,12 @@ function InnerCanvas({
               transcription: transcriptionResult.text,
             });
             
+            // Update transcription status to completed
+            await updateTranscriptionStatus({
+              id: videoId as Id<"videos">,
+              status: "completed",
+            });
+            
             // Update node to show transcription complete
             setNodes((nds: any) =>
               nds.map((node: any) =>
@@ -2089,6 +2229,10 @@ function InnerCanvas({
                         isTranscribing: false,
                         hasTranscription: true,
                         transcriptionError: null,
+                        transcription: transcriptionResult.text,
+                        onViewTranscription: () => {
+                          handleViewTranscription(videoId as Id<"videos">, videoRecord?.title || "Untitled Video", transcriptionResult.text);
+                        },
                       },
                     }
                   : node
@@ -2101,6 +2245,14 @@ function InnerCanvas({
           }
         } catch (error: any) {
           console.error("Transcription error:", error);
+          
+          // Update transcription status to failed in database
+          await updateTranscriptionStatus({
+            id: videoId as Id<"videos">,
+            status: "failed",
+            error: error.message,
+          });
+          
           // Update node to show error
           setNodes((nds: any) =>
             nds.map((node: any) =>
@@ -2112,12 +2264,33 @@ function InnerCanvas({
                       isTranscribing: false,
                       hasTranscription: false,
                       transcriptionError: error.message,
+                      onRetryTranscription: () => retryTranscription(videoId),
+                      onUploadTranscription: () => handleManualTranscriptionUpload(videoId as Id<"videos">),
                     },
                   }
                 : node
             )
           );
-          throw error;
+          
+          // Show appropriate error message
+          if (error.message.includes("experiencing high demand") || error.message.includes("service is busy")) {
+            toast.warning("Transcription service busy", {
+              description: "The service is experiencing heavy traffic. Try again in a few minutes or upload a manual transcription.",
+              duration: 10000,
+              action: {
+                label: "Upload Transcription",
+                onClick: () => handleManualTranscriptionUpload(videoId as Id<"videos">),
+              },
+            });
+          } else {
+            toast.error("Transcription retry failed", {
+              description: error.message || "Please try again or upload a manual transcription.",
+              action: {
+                label: "Upload Transcription", 
+                onClick: () => handleManualTranscriptionUpload(videoId as Id<"videos">),
+              },
+            });
+          }
         }
       } else {
         toast.error("Cannot retry: No video URL found");
@@ -2125,25 +2298,251 @@ function InnerCanvas({
       }
     } catch (error: any) {
       console.error("Retry transcription error:", error);
-      handleVideoError(error, 'Transcription Retry');
+      // Don't show additional error messages here - they're already handled in the inner catch blocks
+    }
+  };
+
+  // Handle manual transcription upload
+  const handleManualTranscriptionUpload = useCallback((videoId: Id<"videos">) => {
+    setTranscriptionUploadVideoId(videoId);
+  }, []);
+  
+  // Handle viewing transcription
+  const handleViewTranscription = useCallback((videoId: Id<"videos">, videoTitle: string, transcription?: string) => {
+    console.log('[Canvas] handleViewTranscription called', {
+      videoId,
+      videoTitle,
+      hasTranscription: !!transcription,
+      transcriptionLength: transcription?.length
+    });
+    
+    if (transcription) {
+      // Transcription already available
+      console.log('[Canvas] Setting transcription modal open with text');
+      setSelectedTranscription({ text: transcription, title: videoTitle });
+      setTranscriptionModalOpen(true);
+      console.log('[Canvas] Modal state after setting:', { transcriptionModalOpen: true });
+    } else {
+      // Need to fetch transcription
+      setTranscriptionVideoId(videoId);
+      setTranscriptionLoading(true);
+      setTranscriptionModalOpen(true);
+      setSelectedTranscription({ text: '', title: videoTitle });
+    }
+  }, []);
+  
+  const handleTranscriptionUploadComplete = useCallback(async (transcription: ParsedTranscription, file: File) => {
+    if (!transcriptionUploadVideoId) return;
+    
+    try {
+      // Find the video node to position the transcription node near it
+      const videoNode = nodes.find((n: any) => n.id === `video_${transcriptionUploadVideoId}`);
+      if (!videoNode) {
+        toast.error("Video node not found");
+        return;
+      }
       
-      // Reset node state
+      // Update video node to show processing
       setNodes((nds: any) =>
         nds.map((node: any) =>
-          node.id === `video_${videoId}`
+          node.id === `video_${transcriptionUploadVideoId}`
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  isTranscribing: true,
+                  transcriptionError: null,
+                },
+              }
+            : node
+        )
+      );
+      
+      // Upload transcription file to storage (optional)
+      let fileStorageId: Id<"_storage"> | undefined;
+      if (file.size < 5 * 1024 * 1024) { // Only store files under 5MB
+        const uploadUrl = await generateTranscriptionUploadUrl();
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          body: file,
+          headers: {
+            "Content-Type": file.type || "text/plain",
+          },
+        });
+        
+        if (response.ok) {
+          const { storageId } = await response.json();
+          fileStorageId = storageId;
+        }
+      }
+      
+      // Save transcription to database
+      const result = await uploadManualTranscription({
+        videoId: transcriptionUploadVideoId,
+        transcription: transcription.fullText,
+        transcriptionSegments: transcription.segments,
+        fileStorageId,
+        format: transcription.format,
+      });
+      
+      // Create a new transcription node - use the database ID once we have it
+      const temporaryNodeId = `transcription_temp_${Date.now()}`;
+      const transcriptionPosition = {
+        x: videoNode.position.x + 400, // Position to the right of the video
+        y: videoNode.position.y,
+      };
+      
+      // Calculate word count
+      const wordCount = transcription.fullText.trim().split(/\s+/).length;
+      
+      // Calculate duration from segments if available
+      let duration = 0;
+      if (transcription.segments.length > 0) {
+        const lastSegment = transcription.segments[transcription.segments.length - 1];
+        duration = lastSegment.end;
+      }
+      
+      // Save transcription node to database
+      console.log("[Canvas] Saving transcription to database:", {
+        projectId,
+        videoId: transcriptionUploadVideoId,
+        fileName: file.name,
+        position: transcriptionPosition,
+        hasCreateTranscription: !!createTranscription,
+        fullTextLength: transcription.fullText?.length,
+        segmentsCount: transcription.segments?.length,
+      });
+      
+      if (!createTranscription) {
+        console.error("[Canvas] createTranscription mutation is not defined!");
+        throw new Error("createTranscription mutation is not defined");
+      }
+      
+      let transcriptionId;
+      try {
+        console.log("[Canvas] Calling createTranscription...");
+        transcriptionId = await createTranscription({
+          projectId,
+          videoId: transcriptionUploadVideoId,
+          fileName: file.name,
+          format: transcription.format,
+          fullText: transcription.fullText,
+          segments: transcription.segments,
+          wordCount,
+          duration,
+          fileStorageId,
+          canvasPosition: transcriptionPosition,
+        });
+        
+        console.log("[Canvas] Transcription saved with ID:", transcriptionId);
+      } catch (dbError) {
+        console.error("[Canvas] Failed to save transcription to database:", dbError);
+        throw new Error("Failed to save transcription to database");
+      }
+      
+      // Use the actual database ID for the node
+      const transcriptionNodeId = `transcription_${transcriptionId}`;
+      
+      const transcriptionNode: Node = {
+        id: transcriptionNodeId,
+        type: 'transcription',
+        position: transcriptionPosition,
+        data: {
+          transcriptionId, // Store the database ID
+          fileName: file.name,
+          format: transcription.format,
+          transcription: transcription.fullText,
+          segments: transcription.segments,
+          wordCount,
+          duration,
+          uploadedAt: Date.now(),
+          onView: () => {
+            handleViewTranscription(transcriptionUploadVideoId, file.name, transcription.fullText);
+          },
+        },
+      };
+      
+      // Update nodes - update video node and add transcription node
+      console.log("[Canvas] Adding transcription node to canvas:", transcriptionNode);
+      setNodes((nds: any) => {
+        const updatedNodes = [
+          ...nds.map((node: any) =>
+            node.id === `video_${transcriptionUploadVideoId}`
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    isTranscribing: false,
+                    hasTranscription: true,
+                    transcriptionError: null,
+                    transcription: transcription.fullText,
+                    onViewTranscription: () => {
+                      handleViewTranscription(transcriptionUploadVideoId, videoNode.data.title || "Untitled Video", transcription.fullText);
+                    },
+                  },
+                }
+              : node
+          ),
+          transcriptionNode,
+        ];
+        console.log("[Canvas] Updated nodes after adding transcription:", updatedNodes.map(n => ({ id: n.id, type: n.type })));
+        return updatedNodes;
+      });
+      
+      // Create edge connecting video to transcription
+      const newEdge: Edge = {
+        id: `e${videoNode.id}-${transcriptionNodeId}`,
+        source: videoNode.id,
+        target: transcriptionNodeId,
+        sourceHandle: 'video-output',
+        targetHandle: 'transcription-input',
+        animated: true,
+      };
+      
+      setEdges((eds: any) => [...eds, newEdge]);
+      
+      toast.success(`Transcription uploaded! ${result.affectedAgents} agent(s) ready for regeneration.`);
+      
+      // Reset state
+      setTranscriptionUploadVideoId(null);
+    } catch (error: any) {
+      console.error("Failed to upload transcription:", error);
+      toast.error("Failed to upload transcription");
+      
+      // Reset video node state
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === `video_${transcriptionUploadVideoId}`
             ? {
                 ...node,
                 data: {
                   ...node.data,
                   isTranscribing: false,
-                  transcriptionError: error.message,
+                  transcriptionError: "Failed to upload transcription",
                 },
               }
             : node
         )
       );
     }
-  };
+  }, [transcriptionUploadVideoId, uploadManualTranscription, generateTranscriptionUploadUrl, setNodes, setEdges, nodes, handleViewTranscription, createTranscription, projectId]);
+  
+  // Watch for video transcription data
+  useEffect(() => {
+    if (videoForTranscription && transcriptionVideoId) {
+      if (videoForTranscription.transcription) {
+        setSelectedTranscription({ 
+          text: videoForTranscription.transcription, 
+          title: selectedTranscription?.title || "Video" 
+        });
+      } else {
+        toast.error("No transcription available");
+        setTranscriptionModalOpen(false);
+      }
+      setTranscriptionLoading(false);
+      setTranscriptionVideoId(null);
+    }
+  }, [videoForTranscription, transcriptionVideoId, selectedTranscription?.title]);
 
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
@@ -2273,9 +2672,27 @@ function InnerCanvas({
     [reactFlowInstance, setNodes, setEdges, handleVideoUpload, handleGenerate, nodes, createAgent, projectId, updateAgentConnections, handleChatButtonClick, handleRegenerateClick]
   );
 
-  // Load existing videos and agents from the project
+  // Load existing videos, agents, and transcriptions from the project
   useEffect(() => {
-    if (!hasLoadedFromDB && projectVideos !== undefined && projectAgents !== undefined) {
+    console.log("[Canvas] Loading from DB check:", {
+      hasLoadedFromDB,
+      projectVideos: projectVideos?.length,
+      projectAgents: projectAgents?.length,
+      projectTranscriptions: projectTranscriptions?.length,
+    });
+    
+    // Additional debug logging
+    if (projectTranscriptions) {
+      console.log("[Canvas] Raw transcriptions from DB:", projectTranscriptions);
+      console.log("[Canvas] Transcription details:", projectTranscriptions.map(t => ({
+        id: t._id,
+        fileName: t.fileName,
+        videoId: t.videoId,
+        position: t.canvasPosition
+      })));
+    }
+    
+    if (!hasLoadedFromDB && projectVideos !== undefined && projectAgents !== undefined && projectTranscriptions !== undefined) {
       const videoNodes: Node[] = projectVideos.map((video) => ({
         id: `video_${video._id}`,
         type: "video",
@@ -2289,8 +2706,8 @@ function InnerCanvas({
           fileSize: video.fileSize,
           // Transcription flow: idle -> processing -> completed (with transcription text)
           // Sometimes status is "completed" but transcription text hasn't propagated yet
-          hasTranscription: !!video.transcription,
-          isTranscribing: video.transcriptionStatus === "processing" || (video.transcriptionStatus === "completed" && !video.transcription),
+          hasTranscription: !!video.transcription || video.transcriptionStatus === "completed",
+          isTranscribing: video.transcriptionStatus === "processing",
           transcriptionError: video.transcriptionStatus === "failed" ? video.transcriptionError : null,
           transcriptionProgress: video.transcriptionProgress || null,
           onVideoClick: () => handleVideoClick({
@@ -2300,6 +2717,11 @@ function InnerCanvas({
             fileSize: video.fileSize,
           }),
           onRetryTranscription: () => retryTranscription(video._id),
+          onUploadTranscription: () => handleManualTranscriptionUpload(video._id),
+          onViewTranscription: video.transcription ? () => {
+            handleViewTranscription(video._id, video.title || "Untitled Video", video.transcription);
+          } : undefined,
+          transcription: video.transcription,
         },
       }));
 
@@ -2328,7 +2750,35 @@ function InnerCanvas({
         },
       }));
 
-      setNodes([...videoNodes, ...agentNodes]);
+      // Create transcription nodes from database
+      console.log("[Canvas] Creating transcription nodes from:", projectTranscriptions);
+      console.log("[Canvas] Raw transcriptions data:", JSON.stringify(projectTranscriptions, null, 2));
+      
+      const transcriptionNodes: Node[] = projectTranscriptions.map((transcription) => ({
+        id: `transcription_${transcription._id}`,
+        type: "transcription",
+        position: transcription.canvasPosition,
+        data: {
+          transcriptionId: transcription._id,
+          fileName: transcription.fileName,
+          format: transcription.format,
+          transcription: transcription.fullText,
+          segments: transcription.segments,
+          wordCount: transcription.wordCount,
+          duration: transcription.duration,
+          uploadedAt: transcription.createdAt,
+          onView: () => {
+            handleViewTranscription(transcription.videoId || null as any, transcription.fileName, transcription.fullText);
+          },
+        },
+      }));
+
+      console.log("[Canvas] Setting all nodes:", {
+        videos: videoNodes.length,
+        agents: agentNodes.length,
+        transcriptions: transcriptionNodes.length,
+      });
+      setNodes([...videoNodes, ...agentNodes, ...transcriptionNodes]);
       
       // Load chat history from agents
       const allMessages: typeof chatMessages = [];
@@ -2364,6 +2814,12 @@ function InnerCanvas({
             const agentNode = agentNodes.find(an => an.data.agentId === connectionId);
             if (agentNode) {
               sourceNodeId = agentNode.id;
+            } else {
+              // Check if it's a transcription ID
+              const transcriptionNode = transcriptionNodes.find(tn => tn.data.transcriptionId === connectionId);
+              if (transcriptionNode) {
+                sourceNodeId = transcriptionNode.id;
+              }
             }
           }
           
@@ -2378,10 +2834,28 @@ function InnerCanvas({
         });
       });
       
+      // Reconstruct edges for transcription nodes (video -> transcription)
+      projectTranscriptions.forEach((transcription) => {
+        if (transcription.videoId) {
+          const videoNode = videoNodes.find(vn => vn.data.videoId === transcription.videoId);
+          if (videoNode) {
+            edges.push({
+              id: `e${videoNode.id}-transcription_${transcription._id}`,
+              source: videoNode.id,
+              target: `transcription_${transcription._id}`,
+              sourceHandle: 'video-output',
+              targetHandle: 'transcription-input',
+              animated: enableEdgeAnimations && !isDragging,
+            });
+          }
+        }
+      });
+      
       setEdges(edges);
       setHasLoadedFromDB(true);
+      console.log("[Canvas] Finished loading from DB, total nodes:", [...videoNodes, ...agentNodes, ...transcriptionNodes].length);
     }
-  }, [projectVideos, projectAgents, hasLoadedFromDB, setNodes, setEdges, handleGenerate, handleChatButtonClick]);
+  }, [projectVideos, projectAgents, projectTranscriptions, hasLoadedFromDB, setNodes, setEdges, handleGenerate, handleChatButtonClick, handleViewTranscription, retryTranscription, handleManualTranscriptionUpload, handleVideoClick, handleRegenerateClick]);
   
   // Load canvas viewport state - only run once when everything is ready
   useEffect(() => {
@@ -2467,7 +2941,12 @@ function InnerCanvas({
                       hasTranscription: newHasTranscription,
                       isTranscribing: newIsTranscribing,
                       transcriptionError: newTranscriptionError,
+                      transcription: video.transcription,
                       onRetryTranscription: newTranscriptionError ? () => retryTranscription(video._id) : undefined,
+                      onUploadTranscription: newTranscriptionError ? () => handleManualTranscriptionUpload(video._id) : undefined,
+                      onViewTranscription: video.transcription ? () => {
+                        handleViewTranscription(video._id, video.title || "Untitled Video", video.transcription);
+                      } : undefined,
                       onVideoClick: video.videoUrl ? () => handleVideoClick({
                         url: video.videoUrl!,
                         title: video.title || "Untitled Video",
@@ -2486,7 +2965,7 @@ function InnerCanvas({
     }, 3000); // Check every 3 seconds
     
     return () => clearInterval(interval);
-  }, [projectVideos, setNodes]);
+  }, [projectVideos, setNodes, retryTranscription, handleManualTranscriptionUpload, handleViewTranscription, handleVideoClick]);
 
   // Auto-save canvas state
   useEffect(() => {
@@ -2610,6 +3089,105 @@ function InnerCanvas({
                 collapsed={isSidebarCollapsed}
                 color="yellow"
               />
+              
+              {/* Transcription Upload */}
+              {!isSidebarCollapsed && (
+                <div className="mt-6 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transcription Tools</span>
+                  </div>
+                  <TranscriptionUpload
+                    videoId="general"
+                    onUploadComplete={async (transcription: ParsedTranscription, file: File) => {
+                      try {
+                        // Find a good position - center of viewport
+                        const centerPosition = reactFlowInstance 
+                          ? reactFlowInstance.screenToFlowPosition({
+                              x: window.innerWidth / 2,
+                              y: window.innerHeight / 2
+                            })
+                          : { x: 250, y: 250 };
+                        
+                        // Calculate word count
+                        const wordCount = transcription.fullText.trim().split(/\s+/).length;
+                        
+                        // Calculate duration from segments if available
+                        let duration = 0;
+                        if (transcription.segments.length > 0) {
+                          const lastSegment = transcription.segments[transcription.segments.length - 1];
+                          duration = lastSegment.end;
+                        }
+                        
+                        // Save transcription to database
+                        console.log("[Canvas Sidebar] Saving standalone transcription to database");
+                        const transcriptionId = await createTranscription({
+                          projectId,
+                          videoId: undefined, // No video for standalone transcriptions
+                          fileName: file.name,
+                          format: transcription.format,
+                          fullText: transcription.fullText,
+                          segments: transcription.segments,
+                          wordCount,
+                          duration,
+                          fileStorageId: undefined, // Could add file upload if needed
+                          canvasPosition: centerPosition,
+                        });
+                        
+                        console.log("[Canvas Sidebar] Transcription saved with ID:", transcriptionId);
+                        
+                        // Create node with database ID
+                        const transcriptionNodeId = `transcription_${transcriptionId}`;
+                        
+                        const transcriptionNode: Node = {
+                          id: transcriptionNodeId,
+                          type: 'transcription',
+                          position: centerPosition,
+                          data: {
+                            transcriptionId, // Store the database ID
+                            fileName: file.name,
+                            format: transcription.format,
+                            transcription: transcription.fullText,
+                            segments: transcription.segments,
+                            wordCount,
+                            duration,
+                            uploadedAt: Date.now(),
+                            onView: () => {
+                              // For standalone transcriptions, just show the modal without a video ID
+                              setSelectedTranscription({ text: transcription.fullText, title: file.name });
+                              setTranscriptionModalOpen(true);
+                            },
+                          },
+                        };
+                        
+                        setNodes((nds: any) => [...nds, transcriptionNode]);
+                        
+                        toast.success(`Transcription file "${file.name}" added to canvas!`);
+                        console.log('Transcription uploaded from sidebar:', { transcription, file, transcriptionId });
+                      } catch (error) {
+                        console.error("[Canvas Sidebar] Failed to save transcription:", error);
+                        toast.error("Failed to save transcription");
+                      }
+                    }}
+                    trigger={
+                      <div className="cursor-pointer rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 hover:from-orange-500/30 hover:to-orange-600/30 border border-orange-500/30 backdrop-blur-sm p-4 transition-all hover:scale-[1.02] hover:shadow-lg group">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <div className="text-orange-500">
+                              <Upload className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium text-foreground">Upload Transcription</h3>
+                              <p className="text-xs text-muted-foreground mt-0.5">Upload SRT, VTT, or TXT files</p>
+                            </div>
+                            <GripVertical className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground" />
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  />
+                </div>
+              )}
             </div>
             
             {!isSidebarCollapsed && (
@@ -2781,21 +3359,27 @@ function InnerCanvas({
         <div className="flex-1 relative" ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes}
-            edges={edges.map((edge: any) => ({
-              ...edge,
-              animated: enableEdgeAnimations && !isDragging,
-              style: { 
-                stroke: '#6366f1',
-                strokeWidth: 2,
-                strokeOpacity: 0.5
-              },
-              markerEnd: {
-                type: 'arrowclosed',
-                color: '#6366f1',
-                width: 20,
-                height: 20,
-              }
-            }))}
+            edges={edges.map((edge: any) => {
+              // Check if this edge is from a transcription node
+              const sourceNode = nodes.find((n: any) => n.id === edge.source);
+              const isTranscriptionEdge = sourceNode?.type === 'transcription';
+              
+              return {
+                ...edge,
+                animated: enableEdgeAnimations && !isDragging,
+                style: { 
+                  stroke: isTranscriptionEdge ? '#a855f7' : '#6366f1', // Purple for transcription edges
+                  strokeWidth: isTranscriptionEdge ? 3 : 2,
+                  strokeOpacity: isTranscriptionEdge ? 0.7 : 0.5
+                },
+                markerEnd: {
+                  type: 'arrowclosed',
+                  color: isTranscriptionEdge ? '#a855f7' : '#6366f1',
+                  width: 20,
+                  height: 20,
+                }
+              };
+            })}
             onNodesChange={onNodesChange}
             onNodeDragStart={() => setIsDragging(true)}
             onNodeDragStop={async (_event: any, node: any) => {
@@ -2820,6 +3404,15 @@ function InnerCanvas({
                   });
                 } catch (error) {
                   console.error("Failed to update agent position:", error);
+                }
+              } else if (node.type === 'transcription' && node.data.transcriptionId) {
+                try {
+                  await updateTranscriptionPosition({
+                    id: node.data.transcriptionId as Id<"transcriptions">,
+                    position: node.position,
+                  });
+                } catch (error) {
+                  console.error("Failed to update transcription position:", error);
                 }
               }
             }}
@@ -2902,7 +3495,7 @@ function InnerCanvas({
             
             return {
               title: videoNode.data.title || video?.title,
-              thumbnailUrl: video?.thumbnailUrl || videoNode.data.thumbnail,
+              thumbnailUrl: videoNode.data.thumbnail,
               duration: videoNode.data.duration || video?.duration,
             };
           })()}
@@ -2939,6 +3532,7 @@ function InnerCanvas({
           />
         )}
         
+        
         {/* Prompt Modal */}
         {selectedPrompt && (
           <PromptModal
@@ -2946,6 +3540,34 @@ function InnerCanvas({
             onOpenChange={setPromptModalOpen}
             agentType={selectedPrompt.agentType}
             prompt={selectedPrompt.prompt}
+          />
+        )}
+        
+        {/* Transcription View Modal */}
+        <TranscriptionViewModal
+          isOpen={transcriptionModalOpen}
+          onClose={() => {
+            setTranscriptionModalOpen(false);
+            setSelectedTranscription(null);
+            setTranscriptionLoading(false);
+          }}
+          transcription={selectedTranscription?.text || null}
+          videoTitle={selectedTranscription?.title}
+          isLoading={transcriptionLoading}
+        />
+        
+        {/* Transcription Upload Modal */}
+        {transcriptionUploadVideoId && (
+          <TranscriptionUpload
+            videoId={transcriptionUploadVideoId}
+            videoDuration={nodes.find((n: any) => n.id === `video_${transcriptionUploadVideoId}`)?.data?.duration}
+            onUploadComplete={handleTranscriptionUploadComplete}
+            open={!!transcriptionUploadVideoId}
+            onOpenChange={(open) => {
+              if (!open) {
+                setTranscriptionUploadVideoId(null);
+              }
+            }}
           />
         )}
         

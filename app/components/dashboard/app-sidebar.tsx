@@ -41,6 +41,7 @@ export function AppSidebar({
   variant: "sidebar" | "floating" | "inset";
   user: any;
 }) {
+
   return (
     <Sidebar collapsible="offcanvas" variant={variant}>
       <SidebarHeader>

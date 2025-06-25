@@ -16,6 +16,11 @@ export const generateThumbnail = action({
     videoData: v.object({
       title: v.optional(v.string()),
       transcription: v.optional(v.string()),
+      manualTranscriptions: v.optional(v.array(v.object({
+        fileName: v.string(),
+        text: v.string(),
+        format: v.string(),
+      }))),
       duration: v.optional(v.number()),
       resolution: v.optional(v.object({
         width: v.number(),
@@ -69,7 +74,7 @@ export const generateThumbnail = action({
       if (args.videoId) {
         console.log("[Thumbnail] Fetching fresh video data for ID:", args.videoId);
         const freshVideoData = await ctx.runQuery(api.videos.getWithTranscription, {
-          id: args.videoId,
+          videoId: args.videoId,
         });
         console.log("[Thumbnail] Fresh video data fetched:", {
           hasTitle: !!freshVideoData?.title,
@@ -106,6 +111,17 @@ export const generateThumbnail = action({
       if (videoData.transcription) {
         const summary = videoData.transcription.slice(0, 500);
         thumbnailPrompt += `\nVideo Content Summary: ${summary}...\n`;
+      }
+      
+      // Add manual transcriptions if available
+      if (videoData.manualTranscriptions && videoData.manualTranscriptions.length > 0) {
+        thumbnailPrompt += "\nManual Transcriptions Provided:\n";
+        videoData.manualTranscriptions.forEach((transcript, index) => {
+          thumbnailPrompt += `\n--- ${transcript.fileName} (${transcript.format.toUpperCase()}) ---\n`;
+          const excerpt = transcript.text.slice(0, 800);
+          thumbnailPrompt += `${excerpt}...\n`;
+        });
+        thumbnailPrompt += "\n";
       }
       
       if (args.connectedAgentOutputs.length > 0) {

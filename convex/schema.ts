@@ -171,4 +171,29 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_project", ["projectId"]),
+    
+  transcriptions: defineTable({
+    userId: v.string(),
+    projectId: v.id("projects"),
+    videoId: v.optional(v.id("videos")), // Optional - can be standalone
+    fileName: v.string(),
+    format: v.string(),
+    fullText: v.string(),
+    segments: v.optional(v.array(v.object({
+      start: v.number(),
+      end: v.number(),
+      text: v.string(),
+    }))),
+    wordCount: v.number(),
+    duration: v.optional(v.number()),
+    fileStorageId: v.optional(v.id("_storage")),
+    canvasPosition: v.object({
+      x: v.number(),
+      y: v.number(),
+    }),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"])
+    .index("by_video", ["videoId"]),
 });

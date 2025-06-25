@@ -1,6 +1,6 @@
 import { memo, useState, useRef, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "./ReactFlowComponents";
-import { Play, Film, Loader2, FileText, AlertCircle, RefreshCw, Sparkles, Clock, HardDrive } from "lucide-react";
+import { Play, Film, Loader2, FileText, AlertCircle, RefreshCw, Sparkles, Clock, HardDrive, Upload, Eye } from "lucide-react";
 import { Card } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import {
@@ -25,8 +25,11 @@ export interface VideoNodeData {
   extractionProgress?: number;
   transcriptionError?: string | null;
   transcriptionProgress?: string | null;
+  transcription?: string;
   onVideoClick?: () => void;
   onRetryTranscription?: () => void;
+  onUploadTranscription?: () => void;
+  onViewTranscription?: () => void;
 }
 
 export const VideoNode = memo(({ data, selected }: NodeProps) => {
@@ -259,12 +262,43 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
           )}
           {!videoData.isExtracting && !videoData.isTranscribing && videoData.hasTranscription && (
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-1 rounded-full bg-green-500/10">
-                  <FileText className="h-3.5 w-3.5 text-green-500" />
-                </div>
-                <p className="text-xs font-medium text-green-600">Transcription ready</p>
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div 
+                      className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-green-500/5 rounded-md p-1 -m-1 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('[VideoNode] Transcription view clicked', {
+                          hasCallback: !!videoData.onViewTranscription,
+                          hasTranscription: videoData.hasTranscription,
+                          transcriptionText: videoData.transcription?.substring(0, 50)
+                        });
+                        videoData.onViewTranscription?.();
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('[VideoNode] Transcription view key pressed');
+                          videoData.onViewTranscription?.();
+                        }
+                      }}
+                    >
+                      <div className="p-1 rounded-full bg-green-500/10">
+                        <FileText className="h-3.5 w-3.5 text-green-500" />
+                      </div>
+                      <p className="text-xs font-medium text-green-600">Transcription ready</p>
+                      <Eye className="h-3 w-3 text-green-600/70 ml-auto" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Click to view transcription</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               {videoData.onRetryTranscription && (
                 <TooltipProvider>
                   <Tooltip>
@@ -318,18 +352,33 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
         </div>
       </div>
       
-      {/* Error action button */}
+      {/* Error action buttons */}
       {!videoData.isUploading && !videoData.isTranscribing && !videoData.isExtracting && 
-       videoData.transcriptionError && videoData.onRetryTranscription && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-2 w-full hover:bg-primary/10 hover:border-primary/50 transition-all"
-          onClick={videoData.onRetryTranscription}
-        >
-          <RefreshCw className="h-3 w-3 mr-1.5" />
-          Retry Transcription
-        </Button>
+       videoData.transcriptionError && (
+        <div className="flex gap-2 mt-2">
+          {videoData.onRetryTranscription && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 hover:bg-primary/10 hover:border-primary/50 transition-all"
+              onClick={videoData.onRetryTranscription}
+            >
+              <RefreshCw className="h-3 w-3 mr-1.5" />
+              Retry
+            </Button>
+          )}
+          {videoData.onUploadTranscription && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 hover:bg-primary/10 hover:border-primary/50 transition-all"
+              onClick={videoData.onUploadTranscription}
+            >
+              <Upload className="h-3 w-3 mr-1.5" />
+              Upload
+            </Button>
+          )}
+        </div>
       )}
       
       <Handle
