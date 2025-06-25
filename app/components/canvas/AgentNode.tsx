@@ -14,7 +14,8 @@ import {
   Palette,
   Zap,
   Bot,
-  Brain
+  Brain,
+  Linkedin
 } from "lucide-react";
 import { Card } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
