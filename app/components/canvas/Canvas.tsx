@@ -2211,13 +2211,13 @@ function InnerCanvas({
       // Create agent in database
       createAgent({
         videoId: videoNode.data.videoId as Id<"videos">,
-        type: type as "title" | "description" | "thumbnail" | "tweets",
+        type: type as "title" | "description" | "thumbnail" | "tweets" | "linkedin",
         canvasPosition: position,
       }).then((agentId) => {
-        const nodeId = `agent_${type}_${agentId}`;
+        const nodeId = `${type === 'linkedin' ? 'linkedin' : 'agent'}_${type}_${agentId}`;
         const newNode: Node = {
           id: nodeId,
-          type: "agent",
+          type: type === 'linkedin' ? 'linkedin' : 'agent',
           position,
           data: {
             agentId, // Store the database ID
