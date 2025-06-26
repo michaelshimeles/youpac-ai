@@ -16,4 +16,10 @@ export default defineConfig({
   optimizeDeps: {
     include: ["@xyflow/react", "@xyflow/system", "use-sync-external-store/shim/with-selector"],
   },
+  server: {
+    fs: {
+      // Allow serving files from one level up to the project root
+      allow: [".."]
+    }
+  }
 });

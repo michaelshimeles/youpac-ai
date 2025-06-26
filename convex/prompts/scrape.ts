@@ -75,7 +75,12 @@ export const scrapeContent = action({
         };
         
       } catch (error) {
-        if (retryCount < maxRetries && error.message.includes('Rate limit')) {
+        if (
+          retryCount < maxRetries &&
+          error instanceof Error &&
+          typeof error.message === "string" &&
+          error.message.includes('Rate limit')
+        ) {
           retryCount++;
           console.log(`Retrying scrape (${retryCount}/${maxRetries}) in 1 second...`);
           await new Promise(resolve => setTimeout(resolve, 1000));

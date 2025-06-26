@@ -17,6 +17,9 @@ import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as profiles from "../profiles.js";
 import type * as projects from "../projects.js";
+import type * as prompts_blog from "../prompts/blog.js";
+import type * as prompts_scrape from "../prompts/scrape.js";
+import type * as scrape from "../scrape.js";
 import type * as shares from "../shares.js";
 import type * as stats from "../stats.js";
 import type * as thumbnail from "../thumbnail.js";
@@ -24,6 +27,7 @@ import type * as thumbnailGPTImage from "../thumbnailGPTImage.js";
 import type * as thumbnailRefine from "../thumbnailRefine.js";
 import type * as transcription from "../transcription.js";
 import type * as users from "../users.js";
+import type * as utils_openai from "../utils/openai.js";
 import type * as videoJobs from "../videoJobs.js";
 import type * as videos from "../videos.js";
 
@@ -51,6 +55,9 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   profiles: typeof profiles;
   projects: typeof projects;
+  "prompts/blog": typeof prompts_blog;
+  "prompts/scrape": typeof prompts_scrape;
+  scrape: typeof scrape;
   shares: typeof shares;
   stats: typeof stats;
   thumbnail: typeof thumbnail;
@@ -58,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   thumbnailRefine: typeof thumbnailRefine;
   transcription: typeof transcription;
   users: typeof users;
+  "utils/openai": typeof utils_openai;
   videoJobs: typeof videoJobs;
   videos: typeof videos;
 }>;

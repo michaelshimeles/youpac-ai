@@ -65,7 +65,12 @@ const attemptScrape = async (url: string, apiKey: string, retryCount = 0, maxRet
     
   } catch (error) {
     // Only retry on rate limit errors, not on other errors
-    if (error.message && error.message.includes('Rate limit') && retryCount < maxRetries) {
+    if (
+      error instanceof Error &&
+      typeof error.message === "string" &&
+      error.message.includes('Rate limit') &&
+      retryCount < maxRetries
+    ) {
       const delayMs = getRetryDelay(retryCount + 1);
       console.log(`Retrying scrape (${retryCount + 1}/${maxRetries}) in ${delayMs}ms...`);
       await delay(delayMs);

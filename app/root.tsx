@@ -60,12 +60,6 @@ export const links: Route.LinksFunction = () => [
     as: "image",
     type: "image/png",
   },
-  {
-    rel: "preload",
-    href: "/ypai.png", 
-    as: "image",
-    type: "image/png",
-  },
   
   // Icon
   {
@@ -73,6 +67,28 @@ export const links: Route.LinksFunction = () => [
     type: "image/png",
     href: "/ypai.png",
   },
+];
+
+export const meta: Route.MetaFunction = () => [
+  { title: "YouPac AI - YouTube Content Creation Assistant" },
+  { name: "description", content: "AI-powered YouTube content creation, video ideas, and channel optimization tools." },
+  
+  // Open Graph
+  { property: "og:title", content: "YouPac AI - YouTube Content Creation Assistant" },
+  { property: "og:description", content: "AI-powered YouTube content creation, video ideas, and channel optimization tools." },
+  { property: "og:type", content: "website" },
+  { property: "og:url", content: "https://youpac-ai.vercel.app" },
+  { property: "og:image", content: "https://jdj14ctwppwprnqu.public.blob.vercel-storage.com/youtube-ai-assistant-og.png" },
+  
+  // Twitter Card
+  { name: "twitter:card", content: "summary_large_image" },
+  { name: "twitter:title", content: "YouPac AI - YouTube Content Creation Assistant" },
+  { name: "twitter:description", content: "AI-powered YouTube content creation, video ideas, and channel optimization tools." },
+  { name: "twitter:image", content: "https://jdj14ctwppwprnqu.public.blob.vercel-storage.com/youtube-ai-assistant-og.png" },
+  
+  // Additional SEO
+  { name: "viewport", content: "width=device-width, initial-scale=1" },
+  { name: "theme-color", content: "#000000" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

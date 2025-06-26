@@ -22,14 +22,29 @@ import {
   useSidebar,
 } from "~/components/ui/sidebar";
 import { useClerk } from "@clerk/react-router";
+import { useIsMobile } from "~/hooks/use-mobile";
 
 export function NavUser({ user }: any) {
-  const { isMobile } = useSidebar();
-  const userFullName = user.firstName + " " + user.lastName;
-  const userEmail = user.emailAddresses[0].emailAddress;
+  // Safely get sidebar context, fallback to mobile hook if not available
+  let isMobile = false;
+  try {
+    const sidebarContext = useSidebar();
+    isMobile = sidebarContext.isMobile;
+  } catch {
+    // Fallback to mobile hook if not within SidebarProvider
+    isMobile = useIsMobile();
+  }
+
+  // Add null checks for user data
+  if (!user) {
+    return null; // Don't render anything if user is not loaded
+  }
+
+  const userFullName = (user.firstName || "") + " " + (user.lastName || "");
+  const userEmail = user.emailAddresses?.[0]?.emailAddress || "";
   const userInitials =
     (user?.firstName?.charAt(0) || "").toUpperCase() +
-    (user?.lastName?.charAt(0) || "").toUpperCase();
+    (user?.lastName?.charAt(0) || "").toUpperCase() || "U";
   const userProfile = user.imageUrl;
   const { signOut } = useClerk();
 

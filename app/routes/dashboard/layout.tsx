@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/react-router/ssr.server";
 import { Outlet, redirect, useLoaderData } from "react-router";
+import { useUser } from "@clerk/react-router";
 import { AppSidebar } from "~/components/dashboard/app-sidebar";
 import { SiteHeader } from "~/components/dashboard/site-header";
 import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
@@ -18,7 +19,8 @@ export async function loader(args: Route.LoaderArgs) {
 }
 
 export default function DashboardLayout() {
-  const { user } = useLoaderData();
+  const { userId } = useLoaderData<typeof loader>();
+  const { user } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Load saved state after mount to avoid hydration mismatch

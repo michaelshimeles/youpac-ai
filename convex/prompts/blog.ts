@@ -87,7 +87,11 @@ Generate an SEO-optimized blog post based on this content.`;
       
     } catch (error) {
       console.error("Blog generation error:", error);
-      throw new Error(`Blog generation failed: ${error.message}`);
+      if (error instanceof Error) {
+        throw new Error(`Blog generation failed: ${error.message}`);
+      } else {
+        throw new Error("Blog generation failed: Unknown error");
+      }
     }
   },
 });
