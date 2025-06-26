@@ -62,39 +62,51 @@ export const SourceNode = memo(({ data, selected, id }: SourceNodeProps) => {
     }
     
     try {
-      // Update node to show scraping state
-      // This would typically be handled by the parent Canvas component
       const result = await scrapeContent({ url: content.trim() });
       
-      // Update content with scraped result
-      setContent(`${result.title}\n\n${result.content}`);
-      setSourceType("url");
-      toast.success("Content scraped successfully!");
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return;
+      
+      // Use callbacks to update parent state
+      const newContent = `${result.title}\n\n${result.content}`;
+      data.onContentChange?.(newContent);
+      data.onSourceTypeChange?.("url");
+      
+      if (isMountedRef.current) {
+        toast.success("Content scraped successfully!");
+      }
       
     } catch (error: any) {
+      if (!isMountedRef.current) return;
+      
       toast.error(error.message || "Failed to scrape content");
       console.error("Scraping error:", error);
     }
-  }, [content, scrapeContent]);
+  }, [content, scrapeContent, data, isMountedRef]);
   
   const handleVideoSelect = useCallback((videoId: string) => {
     const selectedVideo = videos.find(v => v._id === videoId);
     if (selectedVideo) {
-      setContent(selectedVideo.transcript || selectedVideo.title || "");
-      setSourceType("video");
-      toast.success("Video content imported!");
+      const newContent = selectedVideo.transcript || selectedVideo.title || "";
+      data.onContentChange?.(newContent);
+      data.onSourceTypeChange?.("video");
+      
+      if (isMountedRef.current) {
+        toast.success("Video content imported!");
+      }
     }
-  }, [videos]);
+  }, [videos, data, isMountedRef]);
   
   const handleContentChange = useCallback((newContent: string) => {
-    setContent(newContent);
+    data.onContentChange?.(newContent);
+    
     // Auto-detect source type
     if (newContent.trim().startsWith('http')) {
-      setSourceType("url");
+      data.onSourceTypeChange?.("url");
     } else {
-      setSourceType("topic");
+      data.onSourceTypeChange?.("topic");
     }
-  }, []);
+  }, [data]);
 
   return (
     <div className={`relative group ${selected ? "scale-105" : ""} transition-transform duration-200`}>
