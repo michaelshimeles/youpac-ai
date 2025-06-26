@@ -49,6 +49,7 @@
     "convex": "^1.24.3",
     "d3-drag": "^3.0.0",
     "date-fns": "^4.1.0",
+    "dompurify": "^3.2.6",
     "framer-motion": "^12.18.1",
     "isbot": "^5.1.27",
     "lucide-react": "^0.511.0",
