@@ -29,10 +29,15 @@ import { VideoNode } from "./VideoNode";
 import { VideoPlayerModal } from "./VideoPlayerModal";
 import { LinkedInNode } from "./LinkedInNode";
 
+import { BlogNode } from "./BlogNode";
+import { SourceNode } from "./SourceNode";
+
 const nodeTypes: NodeTypes = {
   video: VideoNode,
   agent: AgentNode,
   linkedin: LinkedInNode,
+  blog: BlogNode,
+  source: SourceNode,
 };
 
 function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
