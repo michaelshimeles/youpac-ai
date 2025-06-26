@@ -303,7 +303,7 @@ ${links.map((l: BlogLink) => `- [${l.title}](${l.url})`).join('\n')}
             <div className="mt-8 p-4 bg-gray-50 rounded-lg">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Suggested Links</h3>
               <div className="space-y-2">
-                {links.map((link: any, index: number) => (
+                {links.map((link: BlogLink, index: number) => (
                   <div key={index} className="flex items-center gap-2">
                     <ExternalLink className="h-4 w-4 text-gray-500 flex-shrink-0" />
                     <a
