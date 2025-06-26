@@ -430,7 +430,7 @@ function InnerCanvas({
 
         // Use regular content generation for other agent types
         const generationResult = await generateContent({
-          agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets" | "linkedin",
+          agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets" | "linkedin" | "blog",
           videoId: videoNode?.data.videoId as Id<"videos"> | undefined,
           videoData,
           connectedAgentOutputs,
