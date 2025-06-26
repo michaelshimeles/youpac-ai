@@ -122,6 +122,36 @@ npm run dev
 
 Your application will be available at `http://localhost:5173`.
 
+## New Feature: Blog Post & SEO Optimization
+
+### Overview
+Generate SEO-optimized blog posts effortlessly using the Blog Generator agent. Transform video content, topics, or scraped web content into comprehensive, keyword-rich blog posts.
+
+### Key Features
+- **SEO-Optimized Content**: Automatically generates titles (50-60 characters), meta descriptions (150-160 characters), and integrates 3-5 relevant keywords
+- **Multiple Input Sources**: 
+  - Manual topic input (e.g., "How to Scale a SaaS Startup")
+  - Video transcript import from uploaded videos
+  - URL scraping using Firecrawl API for web content
+- **Structured Output**: Professional blog posts with H2/H3 headings, introduction, main sections, and conclusion
+- **Export Options**: Copy to clipboard (full post, HTML, or Markdown) and export as .md files
+- **Link Suggestions**: AI-generated internal/external link recommendations
+
+### User Workflow
+1. **Drag Blog Agent** from the sidebar to the canvas
+2. **Add Content Source** via the auto-created SourceNode:
+   - Enter a topic manually
+   - Paste a URL and click "Scrape Content"  
+   - Select a video to import its transcript
+3. **Generate Blog Post** by clicking the Generate button
+4. **Preview & Export** using the realistic blog post preview with SEO elements
+5. **Copy or Export** content in your preferred format
+
+### V2 Roadmap
+- Keyword suggestion API integration for dynamic SEO optimization
+- Content scoring and readability analysis
+- Custom tone/style preferences from user profiles
+
 ## Building for Production
 
 Create a production build:
