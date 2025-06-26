@@ -15,7 +15,8 @@ import {
   Zap,
   Bot,
   Brain,
-  Files
+  Files,
+  Download
 } from "lucide-react";
 import { Card } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -106,6 +107,31 @@ const cleanDraftText = (draft: string, type: string): string => {
 export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
   const config = agentConfig[data.type];
   const Icon = config.icon;
+  
+  const handleDownloadThumbnail = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the view modal
+    
+    if (!data.thumbnailUrl) return;
+    
+    try {
+      const response = await fetch(data.thumbnailUrl);
+      const blob = await response.blob();
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      a.download = `youtube-thumbnail-${timestamp}.png`;
+      
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download thumbnail:", error);
+    }
+  };
 
   const statusIcons = {
     idle: null,
@@ -211,14 +237,26 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
       
       {/* Regular content display */}
       {data.status !== "generating" && (data.type === "thumbnail" && data.thumbnailUrl ? (
-        <div className="mb-4 cursor-pointer group/content" onClick={data.onView}>
-          <div className="aspect-video relative rounded-xl overflow-hidden bg-black shadow-lg transition-all duration-300 hover:shadow-xl">
-            <img 
-              src={data.thumbnailUrl} 
-              alt="Generated thumbnail" 
-              className="w-full h-full object-cover transition-transform duration-300 group-hover/content:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/content:opacity-100 transition-opacity" />
+        <div className="mb-4">
+          <div className="relative group/thumbnail">
+            <div className="aspect-video relative rounded-xl overflow-hidden bg-black shadow-lg transition-all duration-300 hover:shadow-xl cursor-pointer" onClick={data.onView}>
+              <img 
+                src={data.thumbnailUrl} 
+                alt="Generated thumbnail" 
+                className="w-full h-full object-cover transition-transform duration-300 group-hover/thumbnail:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/thumbnail:opacity-100 transition-opacity" />
+            </div>
+            {/* Download button overlay */}
+            <Button
+              size="icon"
+              variant="secondary"
+              className="absolute bottom-2 right-2 h-8 w-8 opacity-0 group-hover/thumbnail:opacity-100 transition-opacity shadow-lg"
+              onClick={handleDownloadThumbnail}
+              title="Download thumbnail"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
           </div>
           {data.draft && (
             <p className="text-xs text-muted-foreground mt-2 line-clamp-2 px-1">

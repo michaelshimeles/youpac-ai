@@ -8,7 +8,7 @@ import {
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Copy, Check, Eye, Edit3, Youtube, Twitter, Sparkles, FileText, Image } from "lucide-react";
+import { Copy, Check, Eye, Edit3, Youtube, Twitter, Sparkles, FileText, Image, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "~/components/ui/card";
 import { YouTubePreview } from "~/components/preview/YouTubePreview";
@@ -40,6 +40,7 @@ export function ContentModal({ isOpen, onClose, nodeData, onUpdate, videoData, c
   const [content, setContent] = useState("");
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
+  const [downloading, setDownloading] = useState(false);
 
   // Update content when nodeData changes
   React.useEffect(() => {
@@ -60,6 +61,38 @@ export function ContentModal({ isOpen, onClose, nodeData, onUpdate, videoData, c
       onUpdate(content);
     }
     onClose();
+  };
+
+  const handleDownloadThumbnail = async () => {
+    if (!nodeData?.thumbnailUrl) return;
+    
+    setDownloading(true);
+    try {
+      // Fetch the image
+      const response = await fetch(nodeData.thumbnailUrl);
+      const blob = await response.blob();
+      
+      // Create a download link
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      a.download = `youtube-thumbnail-${timestamp}.png`;
+      
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success("Thumbnail downloaded successfully!");
+    } catch (error) {
+      console.error("Failed to download thumbnail:", error);
+      toast.error("Failed to download thumbnail");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (!nodeData) return null;
@@ -196,9 +229,21 @@ export function ContentModal({ isOpen, onClose, nodeData, onUpdate, videoData, c
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                     </div>
-                    <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                      <Sparkles className="h-4 w-4" />
-                      <span>AI-generated YouTube thumbnail</span>
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Sparkles className="h-4 w-4" />
+                        <span>AI-generated YouTube thumbnail</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDownloadThumbnail}
+                        disabled={downloading}
+                        className="gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        {downloading ? "Downloading..." : "Download"}
+                      </Button>
                     </div>
                   </div>
                 </Card>
