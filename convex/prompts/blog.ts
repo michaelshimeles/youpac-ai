@@ -41,6 +41,11 @@ Source content: ${sourceContent}
 Generate an SEO-optimized blog post based on this content.`;
 
     try {
+      // Validate API key presence to prevent runtime errors
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error("OPENAI_API_KEY environment variable is not configured. Please set it in your Convex dashboard.");
+      }
+
       const response = await openai.chat.completions.create({
         model: 'gpt-4',
         messages: [
