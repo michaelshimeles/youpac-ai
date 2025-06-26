@@ -95,6 +95,7 @@ export const generateContentSimple = action({
         thumbnail: { temperature: 0.9, maxTokens: 400 },   // Very creative visuals
         tweets: { temperature: 0.8, maxTokens: 200 },      // Simple 2-tweet format
         linkedin: { temperature: 0.7, maxTokens: 300 },    // Professional LinkedIn posts
+        blog: { temperature: 0.7, maxTokens: 2000 },       // Comprehensive blog posts
       };
 
       const params = generationParams[args.agentType as keyof typeof generationParams] 
