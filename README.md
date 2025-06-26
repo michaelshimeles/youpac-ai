@@ -29,6 +29,7 @@ An AI-powered platform that helps content creators generate compelling titles, d
 - 🔐 **Authentication** - Secure user management with Clerk
 - 📱 **Responsive Design** - Works seamlessly on all devices
 - 🚢 **Vercel Ready** - Optimized for one-click deployment
+- 🎯 **Consistent Icons** - FileText icons for content generators (blog) and brand icons for platforms (LinkedIn)
 
 ## Tech Stack
 
