@@ -189,6 +189,27 @@ export const getWithTranscription = query({
   },
 });
 
+export const list = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const userId = identity.subject;
+
+    const videos = await ctx.db
+      .query("videos")
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .collect();
+
+    return videos.map(video => ({
+      _id: video._id,
+      title: video.title || "Untitled Video",
+      transcript: video.transcription,
+      duration: video.duration,
+      createdAt: video._creationTime,
+    }));
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("videos") },
   handler: async (ctx, args) => {
