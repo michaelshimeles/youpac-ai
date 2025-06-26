@@ -12,7 +12,8 @@ export const generateContentSimple = action({
       v.literal("description"),
       v.literal("thumbnail"),
       v.literal("tweets"),
-      v.literal("linkedin")
+      v.literal("linkedin"),
+      v.literal("blog")
     ),
     videoId: v.optional(v.id("videos")),
     videoData: v.object({
