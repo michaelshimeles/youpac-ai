@@ -48,7 +48,7 @@ export function BlogPostPreview({
   const [copyType, setCopyType] = useState<string>("");
   
   // Parse the blog post JSON
-  let blogData;
+  let blogData: ParsedBlogData;
   try {
     blogData = JSON.parse(content);
   } catch (error) {
@@ -61,14 +61,14 @@ export function BlogPostPreview({
     };
   }
 
-  const { title, content: blogContent, metaDescription, keywords = [], links = [] } = blogData;
+  const { title, content: blogContent, metaDescription, keywords = [], links = [] }: ParsedBlogData = blogData;
 
-  const handleCopy = (type: 'full' | 'html' | 'markdown') => {
+  const handleCopy = async (type: 'full' | 'html' | 'markdown') => {
     let textToCopy = '';
     
     switch (type) {
       case 'full':
-        textToCopy = `${title}\n\n${metaDescription}\n\n${blogContent}\n\nKeywords: ${keywords.join(', ')}\n\nLinks:\n${links.map((l: any) => `- ${l.title}: ${l.url}`).join('\n')}`;
+        textToCopy = `${title}\n\n${metaDescription}\n\n${blogContent}\n\nKeywords: ${keywords.join(', ')}\n\nLinks:\n${links.map((l: BlogLink) => `- ${l.title}: ${l.url}`).join('\n')}`;
         break;
       case 'html':
         textToCopy = `<article>
@@ -88,19 +88,24 @@ ${blogContent.replace(/<h2>/g, '\n## ').replace(/<\/h2>/g, '').replace(/<h3>/g, 
 ${keywords.map((k: string) => `- ${k}`).join('\n')}
 
 ## Links
-${links.map((l: any) => `- [${l.title}](${l.url})`).join('\n')}`;
+${links.map((l: BlogLink) => `- [${l.title}](${l.url})`).join('\n')}`;
         break;
     }
     
-    navigator.clipboard.writeText(textToCopy);
-    setCopyType(type);
-    setCopied(true);
-    toast.success(`${type === 'full' ? 'Blog post' : type.toUpperCase()} copied to clipboard!`);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setCopyType(type);
+      setCopied(true);
+      toast.success(`${type === 'full' ? 'Blog post' : type.toUpperCase()} copied to clipboard!`);
+      setTimeout(() => setCopied(false), COPY_FEEDBACK_TIMEOUT);
+    } catch (error) {
+      toast.error('Failed to copy to clipboard. Please try again.');
+    }
   };
 
   const handleExport = () => {
-    const markdown = `# ${title}
+    try {
+      const markdown = `# ${title}
 
 > ${metaDescription}
 
@@ -110,19 +115,22 @@ ${blogContent.replace(/<h2>/g, '\n## ').replace(/<\/h2>/g, '').replace(/<h3>/g, 
 ${keywords.map((k: string) => `- ${k}`).join('\n')}
 
 ## Suggested Links
-${links.map((l: any) => `- [${l.title}](${l.url})`).join('\n')}
+${links.map((l: BlogLink) => `- [${l.title}](${l.url})`).join('\n')}
 
 ---
 *Generated with VidCraft AI Blog Generator*`;
 
-    const blob = new Blob([markdown], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Blog post exported as Markdown!");
+      const blob = new Blob([markdown], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Blog post exported as Markdown!");
+    } catch (error) {
+      toast.error('Failed to export file. Please try again.');
+    }
   };
 
   const highlightKeywords = (text: string) => {
@@ -130,7 +138,9 @@ ${links.map((l: any) => `- [${l.title}](${l.url})`).join('\n')}
     
     let highlightedText = text;
     keywords.forEach(keyword => {
-      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+      // Escape special regex characters to prevent regex injection
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'gi');
       highlightedText = highlightedText.replace(regex, `<mark class="bg-yellow-100 px-1 rounded">${keyword}</mark>`);
     });
     return highlightedText;
