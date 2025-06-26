@@ -148,9 +148,11 @@ Generate SEO-optimized blog posts effortlessly using the Blog Generator agent. T
 5. **Copy or Export** content in your preferred format
 
 ### V2 Roadmap
-- Keyword suggestion API integration for dynamic SEO optimization
-- Content scoring and readability analysis
-- Custom tone/style preferences from user profiles
+- **Keyword Suggestion API**: Integration with Google Keyword Planner for dynamic SEO optimization
+- **Content Scoring**: Readability analysis and SEO optimization suggestions
+- **Custom Preferences**: Tone/style preferences from user profiles
+- **Video Thumbnails**: Optional thumbnail support for blog posts from video transcripts
+- **A/B Testing**: Multiple blog variations for performance testing
 
 ## Building for Production
 
