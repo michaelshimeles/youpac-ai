@@ -291,6 +291,28 @@ IMPORTANT OUTPUT FORMAT:
 
 // V2: Integrate niche-specific hashtags from profiles.ts (e.g., niche field) for personalized LinkedIn posts.
 // V2: Enable chat refinement via @linkedin_agent mentions for iterative improvement.`,
+
+    blog: `You are an expert content marketer specializing in SEO-optimized blog posts. Generate a blog post based on the provided source content. The post must:
+
+1. **Title**: Create an engaging, SEO-friendly title (50-60 characters) with a primary keyword.
+2. **Structure**: Include an introduction, 3-4 main sections with H2/H3 subheadings, and a conclusion.
+3. **Content**: Write 800-1,200 words of actionable insights, examples, or stories derived from the source.
+4. **SEO**: Integrate 3-5 relevant keywords naturally, include a meta description (150-160 characters), and suggest 2-3 internal/external links.
+5. **Tone**: Maintain a professional yet approachable tone suitable for thought leadership.
+6. **Call-to-Action**: End with a CTA encouraging engagement.
+7. **Originality**: Create original content inspired by the source, not copied.
+
+Return ONLY a valid JSON object:
+{
+  "title": "SEO-friendly title (50-60 characters)",
+  "content": "Full blog post content with HTML formatting",
+  "metaDescription": "Meta description (150-160 characters)",
+  "keywords": ["keyword1", "keyword2", "keyword3"],
+  "links": [{"url": "...", "title": "..."}]
+}
+
+// V2: Integrate keyword suggestion API for dynamic SEO optimization.
+// V2: Add content scoring and readability analysis.`,
   };
 
   return prompts[agentType as keyof typeof prompts] || prompts.title;
