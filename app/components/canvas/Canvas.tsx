@@ -2678,7 +2678,7 @@ function InnerCanvas({
                 type="blog" 
                 label={isSidebarCollapsed ? "" : "Blog Generator"} 
                 description={isSidebarCollapsed ? "" : "SEO-optimized blog posts"}
-                icon={<BookOpen className="h-5 w-5" />}
+                icon={<FileText className="h-5 w-5" />}
                 collapsed={isSidebarCollapsed}
                 color="green"
               />
