@@ -44,6 +44,7 @@ An AI-powered platform that helps content creators generate compelling titles, d
 - **Convex** - Real-time database and serverless functions
 - **Clerk** - Authentication and user management
 - **OpenAI** - GPT-4 for content generation, DALL-E 3 for thumbnails
+- **Firecrawl** - Web content scraping for blog post generation
 - **ElevenLabs** - Advanced speech-to-text transcription
 - **FFmpeg** - Video processing and audio extraction
 
