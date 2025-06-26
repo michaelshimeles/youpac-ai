@@ -294,7 +294,7 @@ ${links.map((l: BlogLink) => `- [${l.title}](${l.url})`).join('\n')}
           <div 
             className="prose prose-lg max-w-none text-gray-800 leading-relaxed"
             dangerouslySetInnerHTML={{ 
-              __html: highlightKeywords(blogContent)
+              __html: DOMPurify.sanitize(highlightKeywords(blogContent))
             }}
           />
           
