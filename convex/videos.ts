@@ -197,7 +197,7 @@ export const list = query({
 
     const videos = await ctx.db
       .query("videos")
-      .filter((q) => q.eq(q.field("userId"), userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
     return videos.map(video => ({
