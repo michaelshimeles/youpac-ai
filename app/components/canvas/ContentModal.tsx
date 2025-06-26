@@ -190,6 +190,14 @@ export function ContentModal({ isOpen, onClose, nodeData, onUpdate, videoData, c
                       thumbnailUrl={nodeData.thumbnailUrl}
                     />
                   )}
+                  
+                  {nodeData.type === "blog" && (
+                    <BlogPostPreview
+                      content={content}
+                      authorName={channelData?.channelName || "Your Name"}
+                      authorImage={channelData?.channelAvatar}
+                    />
+                  )}
                 </TabsContent>
               </div>
             </Tabs>
