@@ -2625,6 +2625,14 @@ function InnerCanvas({
                 collapsed={isSidebarCollapsed}
                 color="blue"
               />
+              <DraggableNode 
+                type="blog" 
+                label={isSidebarCollapsed ? "" : "Blog Generator"} 
+                description={isSidebarCollapsed ? "" : "SEO-optimized blog posts"}
+                icon={<BookOpen className="h-5 w-5" />}
+                collapsed={isSidebarCollapsed}
+                color="green"
+              />
             </div>
             
             {!isSidebarCollapsed && (
