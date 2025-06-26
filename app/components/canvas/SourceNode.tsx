@@ -1,4 +1,4 @@
-import { memo, useState, useCallback } from "react";
+import { memo, useState, useCallback, useEffect, useRef } from "react";
 import { Handle, Position } from "./ReactFlowComponents";
 import { 
   Globe,
@@ -25,6 +25,8 @@ export interface SourceNodeData {
   isScraping: boolean;
   error: string | null;
   videoId?: string;
+  onContentChange?: (content: string) => void;
+  onSourceTypeChange?: (sourceType: "topic" | "url" | "video") => void;
 }
 
 interface SourceNodeProps {
@@ -34,8 +36,18 @@ interface SourceNodeProps {
 }
 
 export const SourceNode = memo(({ data, selected, id }: SourceNodeProps) => {
-  const [content, setContent] = useState(data.content || "");
-  const [sourceType, setSourceType] = useState<"topic" | "url" | "video">(data.sourceType || "topic");
+  // Use controlled components pattern - get values from props and use callbacks
+  const content = data.content || "";
+  const sourceType = data.sourceType || "topic";
+  
+  // Keep track of mounted state for async operations cleanup
+  const isMountedRef = useRef(true);
+  
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   
   const videos = useQuery(api.videos.list) || [];
   const scrapeContent = useAction(api.scrape.scrapeContent);
