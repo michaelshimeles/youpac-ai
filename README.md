@@ -137,6 +137,7 @@ Generate SEO-optimized blog posts effortlessly using the Blog Generator agent. T
 - **Structured Output**: Professional blog posts with H2/H3 headings, introduction, main sections, and conclusion
 - **Export Options**: Copy to clipboard (full post, HTML, or Markdown) and export as .md files
 - **Link Suggestions**: AI-generated internal/external link recommendations
+- **Optimization**: Query in `convex/videos.ts` refactored to use `.withIndex("by_user", ...)` for improved performance and consistency (December 2024)
 
 ### User Workflow
 1. **Drag Blog Agent** from the sidebar to the canvas
