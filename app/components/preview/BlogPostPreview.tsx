@@ -14,6 +14,20 @@ import {
   Download
 } from "lucide-react";
 import { toast } from "sonner";
+import DOMPurify from 'dompurify';
+
+interface BlogLink {
+  title: string;
+  url: string;
+}
+
+interface ParsedBlogData {
+  title: string;
+  content: string;
+  metaDescription: string;
+  keywords: string[];
+  links: BlogLink[];
+}
 
 interface BlogPostPreviewProps {
   content: string;
@@ -21,6 +35,8 @@ interface BlogPostPreviewProps {
   authorImage?: string;
   publishDate?: string;
 }
+
+const COPY_FEEDBACK_TIMEOUT = 2000;
 
 export function BlogPostPreview({
   content,
