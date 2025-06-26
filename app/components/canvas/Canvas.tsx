@@ -2211,10 +2211,59 @@ function InnerCanvas({
         return;
       }
 
+      // Special handling for blog type - create source node too
+      if (type === 'blog') {
+        const sourceNodeId = `source_${Date.now()}`;
+        const blogNodeId = `blog_${Date.now()}`;
+        
+        // Create source node
+        const sourceNode: Node = {
+          id: sourceNodeId,
+          type: 'source',
+          position: { x: position.x - 250, y: position.y },
+          data: {
+            content: '',
+            sourceType: 'topic',
+            isScraping: false,
+            error: null,
+          },
+        };
+        
+        // Create blog node without database agent (for now)
+        const blogNode: Node = {
+          id: blogNodeId,
+          type: 'blog',
+          position,
+          data: {
+            type: 'blog',
+            draft: "",
+            status: "idle",
+            connections: [],
+            onGenerate: () => handleGenerate(blogNodeId),
+            onChat: () => handleChatButtonClick(blogNodeId),
+            onView: () => setSelectedNodeForModal(blogNodeId),
+            onRegenerate: () => handleRegenerateClick(blogNodeId),
+          },
+        };
+        
+        // Create edge between source and blog
+        const edgeId = `e${sourceNodeId}-${blogNodeId}`;
+        const newEdge: Edge = {
+          id: edgeId,
+          source: sourceNodeId,
+          target: blogNodeId,
+          animated: enableEdgeAnimations && !isDragging,
+        };
+        
+        setNodes((nds: any) => nds.concat([sourceNode, blogNode]));
+        setEdges((eds: any) => eds.concat(newEdge));
+        return;
+      }
+
       // Create agent in database
       createAgent({
         videoId: videoNode.data.videoId as Id<"videos">,
-        type: type as "title" | "description" | "thumbnail" | "tweets" | "linkedin",
+        type: type as "title" | "description" | "thumbnail" | "tweets" | "linkedin" | "blog",
         canvasPosition: position,
       }).then((agentId) => {
         const nodeId = `${type === 'linkedin' ? 'linkedin' : 'agent'}_${type}_${agentId}`;
