@@ -2820,7 +2820,7 @@ function InnerCanvas({
                   title="Toggle Mini-map"
                   className="w-full"
                 >
-                  <Map className="h-5 w-5" />
+                  <MapIcon className="h-5 w-5" />
                 </Button>
                 <Button 
                   onClick={() => setEnableEdgeAnimations(!enableEdgeAnimations)}
