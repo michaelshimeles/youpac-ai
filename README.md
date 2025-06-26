@@ -1,22 +1,25 @@
-# YouPac AI - YouTube Content Creation Assistant
+# VidCraft AI - Video Content Creation Suite
 
-An AI-powered platform that helps YouTube creators generate compelling titles, descriptions, thumbnails, and social media posts from their video content. Built with React Router v7, Convex, and OpenAI.
+An AI-powered platform that helps content creators generate compelling titles, descriptions, thumbnails, social media posts, and SEO-optimized blog posts from their video content. Built with React Router v7, Convex, and OpenAI.
 
 ## Features
 
 ### Core Functionality
 - 🎬 **Video Upload & Processing** - Upload videos up to 1GB with automatic transcription
-- 🤖 **AI Content Generation** - Generate titles, descriptions, thumbnails, and tweets
+- 🤖 **AI Content Generation** - Generate titles, descriptions, thumbnails, social posts, and blog content
 - 🎨 **Visual Canvas Interface** - Drag-and-drop nodes for content workflow
 - 💬 **Smart Chat Integration** - Chat with AI agents to refine content
-- 👁️ **Content Preview** - See how content looks on YouTube and Twitter/X
+- 👁️ **Content Preview** - See how content looks on YouTube, Twitter/X, LinkedIn, and as blog posts
 - 🔗 **Share System** - Share read-only canvas views with collaborators
+- 🌐 **Content Scraping** - Import content from URLs for blog post generation
 
 ### AI Agents
 - 📝 **Title Agent** - Creates catchy, SEO-optimized video titles
 - 📄 **Description Agent** - Writes comprehensive video descriptions
 - 🖼️ **Thumbnail Agent** - Generates thumbnail concepts and images with DALL-E 3
 - 🐦 **Social Media Agent** - Creates Twitter/X threads for video promotion
+- 💼 **LinkedIn Agent** - Generates professional posts for LinkedIn networking
+- 📰 **Blog Generator** - Creates SEO-optimized blog posts with keyword integration
 
 ### Technical Features
 - 🚀 **React Router v7** - Modern full-stack React framework
