@@ -315,3 +315,5 @@ ${links.map((l: any) => `- [${l.title}](${l.url})`).join('\n')}
 // V2: Add keyword suggestion UI for selecting keywords from an API
 // V2: Add readability score and SEO optimization suggestions  
 // V2: Enable custom styling and theme options
+// V2: Add optional video thumbnail support for blog posts from video transcripts
+// V2: Add content scoring and custom tone/style preferences
