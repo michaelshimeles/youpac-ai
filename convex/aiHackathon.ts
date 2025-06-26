@@ -454,6 +454,14 @@ function buildPrompt(
       prompt += `- Find data points, statistics, or business results\n`;
       prompt += `- Look for actionable advice for professionals\n`;
       prompt += `- Consider networking and engagement opportunities\n\n`;
+    } else if (agentType === 'blog') {
+      prompt += `🎯 BLOG POST GENERATION FOCUS:\n`;
+      prompt += `- Extract main themes and key insights for comprehensive coverage\n`;
+      prompt += `- Identify SEO opportunities and target keywords\n`;
+      prompt += `- Find actionable tips and detailed examples\n`;
+      prompt += `- Look for data points, statistics, and research findings\n`;
+      prompt += `- Consider educational value and thought leadership angles\n`;
+      prompt += `- Structure content for readability and engagement\n\n`;
     }
   } else {
     prompt += `⚠️ LIMITED CONTEXT MODE - No transcription available\n\n`;
