@@ -835,7 +835,7 @@ function InnerCanvas({
           agentId: agentNode.data.agentId as Id<"agents">,
           userMessage: finalMessage,
           currentDraft: agentNode.data.draft || "",
-          agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets" | "linkedin",
+          agentType: agentNode.data.type as "title" | "description" | "thumbnail" | "tweets" | "linkedin" | "blog",
           chatHistory: agentHistory.map(msg => ({
             role: msg.role,
             content: msg.content,
