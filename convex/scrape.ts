@@ -8,6 +8,11 @@ export const scrapeContent = action({
   handler: async (ctx, args) => {
     const { url } = args;
     
+    // Validate API key presence to prevent runtime errors
+    if (!process.env.FIRECRAWL_API_KEY) {
+      throw new Error("FIRECRAWL_API_KEY environment variable is not configured. Please set it in your Convex dashboard.");
+    }
+    
     // Validate URL format
     try {
       new URL(url);
