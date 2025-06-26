@@ -14,6 +14,7 @@ import { Card } from "~/components/ui/card";
 import { YouTubePreview } from "~/components/preview/YouTubePreview";
 import { TwitterThreadPreview } from "~/components/preview/TwitterThreadPreview";
 import { LinkedInPostPreview } from "~/components/preview/LinkedInPostPreview";
+import { BlogPostPreview } from "~/components/preview/BlogPostPreview";
 import { cn } from "~/lib/utils";
 
 interface ContentModalProps {
