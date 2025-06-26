@@ -94,6 +94,9 @@ OPENAI_API_KEY=your_openai_api_key_here
 # ElevenLabs Configuration
 ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
 
+# Firecrawl Configuration (for blog content scraping)
+FIRECRAWL_API_KEY=your_firecrawl_api_key_here
+
 # Frontend URL
 FRONTEND_URL=http://localhost:5173
 ```
@@ -107,6 +110,7 @@ npx convex dev
 5. Set up environment variables in Convex dashboard:
    - `OPENAI_API_KEY`
    - `ELEVENLABS_API_KEY`
+   - `FIRECRAWL_API_KEY`
 
 ### Development
 
