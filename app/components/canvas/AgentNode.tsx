@@ -35,6 +35,8 @@ export interface AgentNodeData {
   lastPrompt?: string;
   hasManualTranscriptions?: boolean;
   manualTranscriptionCount?: number;
+  hasMoodBoard?: boolean;
+  moodBoardCount?: number;
 }
 
 const agentConfig = {
@@ -210,6 +212,23 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
             )}
           </div>
         )}
+        
+        {/* Mood board indicator */}
+        {data.hasMoodBoard && (
+          <div className={`mb-3 flex items-center gap-2 text-xs bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded-md transition-all ${
+            data.status === 'generating' ? 'animate-pulse ring-2 ring-indigo-500/50 ring-offset-2 ring-offset-background' : ''
+          }`}>
+            <Sparkles className={`h-3.5 w-3.5 ${data.status === 'generating' ? 'animate-bounce' : ''}`} />
+            <span>{data.status === 'generating' ? 'Applying' : 'Using'} {data.moodBoardCount} mood board reference{data.moodBoardCount! > 1 ? 's' : ''}</span>
+            {data.status === 'generating' && (
+              <div className="flex gap-0.5">
+                <div className="w-1 h-1 bg-indigo-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1 h-1 bg-indigo-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1 h-1 bg-indigo-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            )}
+          </div>
+        )}
       
       {/* Show progress when generating */}
       {data.status === "generating" && data.generationProgress && (
@@ -305,7 +324,6 @@ export const AgentNode = memo(({ data, selected, id }: ExtendedNodeProps) => {
             variant="outline" 
             className="flex-1 hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-all"
             onClick={data.onRegenerate}
-            disabled={data.status === "generating"}
           >
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
             Regenerate

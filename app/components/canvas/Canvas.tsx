@@ -30,11 +30,13 @@ import { TranscriptionViewModal } from "./TranscriptionViewModal";
 import { VideoNode } from "./VideoNode";
 import { VideoPlayerModal } from "./VideoPlayerModal";
 import { TranscriptionNode } from "./TranscriptionNode";
+import { MoodBoardNode } from "./MoodBoardNode";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
   agent: AgentNode,
   transcription: TranscriptionNode,
+  moodboard: MoodBoardNode,
 };
 
 function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
@@ -198,12 +200,13 @@ function InnerCanvas({
     }
     
     try {
-      // First, collect connected transcription nodes for animation
+      // First, collect all connected nodes
       const connectedEdgesForAnimation = edges.filter((edge: any) => edge.target === nodeId);
       const connectedNodesForAnimation = connectedEdgesForAnimation.map((edge: any) => 
         nodes.find((n: any) => n.id === edge.source)
       ).filter(Boolean);
       const transcriptionNodesToAnimate = connectedNodesForAnimation.filter((n: any) => n.type === 'transcription');
+      const moodBoardNodesToAnimate = connectedNodesForAnimation.filter((n: any) => n.type === 'moodboard');
       
       // Update status to generating in UI with initial progress
       setNodes((nds: any) =>
@@ -223,6 +226,16 @@ function InnerCanvas({
           }
           // Mark connected transcription nodes as being used
           if (node.type === 'transcription' && transcriptionNodesToAnimate.some((tn: any) => tn.id === node.id)) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                isBeingUsed: true
+              }
+            };
+          }
+          // Mark connected mood board nodes as being used
+          if (node.type === 'moodboard' && moodBoardNodesToAnimate.some((mb: any) => mb.id === node.id)) {
             return {
               ...node,
               data: {
@@ -251,6 +264,12 @@ function InnerCanvas({
       // Find connected transcription nodes
       const connectedTranscriptionNodes = edgesRef.current
         .filter((e: any) => e.target === nodeId && e.source?.includes('transcription'))
+        .map((e: any) => nodesRef.current.find((n: any) => n.id === e.source))
+        .filter(Boolean);
+      
+      // Find connected mood board nodes
+      const connectedMoodBoardNodes = edgesRef.current
+        .filter((e: any) => e.target === nodeId && e.source?.includes('moodboard'))
         .map((e: any) => nodesRef.current.find((n: any) => n.id === e.source))
         .filter(Boolean);
       
@@ -310,6 +329,23 @@ function InnerCanvas({
             preview: t.text.substring(0, 100) + '...'
           }))
         });
+      }
+      
+      // Collect mood board items
+      const moodBoardReferences = connectedMoodBoardNodes.flatMap((node: any) => 
+        node.data.items || []
+      );
+      
+      if (moodBoardReferences.length > 0) {
+        console.log(`[Canvas] 🎨 Mood board references being sent to ${agentNode.data.type} agent:`, {
+          count: moodBoardReferences.length,
+          items: moodBoardReferences.map((item: any) => ({
+            type: item.type,
+            url: item.url,
+            title: item.title
+          }))
+        });
+        toast.info(`Using ${moodBoardReferences.length} mood board reference(s) for inspiration`);
       }
       
       if (videoNode && videoNode.data.videoId) {
@@ -376,6 +412,9 @@ function InnerCanvas({
                   // Store manual transcription info for visual indicator
                   hasManualTranscriptions: manualTranscriptions.length > 0,
                   manualTranscriptionCount: manualTranscriptions.length,
+                  // Store mood board info for visual indicator
+                  hasMoodBoard: moodBoardReferences.length > 0,
+                  moodBoardCount: moodBoardReferences.length,
                 } 
               }
             : node
@@ -448,6 +487,11 @@ function InnerCanvas({
           connectedAgentOutputs,
           profileData,
           additionalContext,
+          moodBoardReferences: moodBoardReferences.map((item: any) => ({
+            url: item.url,
+            type: item.type,
+            title: item.title,
+          })),
         });
         
         console.log("[Canvas] Thumbnail generation completed");
@@ -511,6 +555,11 @@ function InnerCanvas({
           videoData,
           connectedAgentOutputs,
           profileData,
+          moodBoardReferences: moodBoardReferences.map((item: any) => ({
+            url: item.url,
+            type: item.type,
+            title: item.title,
+          })),
         });
         result = generationResult.content;
         
@@ -569,7 +618,7 @@ function InnerCanvas({
             };
           }
           // Clear isBeingUsed flag on transcription nodes
-          if (node.type === 'transcription' && node.data.isBeingUsed) {
+          if ((node.type === 'transcription' || node.type === 'moodboard') && node.data.isBeingUsed) {
             return {
               ...node,
               data: {
@@ -622,7 +671,7 @@ function InnerCanvas({
             };
           }
           // Clear isBeingUsed flag on transcription nodes
-          if (node.type === 'transcription' && node.data.isBeingUsed) {
+          if ((node.type === 'transcription' || node.type === 'moodboard') && node.data.isBeingUsed) {
             return {
               ...node,
               data: {
@@ -1210,12 +1259,14 @@ function InnerCanvas({
       if (
         (sourceNode.type === 'video' && targetNode.type === 'agent') ||
         (sourceNode.type === 'transcription' && targetNode.type === 'agent') ||
+        (sourceNode.type === 'moodboard' && targetNode.type === 'agent') ||
         (sourceNode.type === 'agent' && targetNode.type === 'agent')
       ) {
         const newEdge = {
           ...params,
           animated: enableEdgeAnimations && !isDragging,
-          style: sourceNode.type === 'transcription' ? { stroke: '#a855f7', strokeWidth: 2 } : undefined,
+          style: sourceNode.type === 'transcription' ? { stroke: '#a855f7', strokeWidth: 2 } : 
+                 sourceNode.type === 'moodboard' ? { stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' } : undefined,
         };
         setEdges((eds: any) => addEdge(newEdge, eds));
         
@@ -1533,7 +1584,7 @@ function InnerCanvas({
       }
 
       // Check video format
-      const supportedFormats = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mov'];
+      const supportedFormats = ['video/mp4', 'video/quicktime', 'vidieo/x-msvideo', 'video/webm', 'video/mov'];
       if (!supportedFormats.includes(file.type) && !file.name.match(/\.(mp4|mov|avi|webm)$/i)) {
         // Remove the temporary node since upload won't proceed
         setNodes((nds: any) => nds.filter((n: any) => n.id !== tempNodeId));
@@ -2386,7 +2437,6 @@ function InnerCanvas({
       });
       
       // Create a new transcription node - use the database ID once we have it
-      const temporaryNodeId = `transcription_temp_${Date.now()}`;
       const transcriptionPosition = {
         x: videoNode.position.x + 400, // Position to the right of the video
         y: videoNode.position.y,
@@ -3186,6 +3236,101 @@ function InnerCanvas({
                       </div>
                     }
                   />
+                </div>
+              )}
+              
+              {/* Mood Board */}
+              {!isSidebarCollapsed && (
+                <div className="mt-6">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Creative Tools</span>
+                  </div>
+                  <div 
+                    className="cursor-pointer rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-500/30 backdrop-blur-sm p-4 transition-all hover:scale-[1.02] hover:shadow-lg group"
+                    onClick={() => {
+                      // Create a new mood board node
+                      const centerPosition = reactFlowInstance 
+                        ? reactFlowInstance.screenToFlowPosition({
+                            x: window.innerWidth / 2,
+                            y: window.innerHeight / 2
+                          })
+                        : { x: 350, y: 250 };
+                      
+                      const moodBoardNodeId = `moodboard_${Date.now()}`;
+                      const moodBoardNode: Node = {
+                        id: moodBoardNodeId,
+                        type: 'moodboard',
+                        position: centerPosition,
+                        data: {
+                          items: [],
+                          onAddItem: (item: any) => {
+                            setNodes((nds: any) =>
+                              nds.map((node: any) =>
+                                node.id === moodBoardNodeId
+                                  ? {
+                                      ...node,
+                                      data: {
+                                        ...node.data,
+                                        items: [...node.data.items, item],
+                                      },
+                                    }
+                                  : node
+                              )
+                            );
+                          },
+                          onRemoveItem: (itemId: string) => {
+                            setNodes((nds: any) =>
+                              nds.map((node: any) =>
+                                node.id === moodBoardNodeId
+                                  ? {
+                                      ...node,
+                                      data: {
+                                        ...node.data,
+                                        items: node.data.items.filter((item: any) => item.id !== itemId),
+                                      },
+                                    }
+                                  : node
+                              )
+                            );
+                          },
+                          onUpdateItem: (itemId: string, updatedItem: any) => {
+                            setNodes((nds: any) =>
+                              nds.map((node: any) =>
+                                node.id === moodBoardNodeId
+                                  ? {
+                                      ...node,
+                                      data: {
+                                        ...node.data,
+                                        items: node.data.items.map((item: any) =>
+                                          item.id === itemId ? updatedItem : item
+                                        ),
+                                      },
+                                    }
+                                  : node
+                              )
+                            );
+                          },
+                        },
+                      };
+                      
+                      setNodes((nds: any) => [...nds, moodBoardNode]);
+                      toast.success("Mood board added to canvas!");
+                    }}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="text-indigo-500">
+                          <Sparkles className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-medium text-foreground">Create Mood Board</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">Add reference links for AI context</p>
+                        </div>
+                        <GripVertical className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

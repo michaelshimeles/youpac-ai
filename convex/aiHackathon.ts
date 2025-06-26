@@ -35,6 +35,13 @@ export const generateContentSimple = action({
         content: v.string(),
       })
     ),
+    moodBoardReferences: v.optional(v.array(
+      v.object({
+        url: v.string(),
+        type: v.string(),
+        title: v.optional(v.string()),
+      })
+    )),
     profileData: v.optional(
       v.object({
         channelName: v.string(),
@@ -83,7 +90,8 @@ export const generateContentSimple = action({
         args.agentType,
         videoData, // Use the fresh video data
         args.connectedAgentOutputs,
-        args.profileData
+        args.profileData,
+        args.moodBoardReferences
       );
 
       // Log if generating without transcription
@@ -300,7 +308,12 @@ function buildPrompt(
     niche: string;
     tone?: string;
     targetAudience?: string;
-  }
+  },
+  moodBoardReferences?: Array<{
+    url: string;
+    type: string;
+    title?: string;
+  }>
 ): string {
   let prompt = "";
 
@@ -467,9 +480,37 @@ function buildPrompt(
     prompt += "\n";
   }
 
+  // Add mood board references if available
+  if (moodBoardReferences && moodBoardReferences.length > 0) {
+    prompt += "\n🎨 MOOD BOARD REFERENCES:\n";
+    prompt += "Use these references for inspiration, tone, and creative direction:\n\n";
+    
+    moodBoardReferences.forEach((ref, index) => {
+      const typeLabel = ref.type.charAt(0).toUpperCase() + ref.type.slice(1);
+      prompt += `${index + 1}. [${typeLabel}] ${ref.title || ref.url}\n`;
+      
+      // Add specific guidance based on reference type
+      switch (ref.type) {
+        case "youtube":
+          prompt += `   → Study this video's style, pacing, and audience engagement techniques\n`;
+          break;
+        case "music":
+          prompt += `   → Match the energy, mood, and emotional tone of this music\n`;
+          break;
+        case "image":
+          prompt += `   → Draw visual inspiration and aesthetic cues from this image\n`;
+          break;
+        default:
+          prompt += `   → Consider the overall vibe and approach of this reference\n`;
+      }
+    });
+    
+    prompt += "\nIMPORTANT: Blend these references creatively - don't copy directly, but let them influence your style and approach.\n";
+  }
+
   // Add profile data with strategic emphasis
   if (profileData) {
-    prompt += "🎨 BRAND IDENTITY & AUDIENCE:\n";
+    prompt += "\n🎯 BRAND IDENTITY & AUDIENCE:\n";
     prompt += `Channel: ${profileData.channelName}\n`;
     prompt += `Content Vertical: ${profileData.contentType}\n`;
     prompt += `Niche Authority: ${profileData.niche}\n`;
@@ -489,11 +530,17 @@ function buildPrompt(
     prompt += `- Use language that resonates with the target audience\n`;
     prompt += `- Maintain consistency with existing content style\n`;
     prompt += `- Be authentic to the creator's voice\n`;
+    if (moodBoardReferences && moodBoardReferences.length > 0) {
+      prompt += `- Incorporate the creative direction from the mood board references\n`;
+    }
   } else {
     prompt += "\n💡 FINAL INSTRUCTIONS:\n";
     prompt += `- Create professional, engaging content\n`;
     prompt += `- Focus on value and viewer retention\n`;
     prompt += `- Use clear, accessible language\n`;
+    if (moodBoardReferences && moodBoardReferences.length > 0) {
+      prompt += `- Draw inspiration from the mood board references provided\n`;
+    }
   }
 
   return prompt;

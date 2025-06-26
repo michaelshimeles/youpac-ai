@@ -16,6 +16,7 @@ import type * as chat from "../chat.js";
 import type * as debug from "../debug.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as moodboardUtils from "../moodboardUtils.js";
 import type * as profiles from "../profiles.js";
 import type * as projects from "../projects.js";
 import type * as shares from "../shares.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   debug: typeof debug;
   files: typeof files;
   http: typeof http;
+  moodboardUtils: typeof moodboardUtils;
   profiles: typeof profiles;
   projects: typeof projects;
   shares: typeof shares;
