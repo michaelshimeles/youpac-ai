@@ -48,7 +48,7 @@ Generate an SEO-optimized blog post based on this content.`;
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 3500, // Increased from 2000 to accommodate 800-1,200 words + JSON overhead
       });
       
       const content = response.choices[0].message.content;
