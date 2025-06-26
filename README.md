@@ -137,7 +137,11 @@ Generate SEO-optimized blog posts effortlessly using the Blog Generator agent. T
 - **Structured Output**: Professional blog posts with H2/H3 headings, introduction, main sections, and conclusion
 - **Export Options**: Copy to clipboard (full post, HTML, or Markdown) and export as .md files
 - **Link Suggestions**: AI-generated internal/external link recommendations
-- **Optimization**: Query in `convex/videos.ts` refactored to use `.withIndex("by_user", ...)` for improved performance and consistency (December 2024)
+
+### Optimizations
+- **Query Performance**: Query in `convex/videos.ts` refactored to use `.withIndex("by_user", ...)` for improved performance and consistency (December 2024)
+- **API Reliability**: Added API key validation in `convex/scrape.ts` to prevent runtime errors (December 2024)
+- **Robust Scraping**: Refactored retry logic with exponential backoff for reliable Firecrawl integration (December 2024)
 
 ### User Workflow
 1. **Drag Blog Agent** from the sidebar to the canvas
