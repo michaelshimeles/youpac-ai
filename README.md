@@ -142,6 +142,8 @@ Generate SEO-optimized blog posts effortlessly using the Blog Generator agent. T
 - **Query Performance**: Query in `convex/videos.ts` refactored to use `.withIndex("by_user", ...)` for improved performance and consistency (December 2024)
 - **API Reliability**: Added API key validation in `convex/scrape.ts` to prevent runtime errors (December 2024)
 - **Robust Scraping**: Refactored retry logic with exponential backoff for reliable Firecrawl integration (December 2024)
+- **Enhanced Blog Generation**: Increased `max_tokens` to 3500 in `convex/prompts/blog.ts` to support 800-1,200 word posts (December 2024)
+- **Blog API Validation**: Added API key validation in `convex/prompts/blog.ts` to prevent runtime errors (December 2024)
 
 ### User Workflow
 1. **Drag Blog Agent** from the sidebar to the canvas
