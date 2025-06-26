@@ -38,7 +38,7 @@ export const SourceNode = memo(({ data, selected, id }: SourceNodeProps) => {
   const [sourceType, setSourceType] = useState<"topic" | "url" | "video">(data.sourceType || "topic");
   
   const videos = useQuery(api.videos.list) || [];
-  const scrapeContent = useAction(api.prompts.scrape.scrapeContent);
+  const scrapeContent = useAction(api.scrape.scrapeContent);
   
   // Detect if content looks like a URL
   const isUrl = content.trim().startsWith('http://') || content.trim().startsWith('https://');
