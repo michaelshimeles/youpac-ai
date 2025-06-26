@@ -90,3 +90,4 @@ Generate an SEO-optimized blog post based on this content.`;
 // V2: Integrate keyword suggestion API (e.g., Google Keyword Planner) for dynamic SEO keywords.
 // V2: Add content optimization scoring and readability analysis.
 // V2: Enable custom tone/style preferences from user profiles.
+// V2: Add A/B testing capabilities for different blog variations.
