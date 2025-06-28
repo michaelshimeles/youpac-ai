@@ -1,4 +1,4 @@
-import { IconDashboard, IconSettings, IconPalette } from "@tabler/icons-react";
+import { IconDashboard, IconSettings } from "@tabler/icons-react";
 import { MessageCircle, Twitter, Youtube } from "lucide-react";
 import { Link } from "react-router";
 import { NavMain } from "./nav-main";

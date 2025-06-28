@@ -87,7 +87,6 @@ export const meta: Route.MetaFunction = () => [
   { name: "twitter:image", content: "https://jdj14ctwppwprnqu.public.blob.vercel-storage.com/youtube-ai-assistant-og.png" },
   
   // Additional SEO
-  { name: "viewport", content: "width=device-width, initial-scale=1" },
   { name: "theme-color", content: "#000000" },
 ];
 

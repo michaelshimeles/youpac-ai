@@ -1,4 +1,3 @@
-import { SignOutButton } from "@clerk/react-router";
 import {
   IconDotsVertical,
   IconLogout,
@@ -25,15 +24,10 @@ import { useClerk } from "@clerk/react-router";
 import { useIsMobile } from "~/hooks/use-mobile";
 
 export function NavUser({ user }: any) {
-  // Safely get sidebar context, fallback to mobile hook if not available
-  let isMobile = false;
-  try {
-    const sidebarContext = useSidebar();
-    isMobile = sidebarContext.isMobile;
-  } catch {
-    // Fallback to mobile hook if not within SidebarProvider
-    isMobile = useIsMobile();
-  }
+  // Check if we're within SidebarProvider context, fallback to mobile hook
+  const sidebarContext = useSidebar();
+  const fallbackMobile = useIsMobile();
+  const isMobile = sidebarContext?.isMobile ?? fallbackMobile;
 
   // Add null checks for user data
   if (!user) {

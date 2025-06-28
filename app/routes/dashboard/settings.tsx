@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { 
-  Loader2, Plus, X, User, Globe, Target, Palette, 
+  Loader2, Plus, X, User, Globe,
   Youtube, Link2, Sparkles, Save, Eye, Hash,
   MessageSquare, Users, TrendingUp, Video
 } from "lucide-react";
