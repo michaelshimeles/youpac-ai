@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/favicon.ico",
+      "destination": "/ypai.png",
+      "permanent": true
+    }
+  ]
+}
