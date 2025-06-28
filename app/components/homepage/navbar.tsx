@@ -4,7 +4,7 @@ import { Github, Menu, X } from "lucide-react";
 import React, { useCallback } from "react";
 import { Link } from "react-router";
 import { Button } from "~/components/ui/button";
-import { cn } from "~/lib/utils";
+import { cn } from "~/services/shared";
 
 const menuItems = [
   { name: "Home", href: "#hero" },

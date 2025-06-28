@@ -8,28 +8,30 @@
  * @module
  */
 
-import type * as agents from "../agents.js";
-import type * as ai from "../ai.js";
-import type * as aiHackathon from "../aiHackathon.js";
-import type * as canvas from "../canvas.js";
-import type * as chat from "../chat.js";
-import type * as debug from "../debug.js";
-import type * as files from "../files.js";
+import type * as domains_ai_agents from "../domains/ai/agents.js";
+import type * as domains_ai_chat from "../domains/ai/chat.js";
+import type * as domains_ai_generation from "../domains/ai/generation.js";
+import type * as domains_ai_index from "../domains/ai/index.js";
+import type * as domains_ai_thumbnail from "../domains/ai/thumbnail.js";
+import type * as domains_ai_thumbnailGPTImage from "../domains/ai/thumbnailGPTImage.js";
+import type * as domains_ai_thumbnailRefine from "../domains/ai/thumbnailRefine.js";
+import type * as domains_projects_canvas from "../domains/projects/canvas.js";
+import type * as domains_projects_index from "../domains/projects/index.js";
+import type * as domains_projects_projects from "../domains/projects/projects.js";
+import type * as domains_shared_files from "../domains/shared/files.js";
+import type * as domains_shared_index from "../domains/shared/index.js";
+import type * as domains_shared_shares from "../domains/shared/shares.js";
+import type * as domains_shared_stats from "../domains/shared/stats.js";
+import type * as domains_users_index from "../domains/users/index.js";
+import type * as domains_users_profiles from "../domains/users/profiles.js";
+import type * as domains_users_users from "../domains/users/users.js";
+import type * as domains_videos_index from "../domains/videos/index.js";
+import type * as domains_videos_metadata from "../domains/videos/metadata.js";
+import type * as domains_videos_transcriptionActions from "../domains/videos/transcriptionActions.js";
+import type * as domains_videos_transcriptionMutations from "../domains/videos/transcriptionMutations.js";
+import type * as domains_videos_videoJobs from "../domains/videos/videoJobs.js";
+import type * as domains_videos_videos from "../domains/videos/videos.js";
 import type * as http from "../http.js";
-import type * as moodboardUtils from "../moodboardUtils.js";
-import type * as profiles from "../profiles.js";
-import type * as projects from "../projects.js";
-import type * as shares from "../shares.js";
-import type * as stats from "../stats.js";
-import type * as thumbnail from "../thumbnail.js";
-import type * as thumbnailGPTImage from "../thumbnailGPTImage.js";
-import type * as thumbnailRefine from "../thumbnailRefine.js";
-import type * as transcription from "../transcription.js";
-import type * as transcriptionUpload from "../transcriptionUpload.js";
-import type * as transcriptions from "../transcriptions.js";
-import type * as users from "../users.js";
-import type * as videoJobs from "../videoJobs.js";
-import type * as videos from "../videos.js";
 
 import type {
   ApiFromModules,
@@ -46,28 +48,30 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  agents: typeof agents;
-  ai: typeof ai;
-  aiHackathon: typeof aiHackathon;
-  canvas: typeof canvas;
-  chat: typeof chat;
-  debug: typeof debug;
-  files: typeof files;
+  "domains/ai/agents": typeof domains_ai_agents;
+  "domains/ai/chat": typeof domains_ai_chat;
+  "domains/ai/generation": typeof domains_ai_generation;
+  "domains/ai/index": typeof domains_ai_index;
+  "domains/ai/thumbnail": typeof domains_ai_thumbnail;
+  "domains/ai/thumbnailGPTImage": typeof domains_ai_thumbnailGPTImage;
+  "domains/ai/thumbnailRefine": typeof domains_ai_thumbnailRefine;
+  "domains/projects/canvas": typeof domains_projects_canvas;
+  "domains/projects/index": typeof domains_projects_index;
+  "domains/projects/projects": typeof domains_projects_projects;
+  "domains/shared/files": typeof domains_shared_files;
+  "domains/shared/index": typeof domains_shared_index;
+  "domains/shared/shares": typeof domains_shared_shares;
+  "domains/shared/stats": typeof domains_shared_stats;
+  "domains/users/index": typeof domains_users_index;
+  "domains/users/profiles": typeof domains_users_profiles;
+  "domains/users/users": typeof domains_users_users;
+  "domains/videos/index": typeof domains_videos_index;
+  "domains/videos/metadata": typeof domains_videos_metadata;
+  "domains/videos/transcriptionActions": typeof domains_videos_transcriptionActions;
+  "domains/videos/transcriptionMutations": typeof domains_videos_transcriptionMutations;
+  "domains/videos/videoJobs": typeof domains_videos_videoJobs;
+  "domains/videos/videos": typeof domains_videos_videos;
   http: typeof http;
-  moodboardUtils: typeof moodboardUtils;
-  profiles: typeof profiles;
-  projects: typeof projects;
-  shares: typeof shares;
-  stats: typeof stats;
-  thumbnail: typeof thumbnail;
-  thumbnailGPTImage: typeof thumbnailGPTImage;
-  thumbnailRefine: typeof thumbnailRefine;
-  transcription: typeof transcription;
-  transcriptionUpload: typeof transcriptionUpload;
-  transcriptions: typeof transcriptions;
-  users: typeof users;
-  videoJobs: typeof videoJobs;
-  videos: typeof videos;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

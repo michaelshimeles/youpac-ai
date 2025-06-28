@@ -6,7 +6,7 @@ import { TwitterThreadPreview } from "./TwitterThreadPreview";
 import { Youtube, Twitter, Copy, Download, Eye, Sparkles, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
-import { cn } from "~/lib/utils";
+import { cn } from "~/services/shared";
 
 interface PreviewModalProps {
   isOpen: boolean;

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Progress } from "~/components/ui/progress";
-import { cn } from "~/lib/utils";
+import { cn } from "~/services/shared";
 import {
   Card,
   CardContent,

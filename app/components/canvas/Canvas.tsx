@@ -7,11 +7,11 @@ import { toast } from "sonner";
 import { PreviewModal } from "~/components/preview/PreviewModal";
 import { Button } from "~/components/ui/button";
 import { VideoProcessingHelp } from "~/components/VideoProcessingHelp";
-import { createRetryAction, handleVideoError } from "~/lib/video-error-handler";
-import { extractVideoMetadata } from "~/lib/video-metadata";
+import { createRetryAction, handleVideoError } from "~/services/video/utils/error-handler";
+import { extractVideoMetadata } from "~/services/video/utils/metadata";
 
-import { compressAudioFile, getFileSizeMB, isFileTooLarge } from "~/lib/audio-compression";
-import type { ParsedTranscription } from "~/utils/transcription-upload";
+import { compressAudioFile, getFileSizeMB, isFileTooLarge } from "~/services/video/utils/compression";
+import type { ParsedTranscription } from "~/services/video/utils/transcription-parser";
 import { AgentNode } from "./AgentNode";
 import { ContentModal } from "./ContentModal";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";

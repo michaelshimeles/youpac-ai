@@ -58,7 +58,7 @@ export async function loader(args: Route.LoaderArgs) {
   
   let initialStats = null;
   try {
-    initialStats = await convex.query(api.stats.getHeroStats);
+    initialStats = await convex.query(api.domains.shared.stats.getHeroStats);
   } catch (error) {
     console.error("Error fetching stats:", error);
     // Continue without stats if there's an error

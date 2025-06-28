@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import { Play, Pause, Volume2, Volume1, VolumeX } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "~/lib/utils";
+import { cn } from "~/services/shared";
 import { Button } from "./ui/button";
 
 const formatTime = (seconds: number) => {

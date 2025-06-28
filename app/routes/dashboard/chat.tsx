@@ -4,7 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import Markdown from "react-markdown";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { cn } from "~/lib/utils";
+import { cn } from "~/services/shared";
 
 const CONVEX_SITE_URL = import.meta.env.VITE_CONVEX_URL!.replace(
   /.cloud$/,

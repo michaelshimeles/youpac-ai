@@ -12,7 +12,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { Link } from "react-router";
-import { cn } from "~/lib/utils";
+import { cn } from "~/services/shared";
 
 export default function ContentSection() {
   return (

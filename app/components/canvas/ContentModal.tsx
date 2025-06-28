@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Card } from "~/components/ui/card";
 import { YouTubePreview } from "~/components/preview/YouTubePreview";
 import { TwitterThreadPreview } from "~/components/preview/TwitterThreadPreview";
-import { cn } from "~/lib/utils";
+import { cn } from "~/services/shared";
 
 interface ContentModalProps {
   isOpen: boolean;

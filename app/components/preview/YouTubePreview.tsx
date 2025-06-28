@@ -10,7 +10,7 @@ import {
   MoreHorizontal,
   BellOff
 } from "lucide-react";
-import { formatDuration } from "~/lib/video-metadata";
+import { formatDuration } from "~/services/shared";
 
 interface YouTubePreviewProps {
   title: string;

@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
-import { cn } from "~/lib/utils";
+import { cn } from "~/services/shared";
 
 interface ThumbnailUploadModalProps {
   isOpen: boolean;
