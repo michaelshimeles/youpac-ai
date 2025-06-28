@@ -1,44 +1,56 @@
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+} from "@xyflow/react";
 
 interface ReactFlowWrapperProps {
   children: (components: {
-    ReactFlow: any;
-    ReactFlowProvider: any;
-    Background: any;
-    Controls: any;
-    MiniMap: any;
-    useNodesState: any;
-    useEdgesState: any;
-    addEdge: any;
+    ReactFlow: typeof ReactFlow;
+    ReactFlowProvider: typeof ReactFlowProvider;
+    Background: typeof Background;
+    Controls: typeof Controls;
+    MiniMap: typeof MiniMap;
+    useNodesState: typeof useNodesState;
+    useEdgesState: typeof useEdgesState;
+    addEdge: typeof addEdge;
   }) => ReactNode;
 }
 
+// Define the components object statically
+// Types are inferred from the imports
+const flowComponents = {
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+};
+
 export function ReactFlowWrapper({ children }: ReactFlowWrapperProps) {
-  const [components, setComponents] = useState<any>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // Only import ReactFlow on the client side
+    // Dynamically import CSS only on the client side
+    // and confirm client-side rendering
     if (typeof window !== "undefined") {
-      Promise.all([
-        import("@xyflow/react"),
-        import("@xyflow/react/dist/style.css"),
-      ]).then(([reactFlowModule]) => {
-        setComponents({
-          ReactFlow: reactFlowModule.ReactFlow,
-          ReactFlowProvider: reactFlowModule.ReactFlowProvider,
-          Background: reactFlowModule.Background,
-          Controls: reactFlowModule.Controls,
-          MiniMap: reactFlowModule.MiniMap,
-          useNodesState: reactFlowModule.useNodesState,
-          useEdgesState: reactFlowModule.useEdgesState,
-          addEdge: reactFlowModule.addEdge,
-        });
+      import("@xyflow/react/dist/style.css").then(() => {
+        setIsClient(true);
       });
     }
   }, []);
 
-  if (!components) {
+  if (!isClient) {
+    // Render nothing or a placeholder until client-side is confirmed and CSS is loaded
     return (
       <div className="flex h-[calc(100vh-var(--header-height))] items-center justify-center">
         <p className="text-muted-foreground">Loading canvas...</p>
@@ -46,5 +58,6 @@ export function ReactFlowWrapper({ children }: ReactFlowWrapperProps) {
     );
   }
 
-  return <>{children(components)}</>;
+  // Pass the statically imported components
+  return <>{children(flowComponents)}</>;
 }
