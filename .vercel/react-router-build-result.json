@@ -13,9 +13,10 @@
       "routes/home": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/sign-in": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/sign-up": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/share.$shareId": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/pricing": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/success": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/subscription-required": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dashboard/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/dashboard/project.$projectId": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dashboard/chat": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dashboard/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
     },
@@ -53,11 +54,29 @@
           "runtime": "nodejs"
         }
       },
-      "routes/share.$shareId": {
-        "id": "routes/share.$shareId",
+      "routes/pricing": {
+        "id": "routes/pricing",
         "parentId": "root",
-        "file": "app/routes/share.$shareId.tsx",
-        "path": "share/:shareId",
+        "file": "app/routes/pricing.tsx",
+        "path": "pricing",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/success": {
+        "id": "routes/success",
+        "parentId": "root",
+        "file": "app/routes/success.tsx",
+        "path": "success",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/subscription-required": {
+        "id": "routes/subscription-required",
+        "parentId": "root",
+        "file": "app/routes/subscription-required.tsx",
+        "path": "subscription-required",
         "config": {
           "runtime": "nodejs"
         }
@@ -73,15 +92,6 @@
         "parentId": "routes/dashboard/layout",
         "file": "app/routes/dashboard/index.tsx",
         "path": "dashboard",
-        "config": {
-          "runtime": "nodejs"
-        }
-      },
-      "routes/dashboard/project.$projectId": {
-        "id": "routes/dashboard/project.$projectId",
-        "parentId": "routes/dashboard/layout",
-        "file": "app/routes/dashboard/project.$projectId.tsx",
-        "path": "dashboard/project/:projectId",
         "config": {
           "runtime": "nodejs"
         }
@@ -107,9 +117,9 @@
     }
   },
   "reactRouterConfig": {
-    "appDirectory": "/app/app",
+    "appDirectory": "/Users/michaelshimeles/Desktop/rsk/app",
     "basename": "/",
-    "buildDirectory": "/app/build",
+    "buildDirectory": "/Users/michaelshimeles/Desktop/rsk/build",
     "future": {
       "unstable_middleware": false,
       "unstable_optimizeDeps": false,
@@ -141,11 +151,23 @@
         "file": "routes/sign-up.tsx",
         "path": "sign-up/*"
       },
-      "routes/share.$shareId": {
-        "id": "routes/share.$shareId",
+      "routes/pricing": {
+        "id": "routes/pricing",
         "parentId": "root",
-        "file": "routes/share.$shareId.tsx",
-        "path": "share/:shareId"
+        "file": "routes/pricing.tsx",
+        "path": "pricing"
+      },
+      "routes/success": {
+        "id": "routes/success",
+        "parentId": "root",
+        "file": "routes/success.tsx",
+        "path": "success"
+      },
+      "routes/subscription-required": {
+        "id": "routes/subscription-required",
+        "parentId": "root",
+        "file": "routes/subscription-required.tsx",
+        "path": "subscription-required"
       },
       "routes/dashboard/layout": {
         "id": "routes/dashboard/layout",
@@ -157,12 +179,6 @@
         "parentId": "routes/dashboard/layout",
         "file": "routes/dashboard/index.tsx",
         "path": "dashboard"
-      },
-      "routes/dashboard/project.$projectId": {
-        "id": "routes/dashboard/project.$projectId",
-        "parentId": "routes/dashboard/layout",
-        "file": "routes/dashboard/project.$projectId.tsx",
-        "path": "dashboard/project/:projectId"
       },
       "routes/dashboard/chat": {
         "id": "routes/dashboard/chat",
