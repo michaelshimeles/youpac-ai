@@ -52,16 +52,23 @@ export function meta({ }: Route.MetaArgs) {
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
   
-  // Fetch initial stats from Convex
-  const convexUrl = process.env.VITE_CONVEX_URL || "https://charming-bird-938.convex.cloud";
-  const convex = new ConvexHttpClient(convexUrl);
-  
   let initialStats = null;
+  
   try {
+    // Fetch initial stats from Convex
+    const convexUrl = process.env.VITE_CONVEX_URL || "https://charming-bird-938.convex.cloud";
+    
+    // Validate URL before creating client
+    if (!convexUrl || convexUrl === "https://" || !convexUrl.startsWith("https://")) {
+      throw new Error("Invalid Convex URL");
+    }
+    
+    const convex = new ConvexHttpClient(convexUrl);
     initialStats = await convex.query(api.stats.getHeroStats);
   } catch (error) {
-    console.error("Error fetching stats:", error);
-    // Continue without stats if there's an error
+    console.error("Error with Convex connection:", error);
+    // Continue without stats if there's an error - this simulates Convex being down
+    initialStats = null;
   }
 
   return {
