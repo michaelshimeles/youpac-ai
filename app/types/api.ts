@@ -1,5 +1,5 @@
-import { Id } from "~/convex/_generated/dataModel";
-import { ProcessingStatus, ProgressInfo, RetryConfig } from "./common";
+import type { Id } from "../../convex/_generated/dataModel";
+import type { ProcessingStatus, ProgressInfo, RetryConfig } from "./common";
 
 // Base API types
 export interface ApiRequest<T = any> {
@@ -101,11 +101,10 @@ export interface AIServiceAPI {
   // Analysis
   analyzeContent: (request: AnalyzeContentRequest) => Promise<AnalyzeContentResponse>;
   getOptimizationSuggestions: (content: string, type: string) => Promise<OptimizationSuggestionsResponse>;
-  
   // Templates and presets
-  listTemplates: (type?: string) => Promise<ListTemplatesResponse>;
-  createTemplate: (template: CreateTemplateRequest) => Promise<CreateTemplateResponse>;
-  applyTemplate: (templateId: string, data: any) => Promise<ApplyTemplateResponse>;
+  listTemplates: (type?: string) => Promise<any>;
+  createTemplate: (template: any) => Promise<any>;
+  applyTemplate: (templateId: string, data: any) => Promise<any>;
 }
 
 export interface CanvasServiceAPI {
@@ -478,6 +477,79 @@ export interface ApiClientConfig {
     response?: Array<(response: ApiResponse) => ApiResponse>;
     error?: Array<(error: ApiError) => ApiError>;
   };
+}
+
+export interface ExtractMetadataResponse {
+  metadata: {
+    duration: number;
+    dimensions: { width: number; height: number };
+    fileSize: number;
+    format: string;
+    bitrate?: number;
+    frameRate?: number;
+  };
+}
+
+export interface GenerateThumbnailsResponse {
+  thumbnails: Array<{
+    url: string;
+    timestamp: number;
+    storageId?: Id<"_storage">;
+  }>;
+}
+
+export interface GetTranscriptionResponse {
+  transcription: string;
+  language?: string;
+  confidence?: number;
+  service?: string;
+  segments?: Array<{
+    text: string;
+    start: number;
+    end: number;
+  }>;
+}
+
+export interface AnalyzeContentRequest {
+  content: string;
+  type: "title" | "description" | "video" | "thumbnail";
+  context?: {
+    videoData?: any;
+    targetAudience?: string;
+    platform?: string;
+  };
+}
+
+export interface AnalyzeContentResponse {
+  analysis: {
+    sentiment: string;
+    readability: number;
+    keyTopics: string[];
+    suggestions: string[];
+  };
+  score: number;
+  recommendations: Array<{
+    type: string;
+    message: string;
+    priority: "low" | "medium" | "high";
+  }>;
+}
+
+export interface OptimizationSuggestionsResponse {
+  suggestions: Array<{
+    type: string;
+    current: string;
+    suggested: string;
+    reason: string;
+    impact: "low" | "medium" | "high";
+  }>;
+  overallScore: number;
+  priorities: string[];
+}
+
+export interface DuplicateNodeResponse {
+  nodeId: string;
+  node: any;
 }
 
 export default {};

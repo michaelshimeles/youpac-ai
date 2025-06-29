@@ -20,7 +20,7 @@ interface LoaderData {
 }
 
 export default function HeroSection({ loaderData }: { loaderData: LoaderData }) {
-    const liveStats = useQuery(api.stats.getHeroStats);
+    const liveStats = useQuery(api.domains.shared.stats.getHeroStats);
     // Use live stats if available, otherwise fall back to initial stats
     const stats = liveStats || loaderData.initialStats;
     return (

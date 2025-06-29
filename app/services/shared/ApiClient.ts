@@ -1,6 +1,6 @@
 import { ConvexReactClient } from "convex/react";
-import { ApiRequest, ApiResponse, ApiError, ConvexQueryOptions, ConvexMutationOptions, ConvexActionOptions } from "~/types/api";
 import { ErrorHandler, ServiceError } from "~/services/common/ErrorHandler";
+import type { ConvexActionOptions, ConvexMutationOptions, ConvexQueryOptions } from "~/types/api";
 
 /**
  * Enhanced API client for Convex operations with error handling and retries
