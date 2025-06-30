@@ -18,11 +18,14 @@ export const generate = action({
       throw new Error("OPENAI_API_KEY is not configured in Convex dashboard.");
     }
 
-    const userPrompt = systemPrompt.replace("[SOURCE_CONTENT_HERE]", args.sourceContent);
+    // const userPrompt = systemPrompt.replace("[SOURCE_CONTENT_HERE]", args.sourceContent); // Old method
 
     const response = await openai.chat.completions.create({
         model: "gpt-4o", // As specified in the report
-        messages: [{ role: "system", content: userPrompt }], // The prompt now acts as a system message
+        messages: [
+            { role: "system", content: systemPrompt }, // The static system prompt from prompts/blog.ts
+            { role: "user", content: args.sourceContent } // The dynamic content
+        ],
         response_format: { type: "json_object" }, // Enforce JSON output
     });
 

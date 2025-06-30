@@ -21,5 +21,4 @@ Return ONLY a valid JSON object with this exact structure:
   ]
 }
 
-Do NOT include any text before or after the JSON object. Ensure the JSON is valid and properly escaped.
-Source content: [SOURCE_CONTENT_HERE]`;
+Do NOT include any text before or after the JSON object. Ensure the JSON is valid and properly escaped.`;
