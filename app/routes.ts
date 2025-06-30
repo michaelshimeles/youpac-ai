@@ -6,14 +6,14 @@ import {
 } from "@react-router/dev/routes";
 
 export default [
-  index("routes/home.tsx"),
-  route("sign-in/*", "routes/sign-in.tsx"),
-  route("sign-up/*", "routes/sign-up.tsx"),
-  route("share/:shareId", "routes/share.$shareId.tsx"),
-  layout("routes/dashboard/layout.tsx", [
-    route("dashboard", "routes/dashboard/index.tsx"),
-    route("dashboard/project/:projectId", "routes/dashboard/project.$projectId.tsx"),
-    route("dashboard/chat", "routes/dashboard/chat.tsx"),
-    route("dashboard/settings", "routes/dashboard/settings.tsx"),
+  index("features/homepage/routes/home.tsx"),
+  route("sign-in/*", "features/auth/routes/sign-in.tsx"),
+  route("sign-up/*", "features/auth/routes/sign-up.tsx"),
+  route("share/:shareId", "features/sharing/routes/share.$shareId.tsx"),
+  layout("features/dashboard/routes/layout.tsx", [
+    route("dashboard", "features/dashboard/routes/index.tsx"),
+    route("dashboard/project/:projectId", "features/canvas/routes/project.$projectId.tsx"),
+    route("dashboard/chat", "features/ai/routes/chat.tsx"),
+    route("dashboard/settings", "features/settings/routes/settings.tsx"),
   ]),
 ] satisfies RouteConfig;
