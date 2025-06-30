@@ -50,6 +50,26 @@ export const upsert = mutation({
   },
 });
 
+export const completeOnboarding = mutation({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .first();
+
+    if (profile) {
+      await ctx.db.patch(profile._id, { onboardingCompleted: true });
+    }
+    // If there's no profile, we don't create one here.
+    // Onboarding completion implies a profile should ideally exist or be created
+    // as part of the onboarding flow itself if it involves profile setup.
+    // For now, this just updates an existing profile.
+  },
+});
+
 export const remove = mutation({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();

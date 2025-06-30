@@ -31,6 +31,8 @@ import { LinkedInNode } from "./LinkedInNode";
 
 import { BlogNode } from "./BlogNode";
 import { SourceNode } from "./SourceNode";
+import { sampleNodes, sampleEdges } from "~/lib/sample-project"; // Onboarding
+import { OnboardingTour } from "./OnboardingTour"; // Onboarding
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
@@ -122,6 +124,7 @@ function InnerCanvas({
   const [isChatGenerating, setIsChatGenerating] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
+  const [tourStep, setTourStep] = useState(0); // 0 = inactive, 1-4 = steps // Onboarding
   
   // Use refs to access current values in callbacks
   const nodesRef = useRef(nodes);
@@ -169,6 +172,36 @@ function InnerCanvas({
   const generateThumbnail = useAction(api.thumbnail.generateThumbnail);
   const refineContent = useAction(api.chat.refineContent);
   const refineThumbnail = useAction(api.thumbnailRefine.refineThumbnail);
+  const completeOnboarding = useMutation(api.profiles.completeOnboarding); // Onboarding
+
+  // Onboarding Tour Logic
+  useEffect(() => {
+    // Trigger tour only once when profile loads and is incomplete
+    if (tourStep === 0 && userProfile && !userProfile.onboardingCompleted) {
+      toast.info("Welcome! Let's take a quick tour.");
+      // @ts-ignore TODO: Fix type for sampleNodes if necessary
+      setNodes(sampleNodes);
+      // @ts-ignore TODO: Fix type for sampleEdges if necessary
+      setEdges(sampleEdges);
+      setTourStep(1); // Start the tour
+    }
+  }, [userProfile, tourStep, setNodes, setEdges]);
+
+  const handleNextStep = () => setTourStep(prev => prev + 1);
+  const handleSkipTour = () => {
+    setTourStep(0); // End the tour
+    completeOnboarding();
+    // TODO: Optionally reload to a fresh project, or just leave the sample project for now
+    // For now, we will just clear the sample project and let user start fresh or load existing.
+    // This might need more sophisticated state management if user had a project before tour.
+    if (nodes.some((n: Node) => sampleNodes.find(sn => sn.id === n.id))) {
+      setNodes([]);
+      setEdges([]);
+      // Potentially refit view or load actual project data here
+    }
+    toast.success("Onboarding complete! You can now create your own projects.");
+  };
+  // End Onboarding Tour Logic
 
   // Handle content generation for an agent node
   const handleGenerate = useCallback(async (nodeId: string, thumbnailImages?: File[], additionalContext?: string) => {
@@ -3089,6 +3122,16 @@ function InnerCanvas({
               : "This will permanently delete the selected content. This action cannot be undone."
           }
         />
+
+        {/* Onboarding Tour Modal */}
+        {tourStep > 0 && (
+          <OnboardingTour
+            step={tourStep}
+            onNext={handleNextStep}
+            onSkip={handleSkipTour}
+            // TODO: Pass refs or IDs to OnboardingTour for highlighting elements
+          />
+        )}
         
       </div>
     </ReactFlowProvider>

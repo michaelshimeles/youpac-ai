@@ -115,6 +115,7 @@ export default defineSchema({
     links: v.array(v.string()),
     tone: v.optional(v.string()),
     targetAudience: v.optional(v.string()),
+    onboardingCompleted: v.optional(v.boolean()), // <-- Add this field
     createdAt: v.number(),
     updatedAt: v.number(),
   })
