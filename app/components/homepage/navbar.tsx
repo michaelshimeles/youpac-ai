@@ -46,7 +46,7 @@ export const Navbar = ({
     : "/dashboard";
 
   const dashboardText = !loaderData?.isSignedIn 
-    ? "Get Started (Demo)"
+    ? "Get Started"
     : "Dashboard";
   return (
     <header>
