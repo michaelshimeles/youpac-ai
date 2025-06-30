@@ -3,7 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Button } from "~/components/ui/button";
 import { YouTubePreview } from "./YouTubePreview";
 import { TwitterThreadPreview } from "./TwitterThreadPreview";
-import { Youtube, Twitter, Copy, Download, Eye, Sparkles, X, Check } from "lucide-react";
+import { BlogPostPreview } from "./BlogPostPreview"; // Added import
+import { Youtube, Twitter, Copy, Download, Eye, Sparkles, X, Check, FileText } from "lucide-react"; // Added FileText
 import { toast } from "sonner";
 import { useState } from "react";
 import { cn } from "~/lib/utils";
@@ -23,6 +24,7 @@ interface PreviewModalProps {
   username?: string;
   displayName?: string;
   profileImage?: string;
+  blogContent?: string; // Added blogContent prop
 }
 
 export function PreviewModal({
@@ -39,7 +41,8 @@ export function PreviewModal({
   subscriberCount,
   username,
   displayName,
-  profileImage
+  profileImage,
+  blogContent = "" // Added blogContent prop
 }: PreviewModalProps) {
   const [copiedYouTube, setCopiedYouTube] = useState(false);
   const [copiedTwitter, setCopiedTwitter] = useState(false);
@@ -97,7 +100,10 @@ export function PreviewModal({
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 relative">
           <div className="px-6 pt-4 pb-2 bg-background/50 backdrop-blur-sm">
-            <TabsList className="grid w-full max-w-md grid-cols-2 h-12 p-1 bg-muted/50">
+            <TabsList className={cn(
+              "grid w-full h-12 p-1 bg-muted/50",
+              blogContent ? "max-w-lg grid-cols-3" : "max-w-md grid-cols-2" // Adjust grid based on blogContent
+            )}>
               <TabsTrigger 
                 value="youtube" 
                 className={cn(
@@ -118,6 +124,18 @@ export function PreviewModal({
                 <Twitter className="h-4 w-4" />
                 Twitter/X
               </TabsTrigger>
+              {blogContent && (
+                <TabsTrigger
+                  value="blog"
+                  className={cn(
+                    "gap-2 data-[state=active]:shadow-sm transition-all",
+                    "data-[state=active]:bg-background data-[state=active]:text-foreground"
+                  )}
+                >
+                  <FileText className="h-4 w-4" />
+                  Blog
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
           
@@ -200,6 +218,20 @@ export function PreviewModal({
                 </div>
               </div>
             </TabsContent>
+
+            {blogContent && (
+              <TabsContent value="blog" className="p-6 pt-4 m-0">
+                <div className="space-y-6">
+                  {/* Preview container with background */}
+                  <div className="relative rounded-xl bg-gradient-to-br from-background to-muted/30 p-6 shadow-inner">
+                    <div className="absolute inset-0 bg-grid-white/5 rounded-xl pointer-events-none" />
+                    <div className="relative">
+                      <BlogPostPreview content={blogContent} />
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+            )}
           </div>
         
         </Tabs>

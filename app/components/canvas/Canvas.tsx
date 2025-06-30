@@ -3069,6 +3069,7 @@ function InnerCanvas({
           title={nodes.find((n: any) => n.type === 'agent' && n.data.type === 'title')?.data.draft || ''}
           description={nodes.find((n: any) => n.type === 'agent' && n.data.type === 'description')?.data.draft || ''}
           tweets={nodes.find((n: any) => n.type === 'agent' && n.data.type === 'tweets')?.data.draft || ''}
+          blogContent={nodes.find((n: any) => n.type === 'blog' || (n.type === 'agent' && n.data.type === 'blog'))?.data.draft || ''}
           thumbnailUrl={nodes.find((n: any) => n.type === 'agent' && n.data.type === 'thumbnail')?.data.thumbnailUrl}
           videoUrl={nodes.find((n: any) => n.type === 'video')?.data.videoUrl}
           duration={nodes.find((n: any) => n.type === 'video')?.data.duration}
