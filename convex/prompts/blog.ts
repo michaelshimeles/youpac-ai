@@ -1,16 +1,4 @@
-import { action } from "../_generated/server";
-import { v } from "convex/values";
-import { openai } from "../utils/openai";
-
-export const generateBlogPost = action({
-  args: { 
-    sourceContent: v.string(),
-    type: v.string() // 'topic', 'transcript', or 'scraped'
-  },
-  handler: async (ctx, args) => {
-    const { sourceContent, type } = args;
-    
-    const systemPrompt = `You are an expert content marketer specializing in SEO-optimized blog posts. Generate a blog post based on the provided source content (topic, video transcript, or scraped web content). The post must:
+export const systemPrompt = `You are an expert content marketer specializing in SEO-optimized blog posts. Generate a blog post based on the provided source content (topic, video transcript, or scraped web content). The post must:
 
 1. **Title**: Create an engaging, SEO-friendly title (50-60 characters) with a primary keyword.
 2. **Structure**: Include an introduction, 3-4 main sections with H2/H3 subheadings, and a conclusion.
@@ -33,70 +21,5 @@ Return ONLY a valid JSON object with this exact structure:
   ]
 }
 
-Do NOT include any text before or after the JSON object. Ensure the JSON is valid and properly escaped.`;
-
-    const userPrompt = `Source type: ${type}
-Source content: ${sourceContent}
-
-Generate an SEO-optimized blog post based on this content.`;
-
-    try {
-      // Validate API key presence to prevent runtime errors
-      if (!process.env.OPENAI_API_KEY) {
-        throw new Error("OPENAI_API_KEY environment variable is not configured. Please set it in your Convex dashboard.");
-      }
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 3500, // Increased from 2000 to accommodate 800-1,200 words + JSON overhead
-      });
-      
-      const content = response.choices[0].message.content;
-      
-      if (!content) {
-        throw new Error("No content generated");
-      }
-      
-      // Parse and validate JSON response
-      let blogPost;
-      try {
-        blogPost = JSON.parse(content);
-      } catch (parseError) {
-        throw new Error("Invalid JSON response from AI");
-      }
-      
-      // Validate required fields
-      if (!blogPost.title || !blogPost.content || !blogPost.metaDescription) {
-        throw new Error("Missing required fields in generated blog post");
-      }
-      
-      // Ensure arrays exist
-      if (!Array.isArray(blogPost.keywords)) {
-        blogPost.keywords = [];
-      }
-      if (!Array.isArray(blogPost.links)) {
-        blogPost.links = [];
-      }
-      
-      return blogPost;
-      
-    } catch (error) {
-      console.error("Blog generation error:", error);
-      if (error instanceof Error) {
-        throw new Error(`Blog generation failed: ${error.message}`);
-      } else {
-        throw new Error("Blog generation failed: Unknown error");
-      }
-    }
-  },
-});
-
-// V2: Integrate keyword suggestion API (e.g., Google Keyword Planner) for dynamic SEO keywords.
-// V2: Add content optimization scoring and readability analysis.
-// V2: Enable custom tone/style preferences from user profiles.
-// V2: Add A/B testing capabilities for different blog variations.
+Do NOT include any text before or after the JSON object. Ensure the JSON is valid and properly escaped.
+Source content: [SOURCE_CONTENT_HERE]`;

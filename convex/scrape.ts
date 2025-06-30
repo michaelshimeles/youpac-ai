@@ -1,105 +1,57 @@
+"use node";
+
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 
-// Helper functions for retry logic
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-const getRetryDelay = (attempt: number) => Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5s
+export const scrapeContent = action({
+  args: { url: v.string() },
+  handler: async (ctx, args) => {
+    // Validate API key presence to prevent runtime errors
+    if (!process.env.FIRECRAWL_API_KEY) {
+      throw new Error("FIRECRAWL_API_KEY is not configured in Convex dashboard.");
+    }
 
-// Extracted retry logic with exponential backoff
-const attemptScrape = async (url: string, apiKey: string, retryCount = 0, maxRetries = 3): Promise<{ content: string; title: string }> => {
-  try {
-    const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
-      method: 'POST',
+    // Basic URL validation
+    try {
+      new URL(args.url);
+    } catch (_) {
+      throw new Error("Invalid URL provided. Please enter a valid URL.");
+    }
+
+    const response = await fetch("https://api.firecrawl.dev/v0/scrape", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        "Authorization": `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ 
-        url,
-        formats: ['markdown'],
-        onlyMainContent: true,
-        includeTags: ['h1', 'h2', 'h3', 'p', 'li', 'blockquote']
-      }),
+      body: JSON.stringify({ url: args.url }),
     });
-    
-    // Handle rate limiting with exponential backoff
-    if (response.status === 429) {
-      if (retryCount < maxRetries) {
-        const delayMs = getRetryDelay(retryCount + 1);
-        console.log(`Rate limited, retrying (${retryCount + 1}/${maxRetries}) in ${delayMs}ms...`);
-        await delay(delayMs);
-        return attemptScrape(url, apiKey, retryCount + 1, maxRetries);
-      } else {
-        throw new Error("Rate limit exceeded. Please try again in a moment.");
-      }
-    }
-    
-    // Handle other HTTP errors
-    if (response.status === 404) {
-      throw new Error("Page not found. Please check the URL and try again.");
-    }
-    
-    if (response.status === 400) {
-      throw new Error("Invalid URL. Please check the URL format and try again.");
-    }
-    
+
     if (!response.ok) {
-      throw new Error(`Failed to scrape content (${response.status}). Please try again later.`);
+        const errorBody = await response.text();
+        console.error("Firecrawl API Error:", errorBody);
+        throw new Error(`Failed to scrape content. Status: ${response.status}`);
     }
-    
+
     const data = await response.json();
-    
     if (!data.success) {
-      throw new Error(data.error || 'Failed to scrape content');
+      throw new Error(data.error || "Failed to scrape content from Firecrawl.");
     }
     
-    // Validate scraped data
-    if (!data.data || !data.data.content) {
-      throw new Error("No content found on this page. Please try a different URL.");
+    // Ensure data.data and nested properties exist, as per spec for return
+    // Fallback for title if metadata or title is missing, though spec implies it's there on success
+    const title = data.data && data.data.metadata && typeof data.data.metadata.title === 'string'
+                  ? data.data.metadata.title
+                  : "Untitled";
+
+    if (!data.data || typeof data.data.content !== 'string') {
+        console.error("Firecrawl did not return content in the expected format:", data);
+        throw new Error("Firecrawl did not return content in the expected format.");
     }
     
     return {
-      content: data.data.content || '', // Markdown content
-      title: data.data.metadata?.title || 'Untitled Page', // Page title
+      content: data.data.content,
+      title: title,
     };
-    
-  } catch (error) {
-    // Only retry on rate limit errors, not on other errors
-    if (
-      error instanceof Error &&
-      typeof error.message === "string" &&
-      error.message.includes('Rate limit') &&
-      retryCount < maxRetries
-    ) {
-      const delayMs = getRetryDelay(retryCount + 1);
-      console.log(`Retrying scrape (${retryCount + 1}/${maxRetries}) in ${delayMs}ms...`);
-      await delay(delayMs);
-      return attemptScrape(url, apiKey, retryCount + 1, maxRetries);
-    }
-    throw error;
-  }
-};
-
-export const scrapeContent = action({
-  args: { 
-    url: v.string() 
-  },
-  handler: async (ctx, args) => {
-    const { url } = args;
-    
-    // Validate API key presence to prevent runtime errors
-    if (!process.env.FIRECRAWL_API_KEY) {
-      throw new Error("FIRECRAWL_API_KEY environment variable is not configured. Please set it in your Convex dashboard.");
-    }
-    
-    // Validate URL format
-    try {
-      new URL(url);
-    } catch (error) {
-      throw new Error("Invalid URL format. Please provide a valid URL starting with http:// or https://");
-    }
-    
-    // Use the simplified retry logic
-    return await attemptScrape(url, process.env.FIRECRAWL_API_KEY);
   },
 });
