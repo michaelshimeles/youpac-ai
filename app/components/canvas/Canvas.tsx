@@ -23,6 +23,7 @@ import type {
   Node,
   NodeTypes,
   OnConnect,
+  XYPosition,
 } from "./ReactFlowComponents";
 import { ReactFlowWrapper } from "./ReactFlowWrapper";
 import { ThumbnailUploadModal } from "./ThumbnailUploadModal";
@@ -43,11 +44,21 @@ const nodeTypes: NodeTypes = {
   source: SourceNode,
 };
 
+// Define SourceContentData interface as suggested
+interface SourceContentData {
+  title?: string;
+  transcription?: string;
+  duration?: number;
+  resolution?: { width: number; height: number };
+  format?: string;
+  // Potentially add other source-specific fields here if needed in the future
+}
+
 function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   return (
     <ReactFlowWrapper>
       {({ ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge }) => (
-        <InnerCanvas 
+        <InnerCanvas
           projectId={projectId}
           ReactFlow={ReactFlow}
           ReactFlowProvider={ReactFlowProvider}
@@ -63,7 +74,7 @@ function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
   );
 }
 
-function InnerCanvas({ 
+function InnerCanvas({
   projectId,
   ReactFlow,
   ReactFlowProvider,
@@ -279,14 +290,7 @@ function InnerCanvas({
       const sourceEdge = edgesRef.current.find((e: any) => e.target === nodeId);
       const sourceNode = sourceEdge ? nodesRef.current.find((n: any) => n.id === sourceEdge.source) : null;
 
-      let sourceContentData: {
-        title?: string;
-        transcription?: string; // Using "transcription" as a common key for content
-        duration?: number;
-        resolution?: { width: number; height: number };
-        format?: string;
-        // Add any other common fields or specific ones as needed
-      } = {};
+      let sourceContentData: SourceContentData = {}; // Use the new interface
 
       if (sourceNode) {
           if (sourceNode.type === 'video') {
@@ -320,7 +324,10 @@ function InnerCanvas({
       
       // Find other connected agent nodes (remains the same)
       const connectedAgentNodes = edgesRef.current
-        .filter((e: any) => e.target === nodeId && e.source?.includes('agent')) // Assuming agent IDs contain 'agent'
+        .filter((e: any) =>
+          e.target === nodeId &&
+          nodesRef.current.find((n: any) => n.id === e.source)?.type === 'agent'
+        )
         .map((e: any) => nodesRef.current.find((n: any) => n.id === e.source))
         .filter(Boolean);
       
@@ -1640,13 +1647,9 @@ function InnerCanvas({
           throw new Error(`File is too large for transcription (${fileSizeMB.toFixed(1)}MB). Maximum size is 1GB.`);
         }
         
-        // This 'if (false ...)' block seems to be dead code due to SKIP_AUDIO_EXTRACTION = true
-        // and the `false` condition. It's kept for historical context or potential future re-enablement.
-        if (false && fileSizeMB > 25 && !SKIP_AUDIO_EXTRACTION) {
-          // ... (existing dead code for audio extraction and background transcription) ...
-        } else {
-          // Client-side transcription with ElevenLabs
-          try {
+        // The dead code block previously here (guarded by `if (false && ...`) has been removed.
+        // Client-side transcription with ElevenLabs (or direct backend transcription if that path is taken)
+        try {
             console.log("Starting client-side transcription for video:", video._id);
             
             toast.info("Video transcription started", {
@@ -2079,7 +2082,7 @@ function InnerCanvas({
 
             // Auto-connect to the first available source (anySourceNode)
             const newEdge: Edge = {
-                id: `e-${anySourceNode.id}-${newNode.id}`,
+                id: `e-${anySourceNode.id}-${newNode.id}-${Date.now()}`, // Added timestamp for uniqueness
                 source: anySourceNode.id,
                 target: newNode.id,
                 animated: enableEdgeAnimations && !isDragging, // Use existing animation logic
@@ -2109,7 +2112,7 @@ function InnerCanvas({
             }
         });
     },
-    [reactFlowInstance, nodes, setNodes, setEdges, addEdge, createAgent, handleGenerate, findNonOverlappingPosition, handleVideoUpload, updateAgentConnections, handleChatButtonClick, handleRegenerateClick, enableEdgeAnimations, isDragging]
+    [reactFlowInstance, nodes, setNodes, setEdges, addEdge, createAgent, handleGenerate, findNonOverlappingPosition, handleVideoUpload, updateAgentConnections, handleChatButtonClick, handleRegenerateClick, enableEdgeAnimations, isDragging, handleSourceContentChange, handleSourceTypeChange] // Added new handlers
   );
 
   // Load existing videos and agents from the project

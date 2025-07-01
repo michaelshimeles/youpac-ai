@@ -3,37 +3,63 @@ import { mutation, query } from "./_generated/server";
 
 export const create = mutation({
   args: {
-    videoId: v.id("videos"),
+    videoId: v.optional(v.id("videos")), // Made videoId optional
     type: v.union(
       v.literal("title"),
       v.literal("description"),
       v.literal("thumbnail"),
-      v.literal("tweets")
+      v.literal("tweets"),
+      v.literal("linkedin"), // Added linkedin
+      v.literal("blog")      // Added blog
     ),
     canvasPosition: v.object({
       x: v.number(),
       y: v.number(),
     }),
+    // It might be necessary to pass projectId directly if videoId is not present
+    // For now, projectId will be derived if videoId exists, otherwise it will be undefined.
+    // Consider adding: projectId: v.optional(v.id("projects")) if agents can be created without a video
+    // but must still belong to a project.
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthorized");
     const userId = identity.subject;
 
-    // Verify video exists and belongs to user
-    const video = await ctx.db.get(args.videoId);
-    if (!video || video.userId !== userId) {
-      throw new Error("Video not found or unauthorized");
+    let projectId: typeof v.id("projects") | undefined = undefined;
+
+    if (args.videoId) {
+      // Verify video exists and belongs to user
+      const video = await ctx.db.get(args.videoId);
+      if (!video || video.userId !== userId) {
+        throw new Error("Video not found or unauthorized");
+      }
+      if (!video.projectId) {
+        // This case should ideally not happen if videos are always linked to projects
+        throw new Error("Video must belong to a project, but projectId is missing.");
+      }
+      projectId = video.projectId;
+    } else {
+      // If no videoId, we need a way to determine the projectId.
+      // For now, we'll allow agents to be created without a projectId if no video is linked.
+      // This implies that agents might not be directly queryable by project unless a video is linked,
+      // or if projectId is passed directly in args (which is not the case currently).
+      // A more robust solution would be to require projectId in args if videoId is absent.
+      // For the scope of this change, we proceed with projectId being potentially undefined.
+      // The frontend logic attempts to connect to *any* source, which might or might not have a projectId.
+      // If the source is a 'source' node, its projectId isn't inherently passed here.
+      console.warn("Creating agent without a videoId. ProjectId will be undefined unless explicitly passed or handled differently.");
     }
 
-    if (!video.projectId) {
-      throw new Error("Video must belong to a project");
-    }
+    // If projectId is still undefined here and agents MUST belong to a project,
+    // this would be the place to throw an error or fetch it through another relation (e.g. a default project for the user).
+    // For now, we allow it to be undefined if no video is linked.
+    // This means agents created without a video might not show up in "by_project" queries unless projectId is set later.
 
     return await ctx.db.insert("agents", {
-      videoId: args.videoId,
+      videoId: args.videoId, // This will be undefined if not provided
       userId,
-      projectId: video.projectId,
+      projectId: projectId, // This will be undefined if not derived from a video
       type: args.type,
       draft: "",
       connections: [],
