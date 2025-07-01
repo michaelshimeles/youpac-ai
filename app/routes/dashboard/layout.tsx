@@ -49,7 +49,7 @@ export default function DashboardLayout() {
         } as React.CSSProperties
       }
     >
-      <AppSidebar variant="inset" user={user} setTourStep={setTourStep} />
+      <AppSidebar variant="inset" user={user} />
       <SidebarInset>
         <SiteHeader />
         <Outlet context={{ tourStep, setTourStep }} />

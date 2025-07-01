@@ -1,7 +1,7 @@
 import { IconDashboard, IconSettings } from "@tabler/icons-react";
-import { MessageCircle, Twitter, Youtube, HelpCircle } from "lucide-react"; // Import HelpCircle
-import { Link } from "react-router";
-import type { UserResource } from "@clerk/types"; // More specific type for Clerk user
+import { MessageCircle, Twitter, Youtube, HelpCircle } from "lucide-react";
+import { Link, useOutletContext } from "react-router"; // Import useOutletContext
+import type { UserResource } from "@clerk/types";
 import { NavMain } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
 import { NavUser } from "./nav-user";
@@ -38,12 +38,12 @@ const data = {
 export function AppSidebar({
   variant,
   user,
-  setTourStep,
 }: {
   variant: "sidebar" | "floating" | "inset";
-  user: UserResource | null | undefined; // Updated type from any
-  setTourStep: (step: number) => void;
+  user: UserResource | null | undefined;
 }) {
+  // Use context to get setTourStep, removing it from props
+  const { setTourStep } = useOutletContext<{ setTourStep: (step: number) => void }>();
   return (
     <Sidebar collapsible="offcanvas" variant={variant}>
       <SidebarHeader>
@@ -94,11 +94,23 @@ export function AppSidebar({
         </SidebarGroup>
 
         {/* Onboarding Tour Button */}
-        <SidebarGroup className="mt-2"> {/* Adjusted margin if needed */}
+        <SidebarGroup className="mt-2">
+          <SidebarGroupLabel>Help</SidebarGroupLabel> {/* Added Group Label */}
             <SidebarGroupContent>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton onClick={() => setTourStep(1)}>
+                        <SidebarMenuButton
+                            onClick={() => setTourStep(1)}
+                            role="button"
+                            aria-label="Start onboarding tour"
+                            tabIndex={0} // Ensure focusable
+                            onKeyDown={(e) => {
+                               if (e.key === 'Enter' || e.key === ' ') {
+                                 e.preventDefault();
+                                 setTourStep(1);
+                               }
+                            }}
+                        >
                             <HelpCircle className="h-4 w-4" />
                             <span>Start Tour</span>
                         </SidebarMenuButton>
