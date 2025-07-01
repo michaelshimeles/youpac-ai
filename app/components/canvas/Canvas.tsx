@@ -1,7 +1,7 @@
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { Bot, Check, ChevronLeft, ChevronRight, Eye, FileText, GripVertical, Hash, Layers, Linkedin, Map as MapIcon, Palette, Settings2, Share2, Sparkles, Upload, Video, Zap } from "lucide-react";
+import { Bot, Check, ChevronLeft, ChevronRight, Eye, FileText, GripVertical, Hash, Linkedin, Map as MapIcon, Palette, Settings2, Share2, Sparkles, Upload, Video, Zap } from "lucide-react"; // Removed Layers
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useOutletContext } from "react-router"; // Onboarding: Import useOutletContext
 import { toast } from "sonner";
@@ -2683,12 +2683,70 @@ function InnerCanvas({
               </Button>
             </div>
             
+            {/* Sources Section */}
+            <div className="space-y-3">
+                {!isSidebarCollapsed && (
+                    <div className="flex items-center gap-2 mb-4">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Content Sources</span>
+                    </div>
+                )}
+                <DraggableNode
+                    type="source"
+                    label={isSidebarCollapsed ? "" : "Text/URL Source"}
+                    description={isSidebarCollapsed ? "" : "Start with a topic, text, or URL"}
+                    icon={<FileText className="h-5 w-5" />}
+                    collapsed={isSidebarCollapsed}
+                    color="purple"
+                />
+                {!isSidebarCollapsed && (
+                  <div className="mt-8 space-y-4">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-xl blur-xl" />
+                      <div className="relative rounded-xl bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/20 p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Video className="h-5 w-5 text-primary" />
+                          <span className="text-sm font-medium">Quick Start</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Drag a video file directly onto the canvas to begin
+                        </p>
+                        <Button
+                          onClick={() => fileInputRef.current?.click()}
+                          variant="secondary"
+                          size="sm"
+                          className="w-full"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Video
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {isSidebarCollapsed && (
+                  <div className="mt-8 space-y-2">
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      size="icon"
+                      variant="secondary"
+                      className="w-full hover:bg-primary/10"
+                      title="Upload Video"
+                    >
+                      <Upload className="h-5 w-5" />
+                    </Button>
+                  </div>
+                )}
+            </div>
+
+            <div className="my-4 border-t border-border/50" />
+
             {/* Agents Section */}
             <div className="space-y-3">
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-2 mb-4">
-                  <Layers className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Content Agents</span>
+                  <Bot className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">AI Agents</span>
                 </div>
               )}
               
@@ -2741,46 +2799,6 @@ function InnerCanvas({
                 color="green"
               />
             </div>
-            
-            {!isSidebarCollapsed && (
-              <div className="mt-8 space-y-4">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-xl blur-xl" />
-                  <div className="relative rounded-xl bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/20 p-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Video className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium">Quick Start</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Drag a video file directly onto the canvas to begin
-                    </p>
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      variant="secondary"
-                      size="sm"
-                      className="w-full"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Video
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {isSidebarCollapsed && (
-              <div className="mt-8 space-y-2">
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  size="icon"
-                  variant="secondary"
-                  className="w-full hover:bg-primary/10"
-                  title="Upload Video"
-                >
-                  <Upload className="h-5 w-5" />
-                </Button>
-              </div>
-            )}
           </div>
 
           {/* Bottom Actions */}
