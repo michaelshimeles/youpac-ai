@@ -239,6 +239,15 @@ function InnerCanvas({
   };
   // End Onboarding Tour Logic
 
+  // Extracted handlers for SourceNode data changes
+  const handleSourceContentChange = useCallback((nodeId: string, content: string) => {
+    setNodes((nds) => nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, content } } : n)));
+  }, [setNodes]);
+
+  const handleSourceTypeChange = useCallback((nodeId: string, sourceType: 'topic' | 'url' | 'video') => {
+    setNodes((nds) => (nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, sourceType } } : n))));
+  }, [setNodes]);
+
   // Handle content generation for an agent node
   const handleGenerate = useCallback(async (nodeId: string, thumbnailImages?: File[], additionalContext?: string) => {
     const agentNode = nodesRef.current.find((n: any) => n.id === nodeId);
@@ -2010,13 +2019,8 @@ function InnerCanvas({
                     sourceType: 'topic', // Default sourceType
                     isScraping: false,
                     error: null,
-                    // Pass the onContentChange handlers directly
-                    onContentChange: (content: string) => {
-                        setNodes((nds) => nds.map((n) => n.id === newNodeId ? { ...n, data: { ...n.data, content } } : n));
-                    },
-                    onSourceTypeChange: (sourceType: 'topic' | 'url' | 'video') => {
-                        setNodes((nds) => nds.map((n) => n.id === newNodeId ? { ...n, data: { ...n.data, sourceType } } : n));
-                    },
+                    onContentChange: (content: string) => handleSourceContentChange(newNodeId, content),
+                    onSourceTypeChange: (sourceType: 'topic' | 'url' | 'video') => handleSourceTypeChange(newNodeId, sourceType),
                 },
             };
             setNodes((nds: any) => nds.concat(newNode));
