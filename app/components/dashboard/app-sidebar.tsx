@@ -43,7 +43,18 @@ export function AppSidebar({
   user: UserResource | null | undefined;
 }) {
   // Use context to get setTourStep, removing it from props
-  const { setTourStep } = useOutletContext<{ setTourStep: (step: number) => void }>();
+  const context = useOutletContext<{ setTourStep?: (step: number) => void }>();
+  const setTourStep = context?.setTourStep;
+
+  const handleStartTour = () => {
+    if (setTourStep) {
+      setTourStep(1);
+    } else {
+      console.error("setTourStep from context is not available in AppSidebar");
+      // Optionally, provide user feedback here, e.g., a toast message
+    }
+  };
+
   return (
     <Sidebar collapsible="offcanvas" variant={variant}>
       <SidebarHeader>
@@ -100,16 +111,17 @@ export function AppSidebar({
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton
-                            onClick={() => setTourStep(1)}
+                            onClick={handleStartTour}
                             role="button"
                             aria-label="Start onboarding tour"
                             tabIndex={0} // Ensure focusable
                             onKeyDown={(e) => {
                                if (e.key === 'Enter' || e.key === ' ') {
                                  e.preventDefault();
-                                 setTourStep(1);
+                                 handleStartTour();
                                }
                             }}
+                            disabled={!setTourStep} // Optionally disable if context not ready
                         >
                             <HelpCircle className="h-4 w-4" />
                             <span>Start Tour</span>

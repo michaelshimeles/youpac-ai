@@ -126,7 +126,9 @@ function InnerCanvas({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
   // const [tourStep, setTourStep] = useState(0); // Onboarding: Local state removed
-  const { tourStep, setTourStep } = useOutletContext<{ tourStep: number; setTourStep: React.Dispatch<React.SetStateAction<number>> }>(); // Onboarding: Use context
+  const outletContext = useOutletContext<{ tourStep?: number; setTourStep?: React.Dispatch<React.SetStateAction<number>> }>();
+  const tourStep = outletContext?.tourStep ?? 0; // Provide default if context is not ready
+  const setTourStep = outletContext?.setTourStep;
   
   // Use refs to access current values in callbacks
   const nodesRef = useRef(nodes);
