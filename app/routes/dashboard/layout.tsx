@@ -22,6 +22,7 @@ export default function DashboardLayout() {
   const { userId } = useLoaderData<typeof loader>();
   const { user } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [tourStep, setTourStep] = useState(0); // 0 = inactive, 1+ = steps // Onboarding
 
   // Load saved state after mount to avoid hydration mismatch
   useEffect(() => {
@@ -48,10 +49,10 @@ export default function DashboardLayout() {
         } as React.CSSProperties
       }
     >
-      <AppSidebar variant="inset" user={user} />
+      <AppSidebar variant="inset" user={user} setTourStep={setTourStep} />
       <SidebarInset>
         <SiteHeader />
-        <Outlet />
+        <Outlet context={{ tourStep, setTourStep }} />
       </SidebarInset>
     </SidebarProvider>
   );

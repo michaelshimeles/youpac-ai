@@ -3,6 +3,7 @@ import type { Id } from "convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { Bot, Check, ChevronLeft, ChevronRight, Eye, FileText, GripVertical, Hash, Layers, Linkedin, Map as MapIcon, Palette, Settings2, Share2, Sparkles, Upload, Video, Zap } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useOutletContext } from "react-router"; // Onboarding: Import useOutletContext
 import { toast } from "sonner";
 import { PreviewModal } from "~/components/preview/PreviewModal";
 import { Button } from "~/components/ui/button";
@@ -124,7 +125,8 @@ function InnerCanvas({
   const [isChatGenerating, setIsChatGenerating] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
-  const [tourStep, setTourStep] = useState(0); // 0 = inactive, 1-4 = steps // Onboarding
+  // const [tourStep, setTourStep] = useState(0); // Onboarding: Local state removed
+  const { tourStep, setTourStep } = useOutletContext<{ tourStep: number; setTourStep: React.Dispatch<React.SetStateAction<number>> }>(); // Onboarding: Use context
   
   // Use refs to access current values in callbacks
   const nodesRef = useRef(nodes);
@@ -176,30 +178,71 @@ function InnerCanvas({
 
   // Onboarding Tour Logic
   useEffect(() => {
-    // Trigger tour only once when profile loads and is incomplete
-    if (tourStep === 0 && userProfile && !userProfile.onboardingCompleted) {
+    // If the tour is activated (by the sidebar button or automatic trigger), load sample data.
+    // The automatic trigger (profile check) is now part of this.
+    if (tourStep === 1 && (!userProfile || !userProfile.onboardingCompleted)) { // Check profile here to ensure we only load sample data if onboarding actually due
       toast.info("Welcome! Let's take a quick tour.");
       // @ts-ignore TODO: Fix type for sampleNodes if necessary
       setNodes(sampleNodes);
       // @ts-ignore TODO: Fix type for sampleEdges if necessary
       setEdges(sampleEdges);
-      setTourStep(1); // Start the tour
-    }
-  }, [userProfile, tourStep, setNodes, setEdges]);
+    } else if (tourStep === 1 && userProfile && userProfile.onboardingCompleted) {
+      // If tour was manually started for an already onboarded user, don't overwrite their project.
+      // Just show the tour. For V1, we might still load sample data for simplicity of manual trigger.
+      // As per report: "If the tour is activated (by the sidebar button), load sample data."
+      // So, we will load sample data if tourStep becomes 1, regardless of profile.onboardingCompleted for manual trigger.
+      // The `useEffect` for automatic trigger for *new* users needs to be separate or more nuanced.
+      // For now, this simpler logic will work for manual trigger.
+      // The report's instruction for useEffect:
+      // "If the tour is activated (by the sidebar button), load sample data."
+      // This means reacting to tourStep === 1.
+      // The automatic trigger logic (checking profile.onboardingCompleted) should be in DashboardLayout
+      // or passed down to determine initial tourStep.
+      // For now, this effect in Canvas reacts to tourStep being set to 1.
 
-  const handleNextStep = () => setTourStep(prev => prev + 1);
+      // Revised logic based on report's useEffect for Canvas:
+      // "If the tour is activated (by the sidebar button), load sample data."
+      // This implies this useEffect should *only* react to tourStep being 1.
+      // The *automatic* triggering for new users (checking profile.onboardingCompleted)
+      // should ideally set the initial tourStep in DashboardLayout or be handled there.
+      // However, the report places the profile check and initial setTourStep(1) in Canvas.tsx's useEffect.
+      // Let's reconcile: The sidebar button sets tourStep to 1. The original auto-trigger also set it to 1.
+      // So, if tourStep becomes 1, load sample data.
+      // The check `!profile.onboardingCompleted` should gate the *automatic* start, not this effect.
+      // This useEffect is for reacting to tourStep becoming 1.
+    }
+  }, [tourStep, setNodes, setEdges, userProfile]); // userProfile is needed if we were to gate sample data loading on it.
+
+  // Effect for *automatic* tour start for new users (as per original plan, adapted for context state)
+  useEffect(() => {
+    if (tourStep === 0 && userProfile && !userProfile.onboardingCompleted && setTourStep) {
+      toast.info("Welcome! Let's take a quick tour.");
+      setTourStep(1); // This will trigger the above useEffect to load sample data
+    }
+  }, [userProfile, tourStep, setTourStep]);
+
+
+  const handleNextStep = () => {
+    if (setTourStep) setTourStep(prev => prev + 1);
+  };
+
   const handleSkipTour = () => {
-    setTourStep(0); // End the tour
-    completeOnboarding();
-    // TODO: Optionally reload to a fresh project, or just leave the sample project for now
-    // For now, we will just clear the sample project and let user start fresh or load existing.
-    // This might need more sophisticated state management if user had a project before tour.
-    if (nodes.some((n: Node) => sampleNodes.find(sn => sn.id === n.id))) {
+    if (setTourStep) setTourStep(0); // This now updates the state in DashboardLayout
+    // completeOnboarding(); // Commented out as per instruction for testing
+
+    // Clear sample project if it was loaded by the tour
+    // Check if current nodes/edges are the sample ones
+    const isSampleProjectLoaded = nodes.length === sampleNodes.length &&
+                                edges.length === sampleEdges.length &&
+                                nodes.every((node: Node) => sampleNodes.some(sn => sn.id === node.id));
+
+    if (isSampleProjectLoaded) {
       setNodes([]);
       setEdges([]);
-      // Potentially refit view or load actual project data here
+      // TODO: Potentially reload actual project data or fitView if canvas is empty
+      toast.info("Sample project cleared. You can now start fresh or open an existing project.");
     }
-    toast.success("Onboarding complete! You can now create your own projects.");
+    // toast.success("Onboarding tour skipped."); // Original toast
   };
   // End Onboarding Tour Logic
 

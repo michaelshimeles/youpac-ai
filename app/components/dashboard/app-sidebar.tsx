@@ -1,5 +1,5 @@
 import { IconDashboard, IconSettings } from "@tabler/icons-react";
-import { MessageCircle, Twitter, Youtube } from "lucide-react";
+import { MessageCircle, Twitter, Youtube, HelpCircle } from "lucide-react"; // Import HelpCircle
 import { Link } from "react-router";
 import { NavMain } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
@@ -37,9 +37,11 @@ const data = {
 export function AppSidebar({
   variant,
   user,
+  setTourStep, // <-- Add this prop
 }: {
   variant: "sidebar" | "floating" | "inset";
   user: any;
+  setTourStep: (step: number) => void; // <-- Add prop type
 }) {
   return (
     <Sidebar collapsible="offcanvas" variant={variant}>
@@ -88,6 +90,20 @@ export function AppSidebar({
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Onboarding Tour Button */}
+        <SidebarGroup className="mt-2"> {/* Adjusted margin if needed */}
+            <SidebarGroupContent>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton onClick={() => setTourStep(1)}>
+                            <HelpCircle className="h-4 w-4" />
+                            <span>Start Tour</span>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarGroupContent>
         </SidebarGroup>
         
         <NavSecondary items={data.navSecondary} className="mt-2" />
