@@ -1,6 +1,7 @@
 import { IconDashboard, IconSettings } from "@tabler/icons-react";
 import { MessageCircle, Twitter, Youtube, HelpCircle } from "lucide-react"; // Import HelpCircle
 import { Link } from "react-router";
+import type { UserResource } from "@clerk/types"; // More specific type for Clerk user
 import { NavMain } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
 import { NavUser } from "./nav-user";
@@ -37,11 +38,11 @@ const data = {
 export function AppSidebar({
   variant,
   user,
-  setTourStep, // <-- Add this prop
+  setTourStep,
 }: {
   variant: "sidebar" | "floating" | "inset";
-  user: any;
-  setTourStep: (step: number) => void; // <-- Add prop type
+  user: UserResource | null | undefined; // Updated type from any
+  setTourStep: (step: number) => void;
 }) {
   return (
     <Sidebar collapsible="offcanvas" variant={variant}>

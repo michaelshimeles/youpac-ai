@@ -62,11 +62,27 @@ export const completeOnboarding = mutation({
 
     if (profile) {
       await ctx.db.patch(profile._id, { onboardingCompleted: true });
+      return { success: true, created: false };
     }
-    // If there's no profile, we don't create one here.
-    // Onboarding completion implies a profile should ideally exist or be created
-    // as part of the onboarding flow itself if it involves profile setup.
-    // For now, this just updates an existing profile.
+
+    // Create minimal profile if none exists
+    // Ensure all required fields from the schema are provided.
+    // From schema: userId, channelName, contentType, niche, links, createdAt, updatedAt are required.
+    // onboardingCompleted, tone, targetAudience are optional.
+    await ctx.db.insert("profiles", {
+      userId: identity.subject,
+      channelName: "", // Default empty string as per schema (cannot be undefined)
+      contentType: "", // Default empty string
+      niche: "",       // Default empty string
+      links: [],       // Default empty array
+      onboardingCompleted: true,
+      // Optional fields can be omitted if not logically part of a minimal profile:
+      // tone: undefined,
+      // targetAudience: undefined,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    return { success: true, created: true };
   },
 });
 
