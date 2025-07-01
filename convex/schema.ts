@@ -68,7 +68,7 @@ export default defineSchema({
     .index("by_created", ["createdAt"]),
 
   agents: defineTable({
-    videoId: v.id("videos"),
+    videoId: v.optional(v.id("videos")), // Made videoId optional
     userId: v.string(),
     projectId: v.optional(v.id("projects")),
     type: v.union(
