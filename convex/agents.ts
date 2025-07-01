@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel"; // Added Id import
 
 export const create = mutation({
   args: {
@@ -26,7 +27,7 @@ export const create = mutation({
     if (!identity) throw new Error("Unauthorized");
     const userId = identity.subject;
 
-    let projectId: typeof v.id("projects") | undefined = undefined;
+    let projectId: Id<"projects"> | undefined = undefined; // Corrected type annotation
 
     if (args.videoId) {
       // Verify video exists and belongs to user

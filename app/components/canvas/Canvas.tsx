@@ -1711,7 +1711,7 @@ function InnerCanvas({
             } else {
               throw new Error("No transcription text received.");
             }
-          } catch (transcriptionError: any) {
+          } catch (transcriptionError: any) { // This is Catch for Try-B (inner try for ElevenLabs)
             console.error("Failed to transcribe:", transcriptionError);
             setNodes((nds: any) =>
               nds.map((node: any) =>
@@ -1725,9 +1725,9 @@ function InnerCanvas({
             } else {
               toast.error("Transcription failed", { description: "You can retry transcription later." });
             }
-          }
-        }
-      } catch (transcriptionError: any) {
+          } // End of Catch for Try-B. The extra '}' on the next line (previously 1729) is removed.
+        // This is now the end of Try-A (outer try for transcription logic)
+      } catch (transcriptionError: any) { // This is Catch for Try-A
         console.error("Transcription error:", transcriptionError);
         const errorDetails = handleVideoError(transcriptionError, 'Transcription');
         setNodes((nds: any) =>
