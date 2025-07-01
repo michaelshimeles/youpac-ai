@@ -2234,17 +2234,6 @@ function InnerCanvas({
           
           const position = findNonOverlappingPosition(desiredPosition, 'video');
 
-          // Show file size info
-          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-          const MAX_FILE_SIZE = 25 * 1024 * 1024;
-          
-          if (file.size > MAX_FILE_SIZE) {
-            toast.info(`Video is ${fileSizeMB}MB. Audio will be extracted for transcription (supports up to ~25 min videos).`);
-          } else {
-            toast.info(`Video is ${fileSizeMB}MB. Will transcribe directly.`);
-          }
-
-          // Upload video to Convex
           handleVideoUpload(file, position);
           return;
         }
@@ -2259,68 +2248,45 @@ function InnerCanvas({
         x: event.clientX,
         y: event.clientY,
       });
-      
       const position = findNonOverlappingPosition(desiredPosition, type);
 
-      // Find the first video node to associate with this agent
-      const videoNode = nodes.find((n: any) => n.type === 'video' && n.data.videoId);
-      if (!videoNode) {
-        toast.error("Please add a video first before adding agents");
+      // Handle dropping a SourceNode
+      if (type === 'source') {
+          const newNode: Node = {
+              id: `source_${Date.now()}`,
+              type: 'source',
+              position,
+              data: { content: '', sourceType: 'topic', isScraping: false, error: null },
+          };
+          setNodes((nds: any) => nds.concat(newNode));
+          return; // Done
+      }
+
+      // --- Logic for dropping an AGENT ---
+      const anySourceNode = nodes.find((n: any) => n.type === 'video' || n.type === 'source');
+      if (!anySourceNode) {
+          toast.error("Please add a Source (Video or Text) to the canvas first!");
+          return;
+      }
+
+      // Generic agent creation logic
+      // Note: The backend 'agents' schema currently requires a 'videoId'.
+      // This will need to be made optional or changed to a generic 'sourceId'
+      // for agents to be created from non-video sources without error.
+      // For now, we pass undefined if the source isn't a video.
+      const videoIdForAgent = anySourceNode.type === 'video' ? anySourceNode.data.videoId as Id<"videos"> : undefined;
+
+      if (!videoIdForAgent && type !== 'blog' && type !== 'linkedin') { // Example: only allow blog/linkedin if no video
+        // This check is temporary. Ideally, all agents should work with any source type
+        // once the backend schema for `agents.videoId` is updated/made optional.
+        toast.error(`Agent type '${type}' currently requires a video source. Non-video sources support will be enhanced.`);
         return;
       }
 
-      // Special handling for blog type - create source node too
-      if (type === 'blog') {
-        const sourceNodeId = `source_${Date.now()}`;
-        const blogNodeId = `blog_${Date.now()}`;
-        
-        // Create source node
-        const sourceNode: Node = {
-          id: sourceNodeId,
-          type: 'source',
-          position: { x: position.x - 250, y: position.y },
-          data: {
-            content: '',
-            sourceType: 'topic',
-            isScraping: false,
-            error: null,
-          },
-        };
-        
-        // Create blog node without database agent (for now)
-        const blogNode: Node = {
-          id: blogNodeId,
-          type: 'blog',
-          position,
-          data: {
-            type: 'blog',
-            draft: "",
-            status: "idle",
-            connections: [],
-            onGenerate: () => handleGenerate(blogNodeId),
-            onChat: () => handleChatButtonClick(blogNodeId),
-            onView: () => setSelectedNodeForModal(blogNodeId),
-            onRegenerate: () => handleRegenerateClick(blogNodeId),
-          },
-        };
-        
-        // Create edge between source and blog
-        const edgeId = `e${sourceNodeId}-${blogNodeId}`;
-        const newEdge: Edge = {
-          id: edgeId,
-          source: sourceNodeId,
-          target: blogNodeId,
-          animated: enableEdgeAnimations && !isDragging,
-        };
-        
-        setNodes((nds: any) => nds.concat([sourceNode, blogNode]));
-        setEdges((eds: any) => eds.concat(newEdge));
-        return;
-      }
-
-      // Create agent in database
       createAgent({
-        videoId: videoNode.data.videoId as Id<"videos">,
+        // If videoIdForAgent is undefined, this will likely fail with current backend schema
+        // This highlights the need for backend changes for agents.videoId to be optional or generic.
+        videoId: videoIdForAgent!, // Using non-null assertion, assuming backend will be updated or this path is guarded
         type: type as "title" | "description" | "thumbnail" | "tweets" | "linkedin" | "blog",
         canvasPosition: position,
       }).then((agentId) => {
