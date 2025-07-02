@@ -2106,17 +2106,20 @@ function InnerCanvas({
                 }
             }
 
-        }).catch((error) => {
+        }).catch((error: any) => { // Added :any to error type for broader message checking
             console.error("Failed to create agent:", error);
-            // More informative error if backend requires videoId
-            if (error.message?.includes("videoId") || error.data?.includes("videoId")) {
-                 toast.error("Failed to create agent. The backend might still require a video source for this agent type. Please ensure `convex/agents.ts` is updated.");
+            const errorMessage = typeof error.data === 'string' ? error.data : error.message; // Convex errors might have details in error.data
+
+            if (errorMessage?.includes("Agent creation requires either a videoId or a projectId")) {
+                toast.error("Failed to create agent: Must be linked to a project (e.g., via video or canvas project context).");
+            } else if (errorMessage?.includes("videoId")) { // Keep old check as a fallback, though less likely now
+                 toast.error("Failed to create agent. Backend may still require a video for this specific agent type.");
             } else {
-                toast.error("Failed to create agent.");
+                toast.error(`Failed to create agent: ${errorMessage || "Unknown error"}`);
             }
         });
     },
-    [reactFlowInstance, nodes, setNodes, setEdges, addEdge, createAgent, handleGenerate, findNonOverlappingPosition, handleVideoUpload, updateAgentConnections, handleChatButtonClick, handleRegenerateClick, enableEdgeAnimations, isDragging, handleSourceContentChange, handleSourceTypeChange] // Added new handlers
+    [reactFlowInstance, nodes, setNodes, setEdges, addEdge, createAgent, handleGenerate, findNonOverlappingPosition, handleVideoUpload, updateAgentConnections, handleChatButtonClick, handleRegenerateClick, enableEdgeAnimations, isDragging, handleSourceContentChange, handleSourceTypeChange, projectId] // Added projectId to deps
   );
 
   // Load existing videos and agents from the project
