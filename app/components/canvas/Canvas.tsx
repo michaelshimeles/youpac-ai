@@ -2056,9 +2056,10 @@ function InnerCanvas({
         // if (!videoSourceForAgent?.data.videoId && type !== 'blog' && type !== 'linkedin') { ... }
 
         createAgent({
+            // Provide whichever identifier is available.
             videoId: videoSourceForAgent?.data.videoId as Id<"videos"> | undefined,
-            // projectId will be passed here in a future change if videoId is undefined
-            type: type as any,
+            projectId: videoSourceForAgent?.data.videoId ? undefined : projectId, // Pass canvas projectId if no videoId
+            type: type as "title" | "description" | "thumbnail" | "tweets" | "linkedin" | "blog", // Use specific types
             canvasPosition: findNonOverlappingPosition(position, type),
         }).then((agentId) => {
             const nodeType = type === 'linkedin' ? 'linkedin' : type === 'blog' ? 'blog' : 'agent';
