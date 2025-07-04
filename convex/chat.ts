@@ -25,6 +25,11 @@ export const refineContent = action({
       v.object({
         title: v.optional(v.string()),
         transcription: v.optional(v.string()),
+        articles: v.optional(v.array(v.object({
+          title: v.string(),
+          content: v.string(),
+          wordCount: v.number(),
+        }))),
         duration: v.optional(v.number()),
         resolution: v.optional(v.object({
           width: v.number(),
@@ -71,9 +76,15 @@ export const refineContent = action({
         prompt += "\n";
       }
       
-      // Add context about the video if available
+      // Add context about the video or article if available
       if (args.videoData?.transcription) {
         prompt += `Video context: ${args.videoData.transcription.slice(0, 1000)}...\n\n`;
+      } else if (args.videoData?.articles && args.videoData.articles.length > 0) {
+        prompt += `Article context:\n`;
+        args.videoData.articles.forEach((article) => {
+          prompt += `"${article.title}": ${article.content.slice(0, 1000)}...\n`;
+        });
+        prompt += "\n";
       }
       
       // Add connected agent outputs if available
