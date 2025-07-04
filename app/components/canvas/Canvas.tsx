@@ -33,6 +33,8 @@ import { VideoPlayerModal } from "./VideoPlayerModal";
 import { TranscriptionNode } from "./TranscriptionNode";
 import { MoodBoardNode } from "./MoodBoardNode";
 import { ArticleNode } from "./ArticleNode";
+import { ArticleViewModal } from "./ArticleViewModal";
+import { ArticleEditModal } from "./ArticleEditModal";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
@@ -102,6 +104,9 @@ function InnerCanvas({
   const [transcriptionLoading, setTranscriptionLoading] = useState(false);
   const [transcriptionVideoId, setTranscriptionVideoId] = useState<Id<"videos"> | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string; duration?: number; fileSize?: number } | null>(null);
+  const [articleViewModalOpen, setArticleViewModalOpen] = useState(false);
+  const [articleEditModalOpen, setArticleEditModalOpen] = useState(false);
+  const [selectedArticle, setSelectedArticle] = useState<{ id: string; title: string; content: string; format: string } | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [transcriptionUploadVideoId, setTranscriptionUploadVideoId] = useState<Id<"videos"> | null>(null);
   const [enableEdgeAnimations, setEnableEdgeAnimations] = useState(true);
@@ -180,6 +185,7 @@ function InnerCanvas({
   const updateTranscriptionPosition = useMutation(api.transcriptions.updatePosition);
   const deleteTranscription = useMutation(api.transcriptions.remove);
   const createArticle = useMutation(api.articles.create);
+  const updateArticle = useMutation(api.articles.update);
   const updateArticlePosition = useMutation(api.articles.updatePosition);
   const deleteArticle = useMutation(api.articles.remove);
 
@@ -1593,6 +1599,49 @@ function InnerCanvas({
     }
   };
 
+  const handleArticleSave = async (articleId: string, title: string, content: string) => {
+    try {
+      // Update the article in the database
+      await updateArticle({
+        id: articleId as Id<"articles">,
+        title: title,
+        content: content,
+        wordCount: content.trim().split(/\s+/).filter(word => word.length > 0).length,
+      });
+
+      // Update the node in the canvas
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
+          node.id === `article_${articleId}`
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  title: title,
+                  content: content,
+                  wordCount: content.trim().split(/\s+/).filter(word => word.length > 0).length,
+                },
+              }
+            : node
+        )
+      );
+
+      // Update the selected article state with the new content
+      if (selectedArticle && selectedArticle.id === articleId) {
+        setSelectedArticle({
+          ...selectedArticle,
+          title: title,
+          content: content,
+        });
+      }
+
+      toast.success("Article updated successfully!");
+    } catch (error) {
+      console.error("Failed to update article:", error);
+      toast.error("Failed to save article changes");
+    }
+  };
+
 
   // Handle video file upload
   const handleVideoUpload = async (file: File, position: { x: number; y: number }, retryCount = 0) => {
@@ -2237,12 +2286,28 @@ function InnerCanvas({
             fileName: file.name,
             uploadedAt: Date.now(),
             onView: () => {
-              // TODO: Add article view modal
-              toast.info("Article viewer coming soon!");
+              // Get the latest data from the node using ref to avoid closure issues
+              const currentNode = nodesRef.current.find((n: any) => n.id === articleNodeId);
+              const currentData = currentNode?.data || {};
+              setSelectedArticle({
+                id: articleId,
+                title: currentData.title || title,
+                content: currentData.content || fileContent,
+                format: currentData.format || extension || 'txt',
+              });
+              setArticleViewModalOpen(true);
             },
             onEdit: () => {
-              // TODO: Add article edit modal
-              toast.info("Article editor coming soon!");
+              // Get the latest data from the node using ref to avoid closure issues
+              const currentNode = nodesRef.current.find((n: any) => n.id === articleNodeId);
+              const currentData = currentNode?.data || {};
+              setSelectedArticle({
+                id: articleId,
+                title: currentData.title || title,
+                content: currentData.content || fileContent,
+                format: currentData.format || extension || 'txt',
+              });
+              setArticleEditModalOpen(true);
             },
           },
         };
@@ -3056,12 +3121,28 @@ function InnerCanvas({
           fileName: article.fileName,
           uploadedAt: article.createdAt,
           onView: () => {
-            // TODO: Add article view modal
-            toast.info("Article viewer coming soon!");
+            // Get the latest data from the node using ref to avoid closure issues
+            const currentNode = nodesRef.current.find((n: any) => n.id === `article_${article._id}`);
+            const currentData = currentNode?.data || {};
+            setSelectedArticle({
+              id: article._id,
+              title: currentData.title || article.title,
+              content: currentData.content || article.content,
+              format: currentData.format || article.format || 'markdown',
+            });
+            setArticleViewModalOpen(true);
           },
           onEdit: () => {
-            // TODO: Add article edit modal
-            toast.info("Article editor coming soon!");
+            // Get the latest data from the node using ref to avoid closure issues
+            const currentNode = nodesRef.current.find((n: any) => n.id === `article_${article._id}`);
+            const currentData = currentNode?.data || {};
+            setSelectedArticle({
+              id: article._id,
+              title: currentData.title || article.title,
+              content: currentData.content || article.content,
+              format: currentData.format || article.format || 'markdown',
+            });
+            setArticleEditModalOpen(true);
           },
         },
       }));
@@ -4018,6 +4099,27 @@ function InnerCanvas({
             }}
           />
         )}
+        
+        {/* Article View Modal */}
+        <ArticleViewModal
+          isOpen={articleViewModalOpen}
+          onClose={() => {
+            setArticleViewModalOpen(false);
+            setSelectedArticle(null);
+          }}
+          article={selectedArticle}
+        />
+
+        {/* Article Edit Modal */}
+        <ArticleEditModal
+          isOpen={articleEditModalOpen}
+          onClose={() => {
+            setArticleEditModalOpen(false);
+            setSelectedArticle(null);
+          }}
+          article={selectedArticle}
+          onSave={handleArticleSave}
+        />
         
         {/* Floating Chat - Always Visible */}
         <FloatingChat
