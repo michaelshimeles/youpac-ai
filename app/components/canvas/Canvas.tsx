@@ -2052,10 +2052,14 @@ function InnerCanvas({
         // For now, we find the first video if it exists for backward compatibility.
         const videoSourceForAgent = nodes.find((n: any) => n.type === 'video');
 
+        // The outdated validation block that was here has been removed:
+        // if (!videoSourceForAgent?.data.videoId && type !== 'blog' && type !== 'linkedin') { ... }
+
         createAgent({
-            videoId: videoSourceForAgent?.data.videoId as Id<"videos"> | undefined, // Pass undefined if no video
-            type: type as any, // Cast as any to allow all our new agent types
-            canvasPosition: findNonOverlappingPosition(position, type), // Use findNonOverlappingPosition here too
+            videoId: videoSourceForAgent?.data.videoId as Id<"videos"> | undefined,
+            // projectId will be passed here in a future change if videoId is undefined
+            type: type as any,
+            canvasPosition: findNonOverlappingPosition(position, type),
         }).then((agentId) => {
             const nodeType = type === 'linkedin' ? 'linkedin' : type === 'blog' ? 'blog' : 'agent';
             const newNodeId = `${type}_${agentId}`; // Consistent ID generation
