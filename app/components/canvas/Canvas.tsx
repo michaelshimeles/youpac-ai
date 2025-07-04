@@ -3591,21 +3591,48 @@ function InnerCanvas({
                   <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-xl blur-xl" />
                   <div className="relative rounded-xl bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/20 p-4 space-y-3">
                     <div className="flex items-center gap-2">
-                      <Video className="h-5 w-5 text-primary" />
+                      <div className="flex gap-1">
+                        <Video className="h-5 w-5 text-primary" />
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
                       <span className="text-sm font-medium">Quick Start</span>
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Drag a video file directly onto the canvas to begin
+                      Drag a video or text file directly onto the canvas to begin
                     </p>
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      variant="secondary"
-                      size="sm"
-                      className="w-full"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Video
-                    </Button>
+                    <div className="text-xs text-muted-foreground/70 leading-relaxed">
+                      Supports MP4, MOV, TXT, and more
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          if (fileInputRef.current) {
+                            fileInputRef.current.accept = "video/*";
+                            fileInputRef.current.click();
+                          }
+                        }}
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        <Video className="h-4 w-4 mr-1.5" />
+                        Video
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          if (fileInputRef.current) {
+                            fileInputRef.current.accept = "text/*,.txt,.md,.json";
+                            fileInputRef.current.click();
+                          }
+                        }}
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        <FileText className="h-4 w-4 mr-1.5" />
+                        Article
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3618,7 +3645,7 @@ function InnerCanvas({
                   size="icon"
                   variant="secondary"
                   className="w-full hover:bg-primary/10"
-                  title="Upload Video"
+                  title="Upload Content (Video or Article)"
                 >
                   <Upload className="h-5 w-5" />
                 </Button>
@@ -4007,11 +4034,11 @@ function InnerCanvas({
           initialInputValue={chatInput}
         />
         
-        {/* Hidden file input for video upload */}
+        {/* Hidden file input for content upload */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="video/*"
+          accept="video/*,text/*,.txt,.md,.json"
           style={{ display: 'none' }}
           onChange={async (e) => {
             const file = e.target.files?.[0];
@@ -4025,7 +4052,14 @@ function InnerCanvas({
                   x: centerX,
                   y: centerY,
                 });
-                await handleVideoUpload(file, position);
+                
+                // Check if it's a text file
+                const extension = file.name.split('.').pop()?.toLowerCase();
+                if (extension && ['txt', 'md', 'json'].includes(extension)) {
+                  await handleTextDrop(file, position);
+                } else {
+                  await handleVideoUpload(file, position);
+                }
               }
             }
             // Reset the input
