@@ -9,6 +9,16 @@ import { FileText, Hash, Eye, Edit, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 
 interface ArticleEditModalProps {
   isOpen: boolean;
@@ -32,6 +42,7 @@ export function ArticleEditModal({
   const [content, setContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
+  const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
 
   useEffect(() => {
     if (article) {
@@ -69,11 +80,10 @@ export function ArticleEditModal({
 
   const handleCancel = () => {
     if (article && (title !== article.title || content !== article.content)) {
-      if (!confirm("You have unsaved changes. Are you sure you want to close?")) {
-        return;
-      }
+      setShowUnsavedChangesDialog(true);
+    } else {
+      onClose();
     }
-    onClose();
   };
 
   const wordCount = content.trim().split(/\s+/).filter(word => word.length > 0).length;
@@ -210,5 +220,27 @@ export function ArticleEditModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showUnsavedChangesDialog} onOpenChange={setShowUnsavedChangesDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have unsaved changes. Are you sure you want to close without saving?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Continue Editing</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setShowUnsavedChangesDialog(false);
+              onClose();
+            }}
+          >
+            Discard Changes
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
