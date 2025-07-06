@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -6,6 +6,7 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { Copy, Check, Download, Search, X, FileText, Hash, Clock } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import Highlighter from "react-highlight-words";
 
 interface ArticleViewModalProps {
   isOpen: boolean;
@@ -25,18 +26,6 @@ export function ArticleViewModal({
 }: ArticleViewModalProps) {
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [highlightedText, setHighlightedText] = useState<string>("");
-
-  useEffect(() => {
-    if (article?.content && searchQuery) {
-      // Simple highlighting - replace with mark tag
-      const regex = new RegExp(`(${searchQuery})`, 'gi');
-      const highlighted = article.content.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>');
-      setHighlightedText(highlighted);
-    } else {
-      setHighlightedText(article?.content || "");
-    }
-  }, [article?.content, searchQuery]);
 
   const handleCopy = async () => {
     if (!article?.content) return;
@@ -163,40 +152,51 @@ export function ArticleViewModal({
                   isMarkdown ? (
                     searchQuery ? (
                       // For search in markdown, show plain text with highlights
-                      <div 
-                        className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: highlightedText }}
-                      />
+                      <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed">
+                        <Highlighter
+                          searchWords={[searchQuery]}
+                          autoEscape={true}
+                          textToHighlight={article.content}
+                          highlightClassName="bg-yellow-200 dark:bg-yellow-800"
+                        />
+                      </div>
                     ) : (
                       // Render markdown normally
-                      <ReactMarkdown 
-                        className="prose prose-sm dark:prose-invert max-w-none"
-                        components={{
-                          // Customize code blocks to have better styling
-                          pre: ({ children, ...props }) => (
-                            <pre className="bg-muted rounded-lg p-4 overflow-x-auto" {...props}>
-                              {children}
-                            </pre>
-                          ),
-                          code: ({ inline, children, ...props }) => 
-                            inline ? (
-                              <code className="bg-muted px-1 py-0.5 rounded text-sm" {...props}>
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown
+                          components={{
+                            // Customize code blocks to have better styling
+                            pre: ({ children, ...props }) => (
+                              <pre className="bg-muted rounded-lg p-4 overflow-x-auto" {...props}>
                                 {children}
-                              </code>
-                            ) : (
-                              <code {...props}>{children}</code>
-                            )
-                        }}
-                      >
-                        {article.content}
-                      </ReactMarkdown>
+                              </pre>
+                            ),
+                            code: ({ children, ...props }: any) => {
+                              const inline = !props.node?.position;
+                              return inline ? (
+                                <code className="bg-muted px-1 py-0.5 rounded text-sm" {...props}>
+                                  {children}
+                                </code>
+                              ) : (
+                                <code {...props}>{children}</code>
+                              );
+                            }
+                          }}
+                        >
+                          {article.content}
+                        </ReactMarkdown>
+                      </div>
                     )
                   ) : (
                     // Plain text - preserve formatting
-                    <div 
-                      className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed font-mono text-sm"
-                      dangerouslySetInnerHTML={{ __html: highlightedText }}
-                    />
+                    <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed font-mono text-sm">
+                      <Highlighter
+                        searchWords={[searchQuery]}
+                        autoEscape={true}
+                        textToHighlight={article.content}
+                        highlightClassName="bg-yellow-200 dark:bg-yellow-800"
+                      />
+                    </div>
                   )
                 ) : (
                   <div className="flex items-center justify-center h-64">
