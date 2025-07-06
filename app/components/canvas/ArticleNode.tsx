@@ -56,11 +56,12 @@ export const ArticleNode = memo(({ data, selected }: NodeProps) => {
   const handleDownload = () => {
     if (!nodeData.content || !nodeData.title) return;
     
-    const blob = new Blob([nodeData.content], { type: 'text/plain' });
+    const mimeType = (nodeData.format === 'md' || nodeData.format === 'markdown') ? 'text/markdown' : 'text/plain';
+    const blob = new Blob([nodeData.content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${nodeData.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+    a.download = `${nodeData.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${nodeData.format || 'txt'}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
