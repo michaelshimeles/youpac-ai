@@ -2924,19 +2924,25 @@ function InnerCanvas({
       
       const position = findNonOverlappingPosition(desiredPosition, type);
 
-      // Find the first video or article node to associate with this agent
-      const videoNode = nodes.find((n: any) => n.type === 'video' && n.data.videoId);
-      const articleNode = nodes.find((n: any) => n.type === 'article' && n.data.articleId);
+      // Find the most recent video or article node to associate with this agent
+      const contentNodes = nodes.filter((n: any) => 
+        (n.type === 'video' && n.data.videoId) || 
+        (n.type === 'article' && n.data.articleId)
+      );
       
-      if (!videoNode && !articleNode) {
+      if (contentNodes.length === 0) {
         toast.error("Please add a video or article first before adding agents");
         return;
       }
 
-      // Create agent in database
+      // Use the most recently added content node (last in the array)
+      const contentNode = contentNodes[contentNodes.length - 1];
+      const isVideo = contentNode.type === 'video';
+
+      // Create agent in database - only pass the relevant ID
       createAgent({
-        videoId: videoNode?.data.videoId as Id<"videos"> | undefined,
-        articleId: articleNode?.data.articleId as Id<"articles"> | undefined,
+        ...(isVideo ? { videoId: contentNode.data.videoId as Id<"videos"> } : {}),
+        ...(!isVideo ? { articleId: contentNode.data.articleId as Id<"articles"> } : {}),
         type: type as "title" | "description" | "thumbnail" | "tweets",
         canvasPosition: position,
       }).then((agentId) => {
@@ -2968,19 +2974,18 @@ function InnerCanvas({
         setNodes((nds: any) => nds.concat(newNode));
         
         // Automatically create edge from content source to agent
-        const sourceNode = videoNode || articleNode;
-        const edgeId = `e${sourceNode!.id}-${nodeId}`;
+        const edgeId = `e${contentNode.id}-${nodeId}`;
         const newEdge: Edge = {
           id: edgeId,
-          source: sourceNode!.id,
+          source: contentNode.id,
           target: nodeId,
           animated: enableEdgeAnimations && !isDragging,
-          style: articleNode ? { stroke: '#f97316', strokeWidth: 2 } : undefined,
+          style: !isVideo ? { stroke: '#f97316', strokeWidth: 2 } : undefined,
         };
         setEdges((eds: any) => [...eds, newEdge]);
         
         // Update agent's connections in database
-        const connectionId = videoNode ? videoNode.data.videoId : articleNode!.data.articleId;
+        const connectionId = isVideo ? contentNode.data.videoId : contentNode.data.articleId;
         updateAgentConnections({
           id: agentId,
           connections: [connectionId as string],
@@ -2988,15 +2993,18 @@ function InnerCanvas({
           console.error("Failed to update agent connections:", error);
         });
         
-        toast.success(`${type} agent added and connected to ${videoNode ? 'video' : 'article'}`);
+        toast.success(`${type} agent added and connected to ${isVideo ? 'video' : 'article'}`);
         
         // Just inform about transcription status, don't auto-generate
-        if (videoNode.data.isTranscribing) {
+        if (isVideo && contentNode.data.isTranscribing) {
           toast.info("Video is still being transcribed. Generate once complete.");
-        } else if (videoNode.data.hasTranscription) {
+        } else if (isVideo && contentNode.data.hasTranscription) {
           toast.info("Ready to generate content - click Generate on the agent node");
-        } else {
+        } else if (isVideo) {
           toast.warning("No transcription available - content will be less accurate");
+        } else {
+          // For articles
+          toast.info("Ready to generate content - click Generate on the agent node");
         }
       }).catch((error) => {
         console.error("Failed to create agent:", error);
