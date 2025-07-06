@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 
 // Create a share link
 export const createShareLink = mutation({

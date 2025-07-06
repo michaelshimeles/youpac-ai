@@ -38,7 +38,7 @@ const profileSchema = z.object({
   channelName: z.string().min(1, "Channel name is required"),
   contentType: z.string().min(1, "Content type is required"),
   niche: z.string().min(1, "Niche is required"),
-  links: z.array(z.string()).default([]),
+  links: z.array(z.string()),
   tone: z.string().optional(),
   targetAudience: z.string().optional(),
 });
@@ -195,7 +195,7 @@ export default function Page() {
                   <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-6">
                     <div className="grid gap-6 sm:grid-cols-2">
                       <FormField
-                        control={form.control}
+                        control={form.control as any}
                         name="channelName"
                         render={({ field }) => (
                           <FormItem>
@@ -215,7 +215,7 @@ export default function Page() {
                       />
 
                       <FormField
-                        control={form.control}
+                        control={form.control as any}
                         name="contentType"
                         render={({ field }) => (
                           <FormItem>
@@ -236,7 +236,7 @@ export default function Page() {
                     </div>
 
                     <FormField
-                      control={form.control}
+                      control={form.control as any}
                       name="niche"
                       render={({ field }) => (
                         <FormItem>
@@ -282,7 +282,7 @@ export default function Page() {
                   <form className="space-y-6">
 
                     <FormField
-                      control={form.control}
+                      control={form.control as any}
                       name="tone"
                       render={({ field }) => (
                         <FormItem>
@@ -306,7 +306,7 @@ export default function Page() {
                     />
 
                     <FormField
-                      control={form.control}
+                      control={form.control as any}
                       name="targetAudience"
                       render={({ field }) => (
                         <FormItem>

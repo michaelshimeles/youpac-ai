@@ -33,6 +33,10 @@ export async function generateThumbnailWithGPTImage({
     response_format: "b64_json",
   });
 
+  if (!response.data || response.data.length === 0) {
+    throw new Error("No image data returned from GPT Image API");
+  }
+  
   const base64 = response.data[0].b64_json;
   if (!base64) {
     throw new Error("No image data returned from GPT Image API");

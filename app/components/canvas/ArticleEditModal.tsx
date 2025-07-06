@@ -140,26 +140,29 @@ export function ArticleEditModal({
                 <TabsContent value="preview" className="flex-1 p-0 m-0 overflow-hidden">
                   <ScrollArea className="h-full">
                     <div className="p-6">
-                      <ReactMarkdown 
-                        className="prose prose-sm dark:prose-invert max-w-none"
-                        components={{
-                          pre: ({ children, ...props }) => (
-                            <pre className="bg-muted rounded-lg p-4 overflow-x-auto" {...props}>
-                              {children}
-                            </pre>
-                          ),
-                          code: ({ inline, children, ...props }) => 
-                            inline ? (
-                              <code className="bg-muted px-1 py-0.5 rounded text-sm" {...props}>
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown
+                          components={{
+                            pre: ({ children, ...props }) => (
+                              <pre className="bg-muted rounded-lg p-4 overflow-x-auto" {...props}>
                                 {children}
-                              </code>
-                            ) : (
-                              <code {...props}>{children}</code>
-                            )
-                        }}
-                      >
-                        {content || "*No content to preview*"}
-                      </ReactMarkdown>
+                              </pre>
+                            ),
+                            code: ({ children, ...props }: any) => {
+                              const inline = !props.node?.position;
+                              return inline ? (
+                                <code className="bg-muted px-1 py-0.5 rounded text-sm" {...props}>
+                                  {children}
+                                </code>
+                              ) : (
+                                <code {...props}>{children}</code>
+                              );
+                            }
+                          }}
+                        >
+                          {content || "*No content to preview*"}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </ScrollArea>
                 </TabsContent>
