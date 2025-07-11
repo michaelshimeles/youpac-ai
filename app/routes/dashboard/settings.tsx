@@ -38,7 +38,7 @@ const profileSchema = z.object({
   channelName: z.string().min(1, "Channel name is required"),
   contentType: z.string().min(1, "Content type is required"),
   niche: z.string().min(1, "Niche is required"),
-  links: z.array(z.string()),
+  links: z.array(z.string()).default([]),
   tone: z.string().optional(),
   targetAudience: z.string().optional(),
 });
@@ -192,10 +192,10 @@ export default function Page() {
               </div>
               <CardContent className="p-6">
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-6">
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     <div className="grid gap-6 sm:grid-cols-2">
                       <FormField
-                        control={form.control as any}
+                        control={form.control}
                         name="channelName"
                         render={({ field }) => (
                           <FormItem>
@@ -215,7 +215,7 @@ export default function Page() {
                       />
 
                       <FormField
-                        control={form.control as any}
+                        control={form.control}
                         name="contentType"
                         render={({ field }) => (
                           <FormItem>
@@ -389,7 +389,7 @@ export default function Page() {
             {/* Save Button */}
             <div className="flex justify-end">
               <Button 
-                onClick={form.handleSubmit(onSubmit as any)}
+                onClick={form.handleSubmit(onSubmit)}
                 disabled={isSubmitting}
                 size="lg"
                 className="gap-2"

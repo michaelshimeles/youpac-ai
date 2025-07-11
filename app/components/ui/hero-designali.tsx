@@ -197,7 +197,7 @@ function onMousemove(e: MouseEvent | TouchEvent): void {
 }
 
 function render(): void {
-  if (ctx && ctx.running) {
+  if (ctx?.running) {
     ctx.globalCompositeOperation = "source-over";
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.globalCompositeOperation = "lighter";
@@ -257,7 +257,7 @@ const renderCanvas = function (): void {
   
   window.addEventListener("blur", () => {
     if (ctx) {
-      ctx.running = true;
+      ctx.running = false;
     }
   });
   
