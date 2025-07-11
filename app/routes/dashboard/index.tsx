@@ -174,7 +174,7 @@ export default function Page() {
         <div>
           <h1 className="text-3xl font-bold">Projects</h1>
           <p className="text-muted-foreground">
-            Create and manage your YouTube video projects
+            Create and manage your content projects
           </p>
         </div>
         
@@ -199,7 +199,7 @@ export default function Page() {
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>
               <DialogDescription>
-                Each project is a canvas for creating content for one video
+                Each project is a canvas for creating content from videos or articles
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -207,7 +207,7 @@ export default function Page() {
                 <Label htmlFor="title">Project Title</Label>
                 <Input
                   id="title"
-                  placeholder="My Awesome Video"
+                  placeholder="My Awesome Content"
                   value={newProject.title}
                   onChange={(e) =>
                     setNewProject({ ...newProject, title: e.target.value })
@@ -218,7 +218,7 @@ export default function Page() {
                 <Label htmlFor="description">Description (optional)</Label>
                 <Textarea
                   id="description"
-                  placeholder="Brief description of your video project..."
+                  placeholder="Brief description of your content project..."
                   value={newProject.description}
                   onChange={(e) =>
                     setNewProject({ ...newProject, description: e.target.value })
@@ -257,7 +257,7 @@ export default function Page() {
             <Video className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
             <p className="text-muted-foreground text-center mb-4">
-              Create your first project to start generating YouTube content
+              Create your first project to start generating content
             </p>
             <Button onClick={() => setIsCreateOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />

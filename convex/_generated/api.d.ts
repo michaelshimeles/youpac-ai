@@ -11,6 +11,7 @@
 import type * as agents from "../agents.js";
 import type * as ai from "../ai.js";
 import type * as aiHackathon from "../aiHackathon.js";
+import type * as articles from "../articles.js";
 import type * as canvas from "../canvas.js";
 import type * as chat from "../chat.js";
 import type * as debug from "../debug.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   agents: typeof agents;
   ai: typeof ai;
   aiHackathon: typeof aiHackathon;
+  articles: typeof articles;
   canvas: typeof canvas;
   chat: typeof chat;
   debug: typeof debug;

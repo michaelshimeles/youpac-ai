@@ -22,6 +22,11 @@ export const generateContentSimple = action({
         text: v.string(),
         format: v.string(),
       }))),
+      articles: v.optional(v.array(v.object({
+        title: v.string(),
+        content: v.string(),
+        wordCount: v.number(),
+      }))),
       duration: v.optional(v.number()),
       resolution: v.optional(v.object({
         width: v.number(),
@@ -78,6 +83,9 @@ export const generateContentSimple = action({
         console.log(`[Title Agent] Data availability:`, {
           hasTranscription: !!videoData.transcription,
           transcriptionLength: videoData.transcription?.length || 0,
+          hasArticles: !!(videoData.articles && videoData.articles.length > 0),
+          articleCount: videoData.articles?.length || 0,
+          totalArticleWords: videoData.articles?.reduce((sum, a) => sum + a.wordCount, 0) || 0,
           hasProfile: !!args.profileData,
           channelName: args.profileData?.channelName,
           contentType: args.profileData?.contentType,
@@ -94,9 +102,11 @@ export const generateContentSimple = action({
         args.moodBoardReferences
       );
 
-      // Log if generating without transcription
-      if (!videoData.transcription) {
-        console.log(`Generating ${args.agentType} without transcription - using title only`);
+      // Log if generating without transcription or articles
+      if (!videoData.transcription && (!videoData.articles || videoData.articles.length === 0)) {
+        console.log(`Generating ${args.agentType} without transcription or articles - using title only`);
+      } else if (videoData.articles && videoData.articles.length > 0 && !videoData.transcription) {
+        console.log(`Generating ${args.agentType} from article content (${videoData.articles.length} articles)`);
       }
 
       // Optimize generation parameters based on content type
@@ -297,6 +307,11 @@ function buildPrompt(
       text: string;
       format: string;
     }>;
+    articles?: Array<{
+      title: string;
+      content: string;
+      wordCount: number;
+    }>;
     duration?: number;
     resolution?: { width: number; height: number };
     format?: string;
@@ -337,7 +352,21 @@ function buildPrompt(
     prompt += "\n";
   }
 
-  // Add manual transcriptions first if available
+  // Add articles first if available (prioritize written content)
+  if (videoData.articles && videoData.articles.length > 0) {
+    prompt += `📝 WRITTEN CONTENT PROVIDED:\n`;
+    videoData.articles.forEach((article, index) => {
+      prompt += `\n--- Article: "${article.title}" ---\n`;
+      prompt += `Word Count: ${article.wordCount} words\n\n`;
+      const preview = article.content.length > 3000 
+        ? article.content.slice(0, 3000) + "\n\n[Article continues...]"
+        : article.content;
+      prompt += `${preview}\n`;
+    });
+    prompt += `\n`;
+  }
+  
+  // Add manual transcriptions if available
   if (videoData.manualTranscriptions && videoData.manualTranscriptions.length > 0) {
     prompt += `📄 MANUAL TRANSCRIPTIONS PROVIDED:\n`;
     videoData.manualTranscriptions.forEach((transcript, index) => {
