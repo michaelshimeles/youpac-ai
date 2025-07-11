@@ -36,8 +36,8 @@ interface SharedCanvasProps {
       _id: string;
       title: string;
       url: string;
-      duration?: number;
-      fileSize?: number;
+      duration: number;
+      fileSize: number;
       transcription?: string;
     };
     agents: Array<{

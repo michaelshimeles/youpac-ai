@@ -37,7 +37,7 @@ export const VideoNode = memo(({ data, selected }: NodeProps) => {
   const [isHovering, setIsHovering] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout>();
   
   // Cleanup timeout on unmount
   useEffect(() => {

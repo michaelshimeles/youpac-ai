@@ -151,8 +151,7 @@ export async function extractVideoMetadata(
       const frameCount = 5; // Extract 5 frames
       
       for (let i = 0; i < frameCount; i++) {
-        const duration = metadata.duration || 0;
-        const timestamp = (i + 1) / (frameCount + 1) * duration;
+        const timestamp = (i + 1) / (frameCount + 1) * metadata.duration;
         const outputName = `thumb_${i}.jpg`;
         
         await ffmpeg.exec([

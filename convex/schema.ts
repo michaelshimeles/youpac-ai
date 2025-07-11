@@ -68,8 +68,7 @@ export default defineSchema({
     .index("by_created", ["createdAt"]),
 
   agents: defineTable({
-    videoId: v.optional(v.id("videos")),
-    articleId: v.optional(v.id("articles")),
+    videoId: v.id("videos"),
     userId: v.string(),
     projectId: v.optional(v.id("projects")),
     type: v.union(
@@ -197,24 +196,4 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_project", ["projectId"])
     .index("by_video", ["videoId"]),
-    
-  articles: defineTable({
-    userId: v.string(),
-    projectId: v.id("projects"),
-    title: v.string(),
-    content: v.string(),
-    format: v.optional(v.string()), // "markdown", "plain", etc.
-    wordCount: v.number(),
-    fileName: v.optional(v.string()),
-    fileStorageId: v.optional(v.id("_storage")),
-    canvasPosition: v.object({
-      x: v.number(),
-      y: v.number(),
-    }),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_user", ["userId"])
-    .index("by_project", ["projectId"])
-    .index("by_created", ["createdAt"]),
 });

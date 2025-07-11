@@ -192,7 +192,7 @@ export default function Page() {
               </div>
               <CardContent className="p-6">
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-6">
                     <div className="grid gap-6 sm:grid-cols-2">
                       <FormField
                         control={form.control}
@@ -236,7 +236,7 @@ export default function Page() {
                     </div>
 
                     <FormField
-                      control={form.control as any}
+                      control={form.control}
                       name="niche"
                       render={({ field }) => (
                         <FormItem>
@@ -282,7 +282,7 @@ export default function Page() {
                   <form className="space-y-6">
 
                     <FormField
-                      control={form.control as any}
+                      control={form.control}
                       name="tone"
                       render={({ field }) => (
                         <FormItem>
@@ -306,7 +306,7 @@ export default function Page() {
                     />
 
                     <FormField
-                      control={form.control as any}
+                      control={form.control}
                       name="targetAudience"
                       render={({ field }) => (
                         <FormItem>
@@ -389,7 +389,7 @@ export default function Page() {
             {/* Save Button */}
             <div className="flex justify-end">
               <Button 
-                onClick={form.handleSubmit(onSubmit)}
+                onClick={form.handleSubmit(onSubmit as any)}
                 disabled={isSubmitting}
                 size="lg"
                 className="gap-2"

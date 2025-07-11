@@ -67,7 +67,7 @@ const extractYouTubeId = (url: string): string | null => {
 };
 
 export const MoodBoardNode = memo(({ data, selected }: NodeProps) => {
-  const nodeData = data as unknown as MoodBoardNodeData;
+  const nodeData = data as MoodBoardNodeData;
   const [isAdding, setIsAdding] = useState(false);
   const [newUrl, setNewUrl] = useState("");
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
