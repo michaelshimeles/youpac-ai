@@ -1,7 +1,7 @@
-import type { LoaderFunctionArgs } from "react-router";
+import type { Route } from "./+types/$";
 
 // Catch-all route for unmatched paths
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   
   // Handle Chrome DevTools JSON file request

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import { Id } from "./_generated/dataModel";
 
 // Create a share link
 export const createShareLink = mutation({
@@ -87,17 +87,7 @@ export const getSharedCanvas = query({
       .withIndex("by_project", (q) => q.eq("projectId", share.projectId))
       .first();
     
-    // If no video, check for articles
-    let article = null;
     if (!video) {
-      article = await ctx.db
-        .query("articles")
-        .withIndex("by_project", (q) => q.eq("projectId", share.projectId))
-        .first();
-    }
-    
-    // If neither video nor article exists, return null
-    if (!video && !article) {
       return null;
     }
 
@@ -113,21 +103,14 @@ export const getSharedCanvas = query({
         name: project.title, // projects have 'title' not 'name'
         thumbnail: project.thumbnail,
       },
-      video: video ? {
+      video: {
         _id: video._id,
         title: video.title || "",
         url: video.videoUrl || "",
         duration: video.duration,
         fileSize: video.fileSize,
         transcription: video.transcription,
-      } : null,
-      article: article ? {
-        _id: article._id,
-        title: article.title || "",
-        content: article.content || "",
-        format: article.format || "txt",
-        wordCount: article.wordCount || 0,
-      } : null,
+      },
       agents: agents.map(agent => ({
         _id: agent._id,
         type: agent.type,

@@ -12,7 +12,6 @@ import { extractVideoMetadata } from "~/lib/video-metadata";
 
 import { compressAudioFile, getFileSizeMB, isFileTooLarge } from "~/lib/audio-compression";
 import type { ParsedTranscription } from "~/utils/transcription-upload";
-import { parseTranscriptionFile } from "~/utils/transcription-upload";
 import { AgentNode } from "./AgentNode";
 import { ContentModal } from "./ContentModal";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
@@ -32,16 +31,12 @@ import { VideoNode } from "./VideoNode";
 import { VideoPlayerModal } from "./VideoPlayerModal";
 import { TranscriptionNode } from "./TranscriptionNode";
 import { MoodBoardNode } from "./MoodBoardNode";
-import { ArticleNode } from "./ArticleNode";
-import { ArticleViewModal } from "./ArticleViewModal";
-import { ArticleEditModal } from "./ArticleEditModal";
 
 const nodeTypes: NodeTypes = {
   video: VideoNode,
   agent: AgentNode,
   transcription: TranscriptionNode,
   moodboard: MoodBoardNode,
-  article: ArticleNode,
 };
 
 function CanvasContent({ projectId }: { projectId: Id<"projects"> }) {
@@ -104,14 +99,10 @@ function InnerCanvas({
   const [transcriptionLoading, setTranscriptionLoading] = useState(false);
   const [transcriptionVideoId, setTranscriptionVideoId] = useState<Id<"videos"> | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string; duration?: number; fileSize?: number } | null>(null);
-  const [articleViewModalOpen, setArticleViewModalOpen] = useState(false);
-  const [articleEditModalOpen, setArticleEditModalOpen] = useState(false);
-  const [selectedArticle, setSelectedArticle] = useState<{ id: string; title: string; content: string; format: string } | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [transcriptionUploadVideoId, setTranscriptionUploadVideoId] = useState<Id<"videos"> | null>(null);
   const [enableEdgeAnimations, setEnableEdgeAnimations] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
-  const [isFileDragging, setIsFileDragging] = useState(false);
   const [showMiniMap, setShowMiniMap] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [nodesToDelete, setNodesToDelete] = useState<Node[]>([]);
@@ -158,7 +149,6 @@ function InnerCanvas({
   const projectVideos = useQuery(api.videos.listByProject, { projectId });
   const projectAgents = useQuery(api.agents.getByProject, { projectId });
   const projectTranscriptions = useQuery(api.transcriptions.listByProject, { projectId });
-  const projectArticles = useQuery(api.articles.listByProject, { projectId });
   const userProfile = useQuery(api.profiles.get);
   
   // Convex mutations
@@ -184,10 +174,6 @@ function InnerCanvas({
   const createTranscription = useMutation(api.transcriptions.create);
   const updateTranscriptionPosition = useMutation(api.transcriptions.updatePosition);
   const deleteTranscription = useMutation(api.transcriptions.remove);
-  const createArticle = useMutation(api.articles.create);
-  const updateArticle = useMutation(api.articles.update);
-  const updateArticlePosition = useMutation(api.articles.updatePosition);
-  const deleteArticle = useMutation(api.articles.remove);
 
 
   
@@ -281,12 +267,6 @@ function InnerCanvas({
         .map((e: any) => nodesRef.current.find((n: any) => n.id === e.source))
         .filter(Boolean);
       
-      // Find connected article nodes
-      const connectedArticleNodes = edgesRef.current
-        .filter((e: any) => e.target === nodeId && e.source?.includes('article'))
-        .map((e: any) => nodesRef.current.find((n: any) => n.id === e.source))
-        .filter(Boolean);
-      
       // Find connected mood board nodes
       const connectedMoodBoardNodes = edgesRef.current
         .filter((e: any) => e.target === nodeId && e.source?.includes('moodboard'))
@@ -326,11 +306,6 @@ function InnerCanvas({
           text: string;
           format: string;
         }>;
-        articles?: Array<{
-          title: string;
-          content: string;
-          wordCount: number;
-        }>;
         duration?: number;
         resolution?: { width: number; height: number };
         format?: string;
@@ -354,26 +329,6 @@ function InnerCanvas({
             preview: t.text.substring(0, 100) + '...'
           }))
         });
-      }
-      
-      // Collect all articles from connected article nodes
-      const articles = connectedArticleNodes.map((node: any) => ({
-        title: node.data.title || "Untitled Article",
-        content: node.data.content || "",
-        wordCount: node.data.wordCount || 0,
-      }));
-      
-      // Log articles being used
-      if (articles.length > 0) {
-        console.log(`[Canvas] 📝 Articles being sent to ${agentNode.data.type} agent:`, {
-          count: articles.length,
-          articles: articles.map((a: any) => ({
-            title: a.title,
-            wordCount: a.wordCount,
-            preview: a.content.substring(0, 100) + '...'
-          }))
-        });
-        toast.info(`Using ${articles.length} article(s) for generation`);
       }
       
       // Collect mood board items
@@ -400,7 +355,6 @@ function InnerCanvas({
           title: videoNode.data.title as string,
           transcription: video?.transcription,
           manualTranscriptions: manualTranscriptions.length > 0 ? manualTranscriptions : undefined,
-          articles: articles.length > 0 ? articles : undefined,
           duration: video?.duration,
           resolution: video?.resolution,
           format: video?.format,
@@ -412,21 +366,13 @@ function InnerCanvas({
         } else if (manualTranscriptions.length > 0 && !video?.transcription) {
           toast.info(`Using ${manualTranscriptions.length} manual transcription(s) for generation`);
         }
-      } else if (manualTranscriptions.length > 0 || articles.length > 0) {
-        // No video node but we have manual transcriptions or articles
+      } else if (manualTranscriptions.length > 0) {
+        // No video node but we have manual transcriptions
         videoData = {
-          title: articles.length > 0 ? articles[0].title : "Untitled Content",
-          manualTranscriptions: manualTranscriptions.length > 0 ? manualTranscriptions : undefined,
-          articles: articles.length > 0 ? articles : undefined,
+          title: "Untitled Content",
+          manualTranscriptions,
         };
-        
-        if (manualTranscriptions.length > 0 && articles.length > 0) {
-          toast.info(`Using ${manualTranscriptions.length} transcription(s) and ${articles.length} article(s) for generation`);
-        } else if (manualTranscriptions.length > 0) {
-          toast.info(`Using ${manualTranscriptions.length} manual transcription(s) for generation`);
-        } else {
-          toast.info(`Using ${articles.length} article(s) for generation`);
-        }
+        toast.info(`Using ${manualTranscriptions.length} manual transcription(s) for generation`);
       }
       
       const connectedAgentOutputs = connectedAgentNodes.map((n: any) => ({
@@ -1313,7 +1259,6 @@ function InnerCanvas({
       if (
         (sourceNode.type === 'video' && targetNode.type === 'agent') ||
         (sourceNode.type === 'transcription' && targetNode.type === 'agent') ||
-        (sourceNode.type === 'article' && targetNode.type === 'agent') ||
         (sourceNode.type === 'moodboard' && targetNode.type === 'agent') ||
         (sourceNode.type === 'agent' && targetNode.type === 'agent')
       ) {
@@ -1321,7 +1266,6 @@ function InnerCanvas({
           ...params,
           animated: enableEdgeAnimations && !isDragging,
           style: sourceNode.type === 'transcription' ? { stroke: '#a855f7', strokeWidth: 2 } : 
-                 sourceNode.type === 'article' ? { stroke: '#f97316', strokeWidth: 2 } :
                  sourceNode.type === 'moodboard' ? { stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' } : undefined,
         };
         setEdges((eds: any) => addEdge(newEdge, eds));
@@ -1334,8 +1278,6 @@ function InnerCanvas({
             connectionId = sourceNode.data.videoId;
           } else if (sourceNode.data.transcriptionId) {
             connectionId = sourceNode.data.transcriptionId;
-          } else if (sourceNode.data.articleId) {
-            connectionId = sourceNode.data.articleId;
           }
           
           if (connectionId) {
@@ -1366,11 +1308,9 @@ function InnerCanvas({
           }
         }
         
-        // Show success message for transcription and article connections
+        // Show success message for transcription connections
         if (sourceNode.type === 'transcription' && targetNode.type === 'agent') {
           toast.success(`Connected ${sourceNode.data.fileName || 'transcription'} to ${targetNode.data.type} agent`);
-        } else if (sourceNode.type === 'article' && targetNode.type === 'agent') {
-          toast.success(`Connected "${sourceNode.data.title || 'article'}" to ${targetNode.data.type} agent`);
         }
       }
     },
@@ -1395,10 +1335,6 @@ function InnerCanvas({
             // Delete transcription from database
             await deleteTranscription({ id: node.data.transcriptionId as Id<"transcriptions"> });
             toast.success("Transcription deleted");
-          } else if (node.type === 'article' && node.data.articleId) {
-            // Delete article from database
-            await deleteArticle({ id: node.data.articleId as Id<"articles"> });
-            toast.success("Article deleted");
           }
         } catch (error) {
           console.error("Failed to delete node:", error);
@@ -1409,7 +1345,7 @@ function InnerCanvas({
         }
       }
     },
-    [deleteVideo, deleteAgent, deleteTranscription, deleteArticle, setNodes]
+    [deleteVideo, deleteAgent, deleteTranscription, setNodes]
   );
   
   // Handle share functionality
@@ -1596,49 +1532,6 @@ function InnerCanvas({
       }
     } else {
       toast.success("Content updated!");
-    }
-  };
-
-  const handleArticleSave = async (articleId: string, title: string, content: string) => {
-    try {
-      // Update the article in the database
-      await updateArticle({
-        id: articleId as Id<"articles">,
-        title: title,
-        content: content,
-        wordCount: content.trim().split(/\s+/).filter(word => word.length > 0).length,
-      });
-
-      // Update the node in the canvas
-      setNodes((nds: any) =>
-        nds.map((node: any) =>
-          node.id === `article_${articleId}`
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  title: title,
-                  content: content,
-                  wordCount: content.trim().split(/\s+/).filter(word => word.length > 0).length,
-                },
-              }
-            : node
-        )
-      );
-
-      // Update the selected article state with the new content
-      if (selectedArticle && selectedArticle.id === articleId) {
-        setSelectedArticle({
-          ...selectedArticle,
-          title: title,
-          content: content,
-        });
-      }
-
-      toast.success("Article updated successfully!");
-    } catch (error) {
-      console.error("Failed to update article:", error);
-      toast.error("Failed to save article changes");
     }
   };
 
@@ -2182,148 +2075,6 @@ function InnerCanvas({
     }
   };
 
-  // Handle text file drop
-  const handleTextDrop = async (file: File, position: { x: number; y: number }) => {
-    try {
-      // Validate file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('File too large. Maximum size is 10MB');
-        return;
-      }
-
-      // Show processing toast
-      toast.info(`Processing ${file.name}...`);
-
-      const fileContent = await file.text();
-      const extension = file.name.split('.').pop()?.toLowerCase();
-      
-      // Check if it's a transcription format (SRT, VTT) or general text
-      const transcriptionFormats = ['srt', 'vtt', 'webvtt'];
-      const isTranscriptionFormat = extension && transcriptionFormats.includes(extension);
-      
-      if (isTranscriptionFormat) {
-        // Parse as transcription
-        const parsedTranscription = await parseTranscriptionFile(file);
-        
-        // Calculate word count and duration
-        const wordCount = parsedTranscription.fullText.trim().split(/\s+/).length;
-        let duration = 0;
-        if (parsedTranscription.segments.length > 0) {
-          const lastSegment = parsedTranscription.segments[parsedTranscription.segments.length - 1];
-          duration = lastSegment.end;
-        }
-        
-        // Save transcription to database
-        const transcriptionId = await createTranscription({
-          projectId,
-          videoId: undefined,
-          fileName: file.name,
-          format: parsedTranscription.format,
-          fullText: parsedTranscription.fullText,
-          segments: parsedTranscription.segments,
-          wordCount,
-          duration,
-          fileStorageId: undefined,
-          canvasPosition: position,
-        });
-        
-        // Create transcription node
-        const transcriptionNodeId = `transcription_${transcriptionId}`;
-        const transcriptionNode: Node = {
-          id: transcriptionNodeId,
-          type: 'transcription',
-          position,
-          data: {
-            transcriptionId,
-            fileName: file.name,
-            format: parsedTranscription.format,
-            transcription: parsedTranscription.fullText,
-            segments: parsedTranscription.segments,
-            wordCount,
-            duration,
-            uploadedAt: Date.now(),
-            onView: () => {
-              setSelectedTranscription({ text: parsedTranscription.fullText, title: file.name });
-              setTranscriptionModalOpen(true);
-            },
-          },
-        };
-        
-        setNodes((nds: any) => [...nds, transcriptionNode]);
-        toast.success(`Transcription "${file.name}" added to canvas!`);
-      } else {
-        // Treat as article/written content
-        const wordCount = fileContent.trim().split(/\s+/).length;
-        
-        // Extract title from first line or use filename
-        const lines = fileContent.trim().split('\n');
-        const title = lines[0]?.trim() || file.name.replace(/\.[^/.]+$/, "");
-        
-        // Save article to database
-        const articleId = await createArticle({
-          projectId,
-          title,
-          content: fileContent,
-          format: extension || 'txt',
-          wordCount,
-          fileName: file.name,
-          fileStorageId: undefined,
-          canvasPosition: position,
-        });
-        
-        // Create article node
-        const articleNodeId = `article_${articleId}`;
-        const articleNode: Node = {
-          id: articleNodeId,
-          type: 'article',
-          position,
-          data: {
-            articleId,
-            title,
-            content: fileContent,
-            format: extension || 'txt',
-            wordCount,
-            fileName: file.name,
-            uploadedAt: Date.now(),
-            onView: () => {
-              // Get the latest data from the node using ref to avoid closure issues
-              const currentNode = nodesRef.current.find((n: any) => n.id === articleNodeId);
-              const currentData = currentNode?.data || {};
-              setSelectedArticle({
-                id: articleId,
-                title: currentData.title || title,
-                content: currentData.content || fileContent,
-                format: currentData.format || extension || 'txt',
-              });
-              setArticleViewModalOpen(true);
-            },
-            onEdit: () => {
-              // Get the latest data from the node using ref to avoid closure issues
-              const currentNode = nodesRef.current.find((n: any) => n.id === articleNodeId);
-              const currentData = currentNode?.data || {};
-              setSelectedArticle({
-                id: articleId,
-                title: currentData.title || title,
-                content: currentData.content || fileContent,
-                format: currentData.format || extension || 'txt',
-              });
-              setArticleEditModalOpen(true);
-            },
-          },
-        };
-        
-        setNodes((nds: any) => [...nds, articleNode]);
-        toast.success(`Article "${title}" added to canvas!`);
-      }
-      
-      toast.info("Connect to an agent to generate content", { duration: 5000 });
-      
-    } catch (error) {
-      console.error("Failed to process text file:", error);
-      toast.error(error instanceof Error ? error.message : 'Failed to process text file');
-    }
-  };
-
   // Retry transcription for a failed video
   // Create refs for viewport saving
   const viewportRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
@@ -2846,28 +2597,17 @@ function InnerCanvas({
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    
-    // Check if dragging files
-    if (event.dataTransfer.items && event.dataTransfer.items.length > 0) {
-      const item = event.dataTransfer.items[0];
-      if (item.kind === 'file') {
-        setIsFileDragging(true);
-      }
-    }
   }, []);
 
   const onDrop = useCallback(
     (event: DragEvent) => {
       event.preventDefault();
-      setIsFileDragging(false);
 
       const type = event.dataTransfer.getData("application/reactflow");
       
-      // Handle file drop
+      // Handle video file drop
       if (event.dataTransfer.files.length > 0) {
         const file = event.dataTransfer.files[0];
-        
-        // Handle video file drop
         if (file.type.startsWith("video/")) {
           if (!reactFlowInstance) return;
           
@@ -2892,24 +2632,6 @@ function InnerCanvas({
           handleVideoUpload(file, position);
           return;
         }
-        
-        // Handle text file drop
-        const textExtensions = ['txt', 'srt', 'vtt', 'webvtt', 'json'];
-        const extension = file.name.split('.').pop()?.toLowerCase();
-        if (file.type === "text/plain" || (extension && textExtensions.includes(extension))) {
-          if (!reactFlowInstance) return;
-          
-          const desiredPosition = reactFlowInstance.screenToFlowPosition({
-            x: event.clientX,
-            y: event.clientY,
-          });
-          
-          const position = findNonOverlappingPosition(desiredPosition, 'transcription');
-          
-          // Handle text/transcription file drop
-          handleTextDrop(file, position);
-          return;
-        }
       }
 
       // Handle node type drop
@@ -2924,25 +2646,16 @@ function InnerCanvas({
       
       const position = findNonOverlappingPosition(desiredPosition, type);
 
-      // Find the most recent video or article node to associate with this agent
-      const contentNodes = nodes.filter((n: any) => 
-        (n.type === 'video' && n.data.videoId) || 
-        (n.type === 'article' && n.data.articleId)
-      );
-      
-      if (contentNodes.length === 0) {
-        toast.error("Please add a video or article first before adding agents");
+      // Find the first video node to associate with this agent
+      const videoNode = nodes.find((n: any) => n.type === 'video' && n.data.videoId);
+      if (!videoNode) {
+        toast.error("Please add a video first before adding agents");
         return;
       }
 
-      // Use the most recently added content node (last in the array)
-      const contentNode = contentNodes[contentNodes.length - 1];
-      const isVideo = contentNode.type === 'video';
-
-      // Create agent in database - only pass the relevant ID
+      // Create agent in database
       createAgent({
-        ...(isVideo ? { videoId: contentNode.data.videoId as Id<"videos"> } : {}),
-        ...(!isVideo ? { articleId: contentNode.data.articleId as Id<"articles"> } : {}),
+        videoId: videoNode.data.videoId as Id<"videos">,
         type: type as "title" | "description" | "thumbnail" | "tweets",
         canvasPosition: position,
       }).then((agentId) => {
@@ -2973,45 +2686,40 @@ function InnerCanvas({
 
         setNodes((nds: any) => nds.concat(newNode));
         
-        // Automatically create edge from content source to agent
-        const edgeId = `e${contentNode.id}-${nodeId}`;
+        // Automatically create edge from video to agent
+        const edgeId = `e${videoNode.id}-${nodeId}`;
         const newEdge: Edge = {
           id: edgeId,
-          source: contentNode.id,
+          source: videoNode.id,
           target: nodeId,
           animated: enableEdgeAnimations && !isDragging,
-          style: !isVideo ? { stroke: '#f97316', strokeWidth: 2 } : undefined,
         };
         setEdges((eds: any) => [...eds, newEdge]);
         
         // Update agent's connections in database
-        const connectionId = isVideo ? contentNode.data.videoId : contentNode.data.articleId;
         updateAgentConnections({
           id: agentId,
-          connections: [connectionId as string],
+          connections: [videoNode.data.videoId as string],
         }).catch((error) => {
           console.error("Failed to update agent connections:", error);
         });
         
-        toast.success(`${type} agent added and connected to ${isVideo ? 'video' : 'article'}`);
+        toast.success(`${type} agent added and connected to video`);
         
         // Just inform about transcription status, don't auto-generate
-        if (isVideo && contentNode.data.isTranscribing) {
+        if (videoNode.data.isTranscribing) {
           toast.info("Video is still being transcribed. Generate once complete.");
-        } else if (isVideo && contentNode.data.hasTranscription) {
+        } else if (videoNode.data.hasTranscription) {
           toast.info("Ready to generate content - click Generate on the agent node");
-        } else if (isVideo) {
-          toast.warning("No transcription available - content will be less accurate");
         } else {
-          // For articles
-          toast.info("Ready to generate content - click Generate on the agent node");
+          toast.warning("No transcription available - content will be less accurate");
         }
       }).catch((error) => {
         console.error("Failed to create agent:", error);
         toast.error("Failed to create agent");
       });
     },
-    [reactFlowInstance, setNodes, setEdges, handleVideoUpload, handleTextDrop, handleGenerate, nodes, createAgent, projectId, updateAgentConnections, handleChatButtonClick, handleRegenerateClick, createTranscription]
+    [reactFlowInstance, setNodes, setEdges, handleVideoUpload, handleGenerate, nodes, createAgent, projectId, updateAgentConnections, handleChatButtonClick, handleRegenerateClick]
   );
 
   // Load existing videos, agents, and transcriptions from the project
@@ -3034,7 +2742,7 @@ function InnerCanvas({
       })));
     }
     
-    if (!hasLoadedFromDB && projectVideos !== undefined && projectAgents !== undefined && projectTranscriptions !== undefined && projectArticles !== undefined) {
+    if (!hasLoadedFromDB && projectVideos !== undefined && projectAgents !== undefined && projectTranscriptions !== undefined) {
       const videoNodes: Node[] = projectVideos.map((video) => ({
         id: `video_${video._id}`,
         type: "video",
@@ -3115,53 +2823,12 @@ function InnerCanvas({
         },
       }));
 
-      // Create article nodes from database
-      const articleNodes: Node[] = projectArticles.map((article) => ({
-        id: `article_${article._id}`,
-        type: "article",
-        position: article.canvasPosition,
-        data: {
-          articleId: article._id,
-          title: article.title,
-          content: article.content,
-          format: article.format,
-          wordCount: article.wordCount,
-          fileName: article.fileName,
-          uploadedAt: article.createdAt,
-          onView: () => {
-            // Get the latest data from the node using ref to avoid closure issues
-            const currentNode = nodesRef.current.find((n: any) => n.id === `article_${article._id}`);
-            const currentData = currentNode?.data || {};
-            setSelectedArticle({
-              id: article._id,
-              title: currentData.title || article.title,
-              content: currentData.content || article.content,
-              format: currentData.format || article.format || 'markdown',
-            });
-            setArticleViewModalOpen(true);
-          },
-          onEdit: () => {
-            // Get the latest data from the node using ref to avoid closure issues
-            const currentNode = nodesRef.current.find((n: any) => n.id === `article_${article._id}`);
-            const currentData = currentNode?.data || {};
-            setSelectedArticle({
-              id: article._id,
-              title: currentData.title || article.title,
-              content: currentData.content || article.content,
-              format: currentData.format || article.format || 'markdown',
-            });
-            setArticleEditModalOpen(true);
-          },
-        },
-      }));
-
       console.log("[Canvas] Setting all nodes:", {
         videos: videoNodes.length,
         agents: agentNodes.length,
         transcriptions: transcriptionNodes.length,
-        articles: articleNodes.length,
       });
-      setNodes([...videoNodes, ...agentNodes, ...transcriptionNodes, ...articleNodes]);
+      setNodes([...videoNodes, ...agentNodes, ...transcriptionNodes]);
       
       // Load chat history from agents
       const allMessages: typeof chatMessages = [];
@@ -3202,12 +2869,6 @@ function InnerCanvas({
               const transcriptionNode = transcriptionNodes.find(tn => tn.data.transcriptionId === connectionId);
               if (transcriptionNode) {
                 sourceNodeId = transcriptionNode.id;
-              } else {
-                // Check if it's an article ID
-                const articleNode = articleNodes.find(an => an.data.articleId === connectionId);
-                if (articleNode) {
-                  sourceNodeId = articleNode.id;
-                }
               }
             }
           }
@@ -3242,9 +2903,9 @@ function InnerCanvas({
       
       setEdges(edges);
       setHasLoadedFromDB(true);
-      console.log("[Canvas] Finished loading from DB, total nodes:", [...videoNodes, ...agentNodes, ...transcriptionNodes, ...articleNodes].length);
+      console.log("[Canvas] Finished loading from DB, total nodes:", [...videoNodes, ...agentNodes, ...transcriptionNodes].length);
     }
-  }, [projectVideos, projectAgents, projectTranscriptions, projectArticles, hasLoadedFromDB, setNodes, setEdges, handleGenerate, handleChatButtonClick, handleViewTranscription, retryTranscription, handleManualTranscriptionUpload, handleVideoClick, handleRegenerateClick]);
+  }, [projectVideos, projectAgents, projectTranscriptions, hasLoadedFromDB, setNodes, setEdges, handleGenerate, handleChatButtonClick, handleViewTranscription, retryTranscription, handleManualTranscriptionUpload, handleVideoClick, handleRegenerateClick]);
   
   // Load canvas viewport state - only run once when everything is ready
   useEffect(() => {
@@ -3680,48 +3341,21 @@ function InnerCanvas({
                   <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-xl blur-xl" />
                   <div className="relative rounded-xl bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/20 p-4 space-y-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex gap-1">
-                        <Video className="h-5 w-5 text-primary" />
-                        <FileText className="h-5 w-5 text-primary" />
-                      </div>
+                      <Video className="h-5 w-5 text-primary" />
                       <span className="text-sm font-medium">Quick Start</span>
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Drag a video or text file directly onto the canvas to begin
+                      Drag a video file directly onto the canvas to begin
                     </p>
-                    <div className="text-xs text-muted-foreground/70 leading-relaxed">
-                      Supports MP4, MOV, TXT, and more
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => {
-                          if (fileInputRef.current) {
-                            fileInputRef.current.accept = "video/*";
-                            fileInputRef.current.click();
-                          }
-                        }}
-                        variant="secondary"
-                        size="sm"
-                        className="flex-1"
-                      >
-                        <Video className="h-4 w-4 mr-1.5" />
-                        Video
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          if (fileInputRef.current) {
-                            fileInputRef.current.accept = "text/*,.txt,.md,.json";
-                            fileInputRef.current.click();
-                          }
-                        }}
-                        variant="secondary"
-                        size="sm"
-                        className="flex-1"
-                      >
-                        <FileText className="h-4 w-4 mr-1.5" />
-                        Article
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Video
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -3734,7 +3368,7 @@ function InnerCanvas({
                   size="icon"
                   variant="secondary"
                   className="w-full hover:bg-primary/10"
-                  title="Upload Content (Video or Article)"
+                  title="Upload Video"
                 >
                   <Upload className="h-5 w-5" />
                 </Button>
@@ -3925,15 +3559,6 @@ function InnerCanvas({
                 } catch (error) {
                   console.error("Failed to update transcription position:", error);
                 }
-              } else if (node.type === 'article' && node.data.articleId) {
-                try {
-                  await updateArticlePosition({
-                    id: node.data.articleId as Id<"articles">,
-                    position: node.position,
-                  });
-                } catch (error) {
-                  console.error("Failed to update article position:", error);
-                }
               }
             }}
             onEdgesChange={onEdgesChange}
@@ -3942,7 +3567,6 @@ function InnerCanvas({
             onInit={setReactFlowInstance}
             onDrop={onDrop}
             onDragOver={onDragOver}
-            onDragLeave={() => setIsFileDragging(false)}
             onViewportChange={onViewportChange}
             nodeTypes={nodeTypes}
             deleteKeyCode={["Backspace", "Delete"]}
@@ -3953,22 +3577,6 @@ function InnerCanvas({
             maxZoom={2}
             preventScrolling={false}
           >
-            {/* File drop indicator */}
-            {isFileDragging && (
-              <div className="absolute inset-0 z-50 pointer-events-none">
-                <div className="h-full w-full bg-primary/5 border-2 border-dashed border-primary/50 rounded-lg flex items-center justify-center">
-                  <div className="bg-background/95 backdrop-blur-sm px-6 py-4 rounded-lg shadow-xl border border-primary/50">
-                    <p className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <Upload className="h-5 w-5" />
-                      Drop your file here
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Supports videos, transcriptions (SRT, VTT, TXT), and text files
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
             <Background 
               variant="dots" 
               gap={16} 
@@ -4108,27 +3716,6 @@ function InnerCanvas({
           />
         )}
         
-        {/* Article View Modal */}
-        <ArticleViewModal
-          isOpen={articleViewModalOpen}
-          onClose={() => {
-            setArticleViewModalOpen(false);
-            setSelectedArticle(null);
-          }}
-          article={selectedArticle}
-        />
-
-        {/* Article Edit Modal */}
-        <ArticleEditModal
-          isOpen={articleEditModalOpen}
-          onClose={() => {
-            setArticleEditModalOpen(false);
-            setSelectedArticle(null);
-          }}
-          article={selectedArticle}
-          onSave={handleArticleSave}
-        />
-        
         {/* Floating Chat - Always Visible */}
         <FloatingChat
           agents={nodes
@@ -4144,11 +3731,11 @@ function InnerCanvas({
           initialInputValue={chatInput}
         />
         
-        {/* Hidden file input for content upload */}
+        {/* Hidden file input for video upload */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="video/*,text/*,.txt,.md,.json"
+          accept="video/*"
           style={{ display: 'none' }}
           onChange={async (e) => {
             const file = e.target.files?.[0];
@@ -4162,14 +3749,7 @@ function InnerCanvas({
                   x: centerX,
                   y: centerY,
                 });
-                
-                // Check if it's a text file
-                const extension = file.name.split('.').pop()?.toLowerCase();
-                if (extension && ['txt', 'md', 'json'].includes(extension)) {
-                  await handleTextDrop(file, position);
-                } else {
-                  await handleVideoUpload(file, position);
-                }
+                await handleVideoUpload(file, position);
               }
             }
             // Reset the input

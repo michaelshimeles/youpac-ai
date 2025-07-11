@@ -1,11 +1,9 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
 
 export const create = mutation({
   args: {
-    videoId: v.optional(v.id("videos")),
-    articleId: v.optional(v.id("articles")),
+    videoId: v.id("videos"),
     type: v.union(
       v.literal("title"),
       v.literal("description"),
@@ -22,43 +20,20 @@ export const create = mutation({
     if (!identity) throw new Error("Unauthorized");
     const userId = identity.subject;
 
-    // Must have either a video or article
-    if (!args.videoId && !args.articleId) {
-      throw new Error("Agent must be associated with either a video or article");
-    }
-
-    let projectId: string | undefined;
-
     // Verify video exists and belongs to user
-    if (args.videoId) {
-      const video = await ctx.db.get(args.videoId);
-      if (!video || video.userId !== userId) {
-        throw new Error("Video not found or unauthorized");
-      }
-      if (!video.projectId) {
-        throw new Error("Video must belong to a project");
-      }
-      projectId = video.projectId;
+    const video = await ctx.db.get(args.videoId);
+    if (!video || video.userId !== userId) {
+      throw new Error("Video not found or unauthorized");
     }
 
-    // Verify article exists and belongs to user
-    if (args.articleId) {
-      const article = await ctx.db.get(args.articleId);
-      if (!article || article.userId !== userId) {
-        throw new Error("Article not found or unauthorized");
-      }
-      projectId = article.projectId;
-    }
-
-    if (!projectId) {
-      throw new Error("Could not determine project ID");
+    if (!video.projectId) {
+      throw new Error("Video must belong to a project");
     }
 
     return await ctx.db.insert("agents", {
       videoId: args.videoId,
-      articleId: args.articleId,
       userId,
-      projectId: projectId as Id<"projects">,
+      projectId: video.projectId,
       type: args.type,
       draft: "",
       connections: [],
