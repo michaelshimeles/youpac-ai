@@ -29,10 +29,6 @@ export default function Hero({
   loaderData?: LoaderData;
 }) {
   const liveStats = useQuery(api.stats.getHeroStats);
-  
-  // Check if Convex query failed (returns undefined when there's an error)
-  const isConvexDown = liveStats === undefined && !loaderData?.initialStats;
-  
   // Use live stats if available, otherwise fall back to initial stats
   const stats = liveStats || loaderData?.initialStats;
 
@@ -115,22 +111,6 @@ export default function Hero({
               All powered by cutting-edge AI, designed for YouTube creators.
             </p>
 
-            {isConvexDown && (
-              <div className="max-w-2xl mx-auto mt-6 mb-8">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                  <div className="text-red-800 font-medium mb-2">
-                    🚨 Service Currently Unavailable
-                  </div>
-                  <div className="text-sm text-red-600 mb-2">
-                    YouPac AI is temporarily down for maintenance. All features including video processing, AI agents, and project management are currently unavailable.
-                  </div>
-                  <div className="text-xs text-red-500">
-                    Please check back in a few minutes. We apologize for the inconvenience.
-                  </div>
-                </div>
-              </div>
-            )}
-            
             {stats && (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6 mb-8 max-w-2xl mx-auto">
                   <div className="relative group">
@@ -167,29 +147,17 @@ export default function Hero({
                 </div>
             )}
             <div className="flex items-center justify-center gap-2">
-              {isConvexDown ? (
+              <Link to={loaderData?.isSignedIn ? "/dashboard" : "/sign-up"}>
                 <ShineBorder
                   borderWidth={3}
-                  className="border h-auto w-auto p-2 bg-white/5 backdrop-blur-md dark:bg-black/5 opacity-50"
-                  color={["#FF0000", "#FF4444", "#FF8888"]}
+                  className="border cursor-pointer h-auto w-auto p-2 bg-white/5 backdrop-blur-md dark:bg-black/5"
+                  color={["#FF007F", "#39FF14", "#00FFFF"]}
                 >
-                  <Button className="w-full rounded-xl" disabled>
-                    Service Unavailable
+                  <Button className="w-full rounded-xl" >
+                    Start Creating
                   </Button>
                 </ShineBorder>
-              ) : (
-                <Link to={loaderData?.isSignedIn ? "/dashboard" : "/sign-up"}>
-                  <ShineBorder
-                    borderWidth={3}
-                    className="border cursor-pointer h-auto w-auto p-2 bg-white/5 backdrop-blur-md dark:bg-black/5"
-                    color={["#FF007F", "#39FF14", "#00FFFF"]}
-                  >
-                    <Button className="w-full rounded-xl" >
-                      Start Creating
-                    </Button>
-                  </ShineBorder>
-                </Link>
-              )}
+              </Link>
               <Link to={"https://github.com/michaelshimeles/youpac-ai"} target="_blank">
                 <Button className="rounded-xl" variant="outline">View on GitHub</Button>
               </Link>
